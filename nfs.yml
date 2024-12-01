@@ -1,0 +1,42 @@
+---
+- hosts: controllers[0]
+  collections:
+    - kubernetes.core
+  vars:
+    storageClass: ebs
+    size: "10Gi"
+    default: false
+    allow_expansion: true
+    reclaim: Delete
+    version: 1.8.0
+  tasks:
+    - name: Install openshift
+      pip:
+        name: openshift
+        state: present
+    - name: Create the NFS namespace
+      k8s:
+        kind: Namespace
+        name: nfs-provisioner
+        state: present
+    - name: Install the Gangesha NFS Helm repository
+      helm_repository:
+        name: nfs-ganesha
+        repo_url: https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
+        state: present
+    - name: Helm install Gangesha NFS
+      helm:
+        name: nfs-provisioner
+        namespace: nfs-provisioner
+        chart_ref: nfs-ganesha/nfs-server-provisioner
+        chart_version: "{{ version }}"
+        values:
+          persistence:
+            enabled: true
+            storageClass: "{{ storageClass }}"
+            size: "{{ size }}"
+          storageClass:
+            create: true
+            defaultClass: "{{ default }}"
+            allowVolumeExpansion: "{{ allow_expansion }}"
+            reclaimPolicy: "{{ reclaim }}"

@@ -1,0 +1,32 @@
+---
+- hosts: controllers[0]
+  collections:
+    - kubernetes.core
+  vars:
+    repositories:
+      - name: stable
+        url: https://charts.helm.sh/stable
+      - name: cloudve
+        url: https://raw.githubusercontent.com/CloudVE/helm-charts/master/
+  tasks:
+    - name: Install Helm
+      shell:
+        cmd: "curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash -s"
+        creates: /usr/local/bin/helm
+      become: yes
+
+    - name: Remove existing stable Helm repo
+      helm_repository:
+        name: stable
+        state: absent
+
+    - name: Install Helm repositoryies
+      helm_repository:
+        name: "{{ item.name }}"
+        state: present
+        repo_url: "{{ item.url }}"
+      loop: 
+      - name: stable
+        url: https://charts.helm.sh/stable
+      - name: cloudve
+        url: https://raw.githubusercontent.com/CloudVE/helm-charts/master/

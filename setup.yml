@@ -1,0 +1,25 @@
+---
+- hosts: nodes
+  tasks:
+    - name: Install Python3 and pip
+      apt:
+        name: "{{ item }}"
+        state: present
+        update_cache: yes
+      become: true
+      loop:
+        - python3
+        - python3-pip
+        - nfs-common
+    - name: Install openshift
+      pip:
+        name: openshift
+        state: present
+    - name: Check if the instance needs a reboot.
+      stat: 
+        path: /var/run/reboot-required
+      register: f
+    - name: Reboot if needed
+      reboot:
+      become: yes
+      when: f.stat.exists

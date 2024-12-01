@@ -1,0 +1,73 @@
+---
+- hosts: controllers[0]
+  vars:
+    cluster_hostname: galaxy
+    kubeconfig: ~/.kube/config
+    cinder_csi_version: 2.31.2
+  collections:
+    - kubernetes.core
+  tasks:
+    - name: Render the hostpath storage class template
+      k8s:
+        template:
+          path: templates/hostpath_storage_class.yaml.j2
+        state: present
+
+    - name: Render the ebs storage class
+      k8s:
+        template:
+          path: ebs_storage_class.yml.j2
+        state: present
+
+    - name: Create csi-drivers namespace
+      k8s:
+        kind: Namespace
+        name: csi-drivers
+        state: present
+
+    - when: kube_cloud_provider == "openstack"
+      block:      
+      - name: Add the Helm repository for the Cinder CSI driver
+        helm_repository:
+          name: cpo
+          repo_url: https://kubernetes.github.io/cloud-provider-openstack
+          state: present
+
+      - name: Helm install the OpenStack CSI Driver
+        helm:
+          name: cinder-csi
+          namespace: csi-drivers
+          chart_ref: cpo/openstack-cinder-csi
+          chart_version: "{{ cinder_csi_version }}"
+
+    - when: kube_cloud_provider == "gcp"
+      block:
+      - name: Add the wunderio Helm repository
+        helm_repository:
+          name: wunderio
+          repo_url: https://storage.googleapis.com/charts.wdr.io    
+          state: present
+      - name: Helm install RClone for GCP
+        helm:
+          name: rclone-csi
+          namespace: csi-drivers
+          chart_ref: wunderio/csi-rclone
+          values:
+            storageClass:
+              name: rclone
+            params:
+              remote: "google cloud storage"
+              remotePath: "{{ cluster_hostname | replace('.', '-') }}-gvl-data"      
+
+    - when: kube_cloud_provider == "aws"
+      block:
+      - name: Add the AWS Helm repository
+        helm_repository:
+          name: aws-ebs-csi-driver
+          repo_url: https://kubernetes-sigs.github.io/aws-ebs-csi-driver
+          state: present
+      - name: Install AWS Disk CSI Driver
+        helm:
+          name: aws-ebs-csi-driver
+          namespace: csi-drivers
+          chart_ref: aws-ebs-csi-driver/aws-ebs-csi-driver

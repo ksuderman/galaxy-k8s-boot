@@ -1,0 +1,74 @@
+configs:
+  galaxy.yml:
+    galaxy:
+      job_metrics_config_file: job_metrics_conf.yml
+      cleanup_job: onsuccess
+      admin_users: suderman@jhu.edu
+      master_api_key: galaxypassword
+      brand: Jetstream2
+  job_metrics_conf.yml:
+  - type: core
+  - type: cgroup
+  - type: cpuinfo
+  - type: meminfo
+  - type: uname
+  job_conf.yml:
+    execution:
+      environment:
+        tpv_dispatcher:
+          tpv_config_files:
+            - https://gxy.io/tpv/db.yml
+            - lib/galaxy/jobs/rules/tpv_rules_local.yml
+refdata:
+  enabled: true
+  type: cvmfs
+  pvc:
+    size: 10Gi
+cvmfs:
+  enabled: true
+  deployPostInstallFix: false
+  cvmfscsi:
+    cache:
+      alien:
+        enabled: true
+        pvc:
+          name: cvmfs-alien-cache
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  canary:
+    enabled: true
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+  - host: ~
+    paths:
+    - path: /galaxy
+  path: /galaxy
+initJob:
+  downloadToolConfs:
+    enabled: true
+jobHandlers:
+  startupDelay: 5
+persistence:
+  accessMode: ReadWriteMany
+  size: 100Gi
+  storageClass: nfs
+postgresql:
+  enabled: true
+  deploy: true
+  galaxyDatabasePassword: galaxydbpassword
+  persistence:
+    storageClass: nfs
+webHandlers:
+  startupDelay: 10
+workflowHandlers:
+  startupDelay: 0
+resources:
+  limits:
+    cpu: 3
+    memory: 16G
+    ephemeral-storage: 64Gi
+rabbitmq:
+  timeoutGracePeriod: 90

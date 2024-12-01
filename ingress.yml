@@ -1,0 +1,47 @@
+---
+- hosts: controllers[0]
+  collections:
+    - kubernetes.core
+  vars:
+    version: 4.2.5
+  tasks:
+    - pip:
+        name: openshift
+        state: present
+      #become: yes
+    - name: Create namespace for nginx ingress
+      #become: yes
+      k8s:
+        kind: Namespace
+        name: ingress-nginx
+        state: present
+
+    - name: Add helm repo for nginx ingress
+      helm_repository:
+        name: ingress-nginx
+        state: present
+        repo_url: https://kubernetes.github.io/ingress-nginx
+
+    - name: Helm install nginx ingress controller
+      helm:
+        name: ingress-nginx
+        namespace: ingress-nginx
+        chart_ref: ingress-nginx/ingress-nginx
+        chart_version: "{{ version }}"
+        values:
+          controller:
+            hostNetwork: true
+            hostPort:
+              enabled: true
+            ingressClassResource:
+              default: true
+            kind: "DaemonSet"
+            service:
+              type: "ClusterIP"
+            watchIngressWithoutClass: true        
+    - name: "Fix for issue https://github.com/kubernetes/ingress-nginx/issues/5401"
+      k8s:
+        name: ingress-nginx-admission
+        # namespace: ingress-nginx
+        kind: ValidatingWebhookConfiguration
+        state: absent

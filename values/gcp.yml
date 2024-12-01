@@ -1,0 +1,45 @@
+configs:
+  galaxy.yml:
+    galaxy:
+      admin_users: suderman@jhu.edu,afgane@gmail.com
+      master_api_key: galaxypassword
+      brand: Google
+service:
+  type: LoadBalancer
+  port: 80
+ingress:
+  enabled: false
+  ingressClassName: ""
+  canary:
+    enabled: false
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+  - host: ~
+    paths:
+    - path: /galaxy
+  path: /galaxy
+persistence:
+  storageClass: nfs
+  size: 300Gi
+cvmfs:
+  deployPostInstallFix: true
+  cvmfscsi:
+    cache:
+      local:
+        enabled: true
+        pvc:
+          storageClass: nfs
+          name: cvmfs-local-cache
+      alien:
+        enabled: false
+        pvc:
+          name: cvmfs-alien-cache
+    logVerbosityLevel: 5
+postgresql:
+  persistence:
+    storageClass: nfs
+rabbitmq:
+  persistence:
+    storageClassName: nfs
+
