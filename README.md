@@ -27,7 +27,7 @@ pip install -r requirements.txt
 
 ## Generating the inventory
 
-The inventory is a YAML file that lists of servers where we want to deploy the Kubernetes cluster and the Galaxy instance. There is a Bash script that generates the inventory file or it can be created manually based on the template provided.
+The inventory is a file that lists the servers to be configured and defines some variables that are used in the playbooks. There is a Bash script that generates the inventory file, or it can be created manually based on the template provided.  There are example inventory files in the `inventories` directory, but they can not be used as-is as the IP addresses and SSH keys will need to be updated.
 
 To generate the inventory file, run the following command:
 
