@@ -4,6 +4,16 @@ configs:
       admin_users: suderman@jhu.edu,afgane@gmail.com
       master_api_key: galaxypassword
       brand: Google
+
+# Temporary values for the development
+jobs:
+  rules:
+    tpv_rules_local.yml:
+      destinations:
+        k8s:
+          max_cores: 1
+          max_mem: 4
+
 service:
   type: LoadBalancer
   port: 80
@@ -21,7 +31,7 @@ ingress:
   path: /galaxy
 persistence:
   storageClass: nfs
-  size: 300Gi
+  size: 20Gi
 cvmfs:
   deployPostInstallFix: true
   cvmfscsi:
@@ -42,4 +52,3 @@ postgresql:
 rabbitmq:
   persistence:
     storageClassName: nfs
-

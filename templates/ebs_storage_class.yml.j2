@@ -2,7 +2,7 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: ebs
-provisioner: rancher.io/local-path
-reclaimPolicy: Delete
-allowVolumeExpansion: true
-volumeBindingMode: WaitForFirstConsumer
+provisioner: "{{ csi_driver | trim }}"
+volumeBindingMode: {{ pv_binding_mode | default('WaitForFirstConsumer') }}
+parameters:
+  type: "{{ sc_parameters.type | trim }}"
