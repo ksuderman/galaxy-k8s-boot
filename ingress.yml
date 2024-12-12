@@ -5,7 +5,7 @@
   vars:
     version: 4.2.5
   environment:
-    KUBECONFIG: "~{{ ansible_user }}/.kube/config"
+    KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
   tasks:
     - pip:
         name: openshift

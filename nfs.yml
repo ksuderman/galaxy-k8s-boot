@@ -10,7 +10,7 @@
     reclaim: Delete
     version: 1.8.0
   environment:
-    KUBECONFIG: "~{{ ansible_user }}/.kube/config"
+    KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
   tasks:
     - name: Install openshift
       pip:

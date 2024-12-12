@@ -10,7 +10,7 @@
     admin_users: "suderman@jhu.edu"
     api_key: galaxypassword
   environment:
-    KUBECONFIG: "~{{ ansible_user }}/.kube/config"
+    KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
   tasks:
     - name: Install openshift
       pip:
