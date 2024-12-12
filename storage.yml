@@ -16,7 +16,7 @@
     gce_pd_sa_dir: /tmp/
     gce_pd_driver_version: stable-master
   environment:
-    KUBECONFIG: "{{ ansible_user }}/.kube/config"
+    KUBECONFIG: "~{{ ansible_user }}/.kube/config"
   tasks:
     - name: Set facts based on cloud kube_cloud_provider
       block:
