@@ -9,6 +9,8 @@
     tag: 24.1
     admin_users: "suderman@jhu.edu"
     api_key: galaxypassword
+  environment:
+    KUBECONFIG: "{{ ansible_user }}/.kube/config"
   tasks:
     - name: Install openshift
       pip:
