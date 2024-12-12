@@ -8,6 +8,7 @@
     - pip:
         name: openshift
         state: present
+        extra_args: "--break-system-packages"
       #become: yes
     - name: Create namespace for nginx ingress
       #become: yes
@@ -38,7 +39,7 @@
             kind: "DaemonSet"
             service:
               type: "ClusterIP"
-            watchIngressWithoutClass: true        
+            watchIngressWithoutClass: true
     - name: "Fix for issue https://github.com/kubernetes/ingress-nginx/issues/5401"
       k8s:
         name: ingress-nginx-admission

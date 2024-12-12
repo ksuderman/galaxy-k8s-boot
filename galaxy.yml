@@ -10,36 +10,36 @@
     admin_users: "suderman@jhu.edu"
     api_key: galaxypassword
   tasks:
-  - name: Install openshift
-    pip:
-      name: openshift
-      state: present
-  - name: Create the galaxy namespace
-    k8s:
-      kind: Namespace
-      name: galaxy
-      state: present
-  - name: Copy the values file to the remote host
-    copy:
-      src: "{{ values_file }}"
-      dest: /tmp/values.yml
-  - name: Helm install Galaxy
-    helm:
-      name: galaxy
-      namespace: galaxy
-      chart_ref: "{{ chart }}"
-      chart_version: "{{ version }}"
-      values_files:
-        - /tmp/values.yml
-      values:
-        configs:
-          galaxy.yml:
-            galaxy:
-              admin_users: "{{ admin_users }}"
-              master_api_key: "{{ api_key }}"
-        image:
-          repository: "{{ image }}"
-          tag: "{{ tag }}"
+    - name: Install openshift
+      pip:
+        name: openshift
+        state: present
+        extra_args: "--break-system-packages"
+    - name: Create the galaxy namespace
+      k8s:
+        kind: Namespace
+        name: galaxy
+        state: present
+    - name: Copy the values file to the remote host
+      copy:
+        src: "{{ values_file }}"
+        dest: /tmp/values.yml
+    - name: Helm install Galaxy
+      helm:
+        name: galaxy
+        namespace: galaxy
+        chart_ref: "{{ chart }}"
+        chart_version: "{{ version }}"
+        values_files:
+          - /tmp/values.yml
+        values:
+          configs:
+            galaxy.yml:
+              galaxy:
+                admin_users: "{{ admin_users }}"
+                master_api_key: "{{ api_key }}"
+          image:
+            repository: "{{ image }}"
+            tag: "{{ tag }}"
 #        postgresql:
 #          galaxyDatabasePassword: galaxydbpassword
-      

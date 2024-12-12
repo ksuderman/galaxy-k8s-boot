@@ -1,2 +1,5 @@
 .idea/
 .venv/
+.vscode/
+k3s/outputs/
+ansible.cfg
