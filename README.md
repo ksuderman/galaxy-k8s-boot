@@ -203,7 +203,15 @@ Once the inventory file is created, we can run the playbooks to deploy the Kuber
 ansible-playbook -i inventories/my-server.ini playbooks/playbook.yml --extra-vars "kube_cloud_provider=aws" --extra-vars "ebs_volume_id=vol-1234567890abcdef0"
 ```
 
-Once the playbook completes, the Galaxy instance will be available at `http://<server-ip>/galaxy/` after a few minutes. If you would like to manage the Kubernetes cluster, you can use the `kubectl` command on the server, or download the `kubeconfig` file from the server and use it on your local machine.
+Once the playbook completes, the Galaxy instance will be available at `http://<server-ip>/galaxy/` after a few minutes.
+
+### Automated deployment
+
+There is a script that automates the deployment process available in `bin/ini_script.sh`. The script can be supplied as user data when launching the VM and it will automatically set up the environment and run the playbook.
+
+## Managing the Kubernetes cluster
+
+If you would like to manage the Kubernetes cluster, you can use the `kubectl` command on the server, or download the `kubeconfig` file from the server and use it on your local machine.
 
 ```bash
 scp -i ~/.ssh/my-key.pem ubuntu@<server-ip>:/home/ubuntu/.kube/config ~/.kube/config

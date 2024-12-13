@@ -28,4 +28,4 @@ ansible_user='ubuntu'
 master_ip='localhost'
 k3s_version='v1.31.2+k3s1'
 systemd_dir=/etc/systemd/system
-extra_server_args="--tls-san 98.80.207.88 --disable traefik --v=4"
+extra_server_args="--tls-san localhost --disable traefik --v=4"
