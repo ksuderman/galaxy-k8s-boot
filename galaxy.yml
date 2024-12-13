@@ -9,6 +9,8 @@
     tag: 24.1
     admin_users: "suderman@jhu.edu"
     api_key: galaxypassword
+    job_max_cores: 1
+    job_max_mem: 4
   environment:
     KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
   tasks:
@@ -43,5 +45,12 @@
           image:
             repository: "{{ image }}"
             tag: "{{ tag }}"
+          jobs:
+            rules:
+              tpv_rules_local.yml:
+                destinations:
+                  k8s:
+                    max_cores: "{{ job_max_cores }}"
+                    max_mem: "{{ job_max_mem }}"
 #        postgresql:
 #          galaxyDatabasePassword: galaxydbpassword
