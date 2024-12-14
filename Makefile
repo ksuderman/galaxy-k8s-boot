@@ -14,5 +14,5 @@ run:
 	docker run -it $(REPO)/$(IMAGE):$(VERSION) bash
 
 clean:
-	docker rmi $(REPO)/$(IMAGE):$(VERSION)
+	docker rmi --force $(REPO)/$(IMAGE):$(VERSION)
 
