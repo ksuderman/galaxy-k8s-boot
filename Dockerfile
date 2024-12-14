@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM ubuntu/python:3.12-24.04_stable
 
 ARG APP_DIR=/playbook
 ARG KUBE_CLOUD_PROVIDER=openstack
