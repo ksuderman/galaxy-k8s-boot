@@ -5,6 +5,7 @@
   when: ansible_distribution in ['CentOS', 'Red Hat Enterprise Linux']
 
 - name: Enable IPv4 forwarding
+  become: yes
   sysctl:
     name: net.ipv4.ip_forward
     value: "1"
