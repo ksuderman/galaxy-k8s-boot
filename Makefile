@@ -16,3 +16,5 @@ run:
 clean:
 	docker rmi --force $(REPO)/$(IMAGE):$(VERSION)
 
+clean-all:
+	docker rmi --force $(docker images -q)
