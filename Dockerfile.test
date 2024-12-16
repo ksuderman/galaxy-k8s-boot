@@ -26,6 +26,7 @@ RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == system
 
 WORKDIR $APP_DIR
 ADD . $APP_DIR
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Ensure D-Bus machine ID is generated
 RUN dbus-uuidgen --ensure
