@@ -26,8 +26,9 @@ RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == system
     rm -f /lib/systemd/system/basic.target.wants/*; \
     rm -f /lib/systemd/system/anaconda.target.wants/*
 
-WORKDIR $APP_DIR
 ADD . $APP_DIR
+WORKDIR $APP_DIR
+
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Ensure D-Bus machine ID is generated

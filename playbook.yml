@@ -6,7 +6,7 @@
   when: k8s_provider == "k3s"
 
 - name: Setup Kubernetes (RKE2)
-  import_playbook: rke2/main.yml
+  import_playbook: rke/main.yml
   when: k8s_provider == "rke"
 
 - name: Install Helm
