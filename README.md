@@ -179,6 +179,10 @@ Project IAM Admin
 
 When launching a VM, use Ubuntu 22.04 image and attach above created IAM role (AWS) or service account (GCP). Every time before running the playbook on GCP, delete `gce-pd-csi-sa` service account if it exists. We also need a persistent volume created. In the case of AWS, the volume needs to be attached to the instance but in case of GCP it needs not be attached before running the playbook. The minimum size of the volume should be 100GB.
 
+### Automated deployment
+
+There is a script that automates the deployment process available in `bin/ini_script.sh`. The script can be supplied as user data when launching the VM and it will automatically set up the environment and run the playbook. Before using the script, update the values for the volume ID, and job max memory and cpu values to match the size of the instance; Galaxy requires 22GB of memory and 6 CPUs so deduct those amounts from the total available on the instance.
+
 ## Generating the inventory
 
 The inventory is a file that lists the servers to be configured and defines some variables that are used in the playbooks. There is a Bash script that generates the inventory file, or it can be created manually based on the template provided. There are example inventory files in the `inventories` directory, but they can not be used as-is as the IP addresses and SSH keys will need to be updated.
@@ -204,10 +208,6 @@ ansible-playbook -i inventories/my-server.ini playbooks/playbook.yml --extra-var
 ```
 
 Once the playbook completes, the Galaxy instance will be available at `http://<server-ip>/galaxy/` after a few minutes.
-
-### Automated deployment
-
-There is a script that automates the deployment process available in `bin/ini_script.sh`. The script can be supplied as user data when launching the VM and it will automatically set up the environment and run the playbook.
 
 ## Managing the Kubernetes cluster
 

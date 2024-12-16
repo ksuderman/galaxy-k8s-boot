@@ -15,4 +15,4 @@ cd galaxy-k8s-boot
 
 sed -i "s|extra_server_args=\"--tls-san localhost --disable traefik --v=4\"|extra_server_args=\"--tls-san $(curl -s http://169.254.169.254/latest/meta-data/public-ipv4) --disable traefik --v=4\"|" inventories/localhost
 
-ansible-playbook -i inventories/localhost playbook.yml --extra-vars "kube_cloud_provider=aws" --extra-vars "ebs_volume_id=$VOLUME_ID"
+ansible-playbook -i inventories/localhost playbook.yml --extra-vars "kube_cloud_provider=aws" --extra-vars "ebs_volume_id=$VOLUME_ID" --extra-vars "job_max_cores=1" --extra-vars "job_max_mem=4"
