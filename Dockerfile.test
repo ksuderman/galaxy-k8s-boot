@@ -1,0 +1,29 @@
+FROM ubuntu:22.04
+
+# Prevent interaction from apt
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    dbus \
+    systemd \
+    systemd-sysv \
+    iproute2 \
+    python3 \
+    python3-pip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Remove unnecessary systemd services
+RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == systemd-tmpfiles-setup.service ] || rm -f $i; done); \
+    rm -f /lib/systemd/system/multi-user.target.wants/*; \
+    rm -f /lib/systemd/system/local-fs.target.wants/*; \
+    rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+    rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+    rm -f /lib/systemd/system/basic.target.wants/*; \
+    rm -f /lib/systemd/system/anaconda.target.wants/*
+
+# Ensure D-Bus machine ID is generated
+RUN dbus-uuidgen --ensure
+
+# Set up entrypoint to use systemd
+ENTRYPOINT ["/lib/systemd/systemd"]
