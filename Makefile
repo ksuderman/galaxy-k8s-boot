@@ -7,6 +7,9 @@ all: build push
 build:
 	docker build -t $(REPO)/$(IMAGE):$(VERSION) .
 
+cm:
+	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.cmboot .
+
 push:
 	docker push $(REPO)/$(IMAGE):$(VERSION)
 
