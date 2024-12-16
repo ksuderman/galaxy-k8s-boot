@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM ubuntu:20.04
 
 ARG APP_DIR=/opt/galaxy-k8s-boot
 ARG KUBE_CLOUD_PROVIDER=openstack
@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     systemd \
     systemd-sysv \
     iproute2 \
+    curl \
     python3 \
     python3-pip \
     && apt-get clean \

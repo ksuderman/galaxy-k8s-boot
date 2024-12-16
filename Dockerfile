@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 ARG APP_DIR=/playbook
 ARG KUBE_CLOUD_PROVIDER=openstack
-ARG K8S_PROVIDER=k3s
+ARG K8S_PROVIDER=rke
 
 RUN apt-get update \
     && apt-get install -y apt-utils \
@@ -21,5 +21,5 @@ COPY ./inventories/hosts.ini $APP_DIR/inventories/hosts.ini
 COPY ./templates $APP_DIR/templates
 
 RUN pip install --upgrade pip && pip install --no-cache --upgrade -r requirements.txt
-CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "K8S_PROVIDER=$K8S_PROVIDER", "--connection=local"]
+CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
 #ENTRYPOINT ["/sbin/init"]
