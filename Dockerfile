@@ -1,4 +1,3 @@
-#FROM python:3.12-slim
 FROM ubuntu:22.04
 
 ARG APP_DIR=/playbook
@@ -10,12 +9,6 @@ RUN apt-get update \
     && apt-get install -y dbus systemd systemd-sysv systemd-cron rsyslog iproute2 python3 python3-pip python3-venv \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-#RUN apt-get update \
-#	&& apt-get install -y python3 python3-pip python3-venv\
-#	&& apt-get clean \
-#	&& rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-##    && pip install --upgrade pip
 
 WORKDIR $APP_DIR
 
