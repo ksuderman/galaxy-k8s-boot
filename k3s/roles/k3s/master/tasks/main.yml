@@ -1,13 +1,37 @@
 ---
 
+#- name: Copy K3s service file
+#  register: k3s_service
+#  template:
+#    src: "k3s.service.j2"
+#    dest: "{{ systemd_dir }}/k3s.service"
+#    owner: root
+#    group: root
+#    mode: 0644
+
 - name: Copy K3s service file
-  register: k3s_service
-  template:
-    src: "k3s.service.j2"
-    dest: "{{ systemd_dir }}/k3s.service"
-    owner: root
-    group: root
-    mode: 0644
+  block:
+    - name: Ensure systemd directory exists
+      file:
+        path: "{{ systemd_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy K3s service template
+      template:
+        src: "k3s.service.j2"
+        dest: "{{ systemd_dir }}/k3s.service"
+        owner: root
+        group: root
+        mode: 0644
+  rescue:
+    - name: Fallback service file copy
+      copy:
+        content: "{{ lookup('template', 'k3s.service.j2') }}"
+        dest: "{{ systemd_dir }}/k3s.service"
+        owner: root
+        group: root
+        mode: 0644
 
 - name: Enable and check K3s service
   systemd:
