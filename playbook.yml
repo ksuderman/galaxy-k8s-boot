@@ -3,6 +3,11 @@
 
 - name: Setup Kubernetes
   import_playbook: k3s/site.yml
+  when: k8s_provider == "k3s"
+
+- name: Setup Kubernetes (RKE2)
+  import_playbook: rke2/main.yml
+  when: k8s_provider == "rke"
 
 - name: Install Helm
   import_playbook: helm.yml

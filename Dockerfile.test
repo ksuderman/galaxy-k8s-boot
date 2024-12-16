@@ -1,6 +1,8 @@
 FROM ubuntu:22.04
 
 ARG APP_DIR=/opt/galaxy-k8s-boot
+ARG KUBE_CLOUD_PROVIDER=openstack
+ARG K8S_PROVIDER=rke
 
 # Prevent interaction from apt
 ENV DEBIAN_FRONTEND=noninteractive
@@ -33,4 +35,4 @@ RUN dbus-uuidgen --ensure
 
 # Set up entrypoint to use systemd
 #ENTRYPOINT ["/lib/systemd/systemd"]
-CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "K8S_PROVIDER=$K8S_PROVIDER", "--connection=local"]
+CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
