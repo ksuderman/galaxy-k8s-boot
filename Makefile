@@ -10,7 +10,7 @@ build:
 cm:
 	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.cmboot .
 
-cm:
+test:
 	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.test .
 
 push:
