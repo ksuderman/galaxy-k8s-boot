@@ -2,12 +2,12 @@ FROM ubuntu:20.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-ARG APP_DIR=/playbook
+ARG APP_DIR=/home/ubuntu
 ARG KUBE_CLOUD_PROVIDER=openstack
 ARG K8S_PROVIDER=rke
 
 RUN apt-get update \
-    && apt-get install -y apt-utils rsyslog iproute2 python3 python3-pip python3-venv openssh-client curl \
+    && apt-get install -y apt-utils dbus systemd systemd-sysv systemd-cron rsyslog iproute2 python3 python3-pip python3-venv openssh-client curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
@@ -21,6 +21,7 @@ COPY ./values $APP_DIR/values
 COPY *.yml $APP_DIR/
 COPY ./inventories/hosts.ini $APP_DIR/inventories/hosts.ini
 COPY ./templates $APP_DIR/templates
+COPY ./run.sh $APP_DIR/run.sh
 
 RUN pip install --upgrade pip && pip install --no-cache --upgrade -r requirements.txt
 CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
