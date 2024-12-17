@@ -7,11 +7,11 @@ ARG KUBE_CLOUD_PROVIDER=openstack
 ARG K8S_PROVIDER=rke
 
 RUN apt-get update \
-    && apt-get install -y apt-utils \
-    && apt-get install -y dbus systemd systemd-sysv systemd-cron rsyslog iproute2 python3 python3-pip python3-venv \
+    && apt-get install -y apt-utils rsyslog iproute2 python3 python3-pip python3-venv openssh-client curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+#    && apt-get install -y dbus systemd systemd-sysv systemd-cron rsyslog iproute2 python3 python3-pip python3-venv \
 WORKDIR $APP_DIR
 
 COPY requirements.txt $APP_DIR/requirements.txt
