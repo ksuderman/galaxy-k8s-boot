@@ -1,5 +1,7 @@
 FROM ubuntu:20.04
 
+ARG DEBIAN_FRONTEND=noninteractive
+
 ARG APP_DIR=/playbook
 ARG KUBE_CLOUD_PROVIDER=openstack
 ARG K8S_PROVIDER=rke
