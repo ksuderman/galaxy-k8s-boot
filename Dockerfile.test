@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:24.04
 
 ARG APP_DIR=/opt/galaxy-k8s-boot
 ARG KUBE_CLOUD_PROVIDER=openstack
@@ -37,4 +37,4 @@ RUN dbus-uuidgen --ensure
 
 # Set up entrypoint to use systemd
 #ENTRYPOINT ["/lib/systemd/systemd"]
-CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
+CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "-e", "-break-system-packages", "--connection=local"]

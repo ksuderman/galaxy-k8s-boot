@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=ubuntu:22.04
+ARG BASE_IMAGE=ubuntu:24.04
 ARG WORK_DIR=/opt/galaxy-k8s-boot
 
 #=================================
@@ -63,4 +63,5 @@ ADD . $WORK_DIR
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 ENV ANSIBLE_DEBUG=${ANSIBLE_DEBUG:--v}
 #CMD bash -c "venv/bin/ansible-playbook -e "ansible_python_interpreter=/opt/cm-boot/venv/bin/python" -i 'inventories/hosts.ini' -c local playbook.yml --tags cloudman-boot $ANSIBLE_DEBUG & wait"
-CMD bash -c "ansible-playbook -e "ansible_python_interpreter=/usr/bin/python3" -i 'inventories/hosts.ini' -c local playbook.yml $ANSIBLE_DEBUG & wait"
+#CMD bash -c "ansible-playbook -e "ansible_python_interpreter=/usr/bin/python3" -i 'inventories/hosts.ini' -c local playbook.yml $ANSIBLE_DEBUG & wait"
+CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "-e", "-break-system-packages", "--connection=local"]
