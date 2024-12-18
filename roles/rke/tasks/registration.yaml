@@ -1,0 +1,51 @@
+- name: Setup cloud controller secret
+  shell: kubectl create secret -n kube-system generic cloud-config --from-file=cloud.conf=/etc/kubernetes/cloud-config
+  ignore_errors: true
+  when: not kube_in_tree_provider and kube_cloud_provider
+
+- name: Install AWS Cloud Controller Manager
+  shell: kubectl apply -f {{ item }}
+  with_items:
+    - https://raw.githubusercontent.com/kubernetes/cloud-provider-aws/release-1.19/manifests/rbac.yaml
+    - https://raw.githubusercontent.com/kubernetes/cloud-provider-aws/release-1.19/manifests/aws-cloud-controller-manager-daemonset.yaml
+  when: not kube_in_tree_provider and kube_cloud_provider == "aws"
+
+- name: Patch node-selector on AWS because of https://github.com/rancher/k3s/issues/1869
+  shell: |
+    kubectl patch daemonset -n kube-system aws-cloud-controller-manager -p '{"spec": {"template": {"spec": {"nodeSelector": {"node-role.kubernetes.io/master": "true"}}}}}'
+  ignore_errors: true
+  when: not kube_in_tree_provider and kube_cloud_provider == "aws"
+
+- name: Copy GCP cloud-controller-manager manifests
+  copy:
+    src: gcp-cloud-controller-manager.yaml
+    dest: /tmp/gcp-cloud-controller-manager.yaml
+  when: not kube_in_tree_provider and kube_cloud_provider == "gce"
+
+- name: Install GCP Cloud Controller Manager
+  shell: kubectl apply -f {{ item }}
+  with_items:
+    - /tmp/gcp-cloud-controller-manager.yaml
+  when: not kube_in_tree_provider and kube_cloud_provider == "gce"
+
+- name: Install OpenStack Cloud Controller Manager
+  shell: kubectl apply -f {{ item }}
+  with_items:
+    - https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/master/manifests/controller-manager/cloud-controller-manager-roles.yaml
+    - https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/master/manifests/controller-manager/cloud-controller-manager-role-bindings.yaml
+    - https://gist.githubusercontent.com/almahmoud/b02942eb2b18ea14123e163e069a79e2/raw/b59139b17d697c9075ce3870ad7e88c567851d8a/openstack-ds.yaml
+  when: not kube_in_tree_provider and kube_cloud_provider == "openstack"
+
+- name: Patch node-selector on OpenStack because of https://github.com/rancher/k3s/issues/1869
+  shell: |
+    kubectl patch daemonset -n kube-system openstack-cloud-controller-manager -p '{"spec": {"template": {"spec": {"nodeSelector": {"node-role.kubernetes.io/master": "true"}}}}}'
+  ignore_errors: true
+  when: not kube_in_tree_provider and kube_cloud_provider == "openstack"
+
+- name: Setup storage
+  include_tasks: storage.yaml
+  when: rke_setup_storage_drivers
+
+- name: Setup GPU
+  include_tasks: gpu.yaml
+  when: rke_setup_gpu_drivers

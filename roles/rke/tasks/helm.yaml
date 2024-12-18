@@ -1,0 +1,14 @@
+- name: "Install Helm version {{ helm_version }}"
+  shell: "curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash -s - --version '{{ helm_version }}'"
+  become: yes
+
+- name: Remove existing stable Helm repo
+  shell: /usr/local/bin/helm repo remove stable
+  ignore_errors: True
+
+- name: Add stable Helm repo
+  shell: /usr/local/bin/helm repo add stable https://charts.helm.sh/stable
+  ignore_errors: True
+
+- name: Update Helm repos
+  shell: /usr/local/bin/helm repo update

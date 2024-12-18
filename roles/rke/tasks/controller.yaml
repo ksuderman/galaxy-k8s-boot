@@ -1,0 +1,66 @@
+- name: Wait for kubeconfig
+  wait_for:
+    path: /etc/rancher/rke2/rke2.yaml
+    state: present
+    timeout: 30
+
+- name: Allow rke2 config to be read by current user
+  file:
+    path: /etc/rancher/rke2/rke2.yaml
+    owner: "{{ ansible_effective_user_id }}"
+    group: "{{ ansible_effective_group_id }}"
+  become: yes
+
+- name: Decide on password
+  set_fact:
+    cluster_password: "{{ random_pwd }}"
+    using_random_pwd: true
+  when: cluster_password == ''
+
+- debug:
+    msg: "Using cluster pwd {{ cluster_password }}"
+    verbosity: 2
+
+- name: Compose random pwd access doc
+  set_fact:
+    svc_access_line: "Login to any of these services as user 'admin', using password '{{ cluster_password }}'"
+  when: using_random_pwd is defined and using_random_pwd
+
+- name: Compose supplied pwd access doc
+  set_fact:
+    svc_access_line: "Login to any of these services as user 'admin', using the password you supplied."
+  when: using_random_pwd is not defined
+
+- name: Make sure ~/.kube dir exists
+  file:
+    path: ~/.kube
+    state: directory
+
+- name: Symlink kube config
+  file:
+    src: /etc/rancher/rke2/rke2.yaml
+    dest: ~/.kube/config
+    state: link
+    force: true
+
+- name: Check whether kubectl exists
+  shell: "which kubectl"
+  register: kubectl_result
+  ignore_errors: true
+
+- name: Fetch and install kubectl
+  shell: >-
+    curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+    && chmod +x ./kubectl
+    && mv ./kubectl /usr/local/bin/kubectl
+  become: yes
+  when: kubectl_result.rc != 0
+
+- name: Setup Helm
+  include_tasks: helm.yaml
+
+- name: Wait for kubernetes to be ready
+  shell: "kubectl get node | grep {{ ansible_hostname if 'jetstream' in kube_cloud_conf else ansible_fqdn }}"
+  register: kubectl_node_ready
+  until: "' Ready' in kubectl_node_ready.stdout"
+  retries: 50

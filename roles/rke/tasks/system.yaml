@@ -1,0 +1,28 @@
+- name: Update APT cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+    autoremove: yes
+    autoclean: yes
+  retries: 50
+  delay: 10
+  become: yes
+  register: apt_action
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
+- name: install nfs-common (needed for csi mount)
+  apt: pkg=nfs-common state=latest
+  register: apt_status
+  until: apt_status is success
+  delay: 6
+  retries: 20
+  become: yes
+
+- name: install python3-pip (needed to install boto for aws)
+  apt: pkg=python3-pip state=latest
+  become: yes
+  register: apt_status
+  until: apt_status is success
+  delay: 6
+  retries: 20
+  when: kube_cloud_provider == "aws"

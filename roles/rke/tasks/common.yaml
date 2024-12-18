@@ -1,0 +1,105 @@
+- name: Determine rke node type
+  set_fact:
+    rke_node_type: "{{ 'server' if 'controllers' in group_names else 'agent' }}"
+  become: yes
+
+- name: Make sure rancher config dir /etc/rancher/rke2 exists
+  file:
+    path: /etc/rancher/rke2
+    state: directory
+  become: yes
+
+- name: Create rke config file
+  template:
+    src: rke2_config.j2
+    dest: /etc/rancher/rke2/config.yaml
+  become: yes
+
+# Special handling for AWS
+# https://rancher.com/docs/rke/latest/en/config-options/cloud-providers/aws#tagging-amazon-resources
+- name: Install boto3
+  pip:
+    name: boto3
+    state: latest
+  ignore_errors: true
+  when: kube_cloud_provider == "aws"
+
+- name: Set aws instance tag
+  script: "set_aws_instance_tag.py '{{ cluster_hostname }}'"
+  when: kube_cloud_provider == "aws"
+
+- name: Make sure /etc/kubernetes dir exists
+  file:
+    path: /etc/kubernetes
+    state: directory
+  become: yes
+  when: kube_cloud_provider | default(false)
+
+- name: Create cloud config in /etc/kubernetes
+  copy:
+    content: "{{ kube_cloud_conf | default('') }}"
+    dest: /etc/kubernetes/cloud-config
+  become: yes
+  when: kube_cloud_provider | default(false)
+
+- name: "Install rke node of type: {{ rke_node_type }} with version: {{ rke_version }}"
+  shell: >-
+    curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION="{{ rke_version }}" INSTALL_RKE2_TYPE="{{ rke_node_type }}" sh -
+  become: yes
+  when: not rke_in_docker
+
+- name: Make sure the RKE service is enabled
+  shell: "systemctl enable rke2-{{ rke_node_type }}.service"
+  become: yes
+
+- name: Make sure RKE is restarted
+  systemd:
+    state: restarted
+    name: "rke2-{{ rke_node_type }}"
+  become: yes
+
+# xref: https://github.com/rancher/k3s/issues/73
+- name: Start rke in docker (only when running via cloudman-boot)
+  docker_container:
+      name: "rke"
+      image: "{{ rke_container_image }}"
+      command: "{{ rke_node_type }}"
+      restart_policy: unless-stopped
+      privileged: true
+      volumes:
+        - /etc/rancher:/etc/rancher
+        - /var/lib/rancher/rke2:/var/lib/rancher/rke2:rshared
+        - /var/lib/docker:/var/lib/docker:rshared
+        - /var/run:/var/run
+        - /run:/run
+      network_mode: host
+      pid_mode: host
+      ipc_mode: host
+  become: yes
+  when: rke_in_docker
+
+- name: Place crictl config file
+  copy:
+    src: crictl.yaml
+    dest: /etc/crictl.yaml
+  become: yes
+
+- name: Check whether crictl exists
+  shell: "which crictl"
+  register: crictl_result
+  ignore_errors: true
+
+- name: Fetch and install crictl
+  shell: >-
+    curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ crictl_version }}/crictl-{{ crictl_version }}-linux-amd64.tar.gz --output crictl-{{ crictl_version }}-linux-amd64.tar.gz
+    && tar zxvf crictl-{{ crictl_version }}-linux-amd64.tar.gz -C /usr/local/bin
+    && rm -f crictl-{{ crictl_version }}-linux-amd64.tar.gz
+  become: yes
+  when: crictl_result.rc != 0
+
+- name: Wait for rke to startup
+  wait_for:
+    path: /etc/rancher/node/password
+    state: present
+    timeout: 1800
+

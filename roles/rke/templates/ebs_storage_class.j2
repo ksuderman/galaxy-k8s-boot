@@ -1,0 +1,48 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ebs
+{# if cm_cluster_type != "KUBE_RKE" #}
+{# local path provisioner is set as default by k3s when no cloud provider is defined #}
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+{# endif #}
+{% if kube_cloud_provider == "aws" %}
+{% if kube_in_tree_provider  %}
+provisioner: kubernetes.io/aws-ebs
+{% else %}
+provisioner: ebs.csi.aws.com
+{% endif %}
+parameters:
+  encrypted: "true"
+  type: gp2
+{% elif kube_cloud_provider == "azure" %}
+{% if kube_in_tree_provider %}
+provisioner: kubernetes.io/azure-disk
+{% else %}
+provisioner: disk.csi.azure.com
+{% endif %}
+parameters:
+  skuname: StandardSSD_LRS
+{% elif kube_cloud_provider == "gce" %}
+{% if kube_in_tree_provider %}
+provisioner: kubernetes.io/gce-pd
+{% else %}
+provisioner: pd.csi.storage.gke.io
+{% endif %}
+parameters:
+  type: pd-ssd
+{% elif kube_cloud_provider == "openstack" %}
+{% if kube_in_tree_provider %}
+provisioner: kubernetes.io/cinder
+{% else %}
+provisioner: cinder.csi.openstack.org
+{% endif %}
+parameters:
+  availability: nova
+{% else %}
+provisioner: rancher.io/local-path
+{% endif %}
+reclaimPolicy: "{{ cm_volume_reclaim_policy | default('Retain', true) }}"
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer

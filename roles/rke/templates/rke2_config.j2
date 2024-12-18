@@ -1,0 +1,26 @@
+node-name: "{{ ansible_hostname if 'jetstream' in ansible_fqdn or 'js2local' in ansible_fqdn or kube_cloud_provider == 'gce' else ansible_fqdn }}"
+token: {{ rke_registration_token }}
+
+{% if 'controllers' in group_names %}
+write-kubeconfig-mode: "0600"
+disable: rke2-ingress-nginx
+tls-san:
+  - {{ cluster_hostname }}
+{% if 'js2local' in ansible_fqdn %}
+  - {{ cluster_hostname }}.js2local
+{% endif %}
+{% endif %}
+
+{% if not is_rke_registration_server %}
+server: https://{{ rke_registration_server }}:9345
+{% endif %}
+
+{% if kube_cloud_provider %}
+cloud-provider-name: "{{ kube_cloud_provider if kube_in_tree_provider else 'external' }}"
+{% if kube_in_tree_provider %}
+cloud-provider-config: "/etc/kubernetes/cloud-config"
+{% if 'controllers' in group_names %}
+kube-controller-manager-arg: "configure-cloud-routes={{ 'true' if kube_cloud_provider == 'gce' else 'false' }}"
+{% endif %}
+{% endif %}
+{% endif %}

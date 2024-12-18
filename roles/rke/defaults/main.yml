@@ -1,0 +1,32 @@
+# cloud provider for this cluster:
+# ref: https://rancher.com/docs/rke/latest/en/config-options/cloud-providers/
+# ref: https://kubernetes.io/docs/concepts/cluster-administration/cloud-providers/
+kube_cloud_provider: "{{ lookup('env', 'KUBE_CLOUD_PROVIDER') }}"
+kube_cloud_conf: "{{ lookup('env', 'KUBE_CLOUD_CONF') | b64decode }}"
+# Whether to use the in-tree cloud provider or external cloud-provider
+kube_in_tree_provider: false
+
+# cluster settings
+cluster_hostname: "{{ lookup('env', 'CLUSTER_HOSTNAME') | default(inventory_hostname, true) }}"
+cluster_password: "{{ lookup('env', 'CLUSTER_PASSWORD') }}"
+
+# Used when no cluster password is specified
+random_pwd: "{{ lookup('password', '/dev/null length=12 chars=ascii_letters,digits') }}"
+# Used for generating client secrets
+random_client_secret: "{{ lookup('password', '/dev/null length=8 chars=ascii_letters,digits') | lower }}-{{ lookup('password', '/dev/null length=4 chars=ascii_letters,digits') | lower }}-{{ lookup('password', '/dev/null length=4 chars=ascii_letters,digits') | lower }}-{{ lookup('password', '/dev/null length=4 chars=ascii_letters,digits') | lower }}-{{ lookup('password', '/dev/null length=12 chars=ascii_letters,digits') | lower }}"
+
+rke_version: "v1.31.3+rke2r1"
+rke_container_image: "rancher/rke2-runtime:v1.31.3+rke2r1"
+rke_in_docker: "{{ lookup('env', 'RKE_IN_DOCKER') | default(false, true) }}"
+rke_registration_server: "{{ hostvars[groups['controllers'][0]]['ansible_fqdn'] | default(groups['controllers'][0]) }}"
+is_rke_registration_server: "{{ rke_registration_server == ansible_fqdn }}"
+# If running against multiple nodes, make sure this value is set, or random values
+# will be generated per instance. If this token mismatches, nodes won't join the cluster.
+rke_registration_token: "{{ random_client_secret }}"
+rke_setup_storage_drivers: true
+rke_setup_gpu_drivers: false
+rke_hostpath_location: "/opt/local-path-provisioner"
+
+crictl_version: v1.32.0
+
+helm_version: v3.9.4

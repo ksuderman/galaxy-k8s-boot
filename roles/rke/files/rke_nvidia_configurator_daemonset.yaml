@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: rke-nvidia-configurator-daemonset
+  namespace: gpu-operator
+spec:
+  selector:
+    matchLabels:
+      app: rke-nvidia-configurator
+      app.kubernetes.io/part-of: rke2
+  template:
+    metadata:
+      labels:
+        app: rke-nvidia-configurator
+        app.kubernetes.io/part-of: rke2
+    spec:
+      serviceAccountName: rke-nvidia-configurator-svc-account
+      initContainers:
+        - name: rke-nvidia-configurator-daemonset
+          image: bitnami/kubectl:1.19.13
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          command:
+            - /bin/sh
+            - /src/configurator.sh
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          volumeMounts:
+          - mountPath: "/src"
+            name: containerd-template
+          - mountPath: "/dest"
+            name: containerd-config
+      containers:
+        - name: pause
+          image: gcr.io/google_containers/pause
+          resources:
+            limits:
+              cpu: 20m
+              memory: 20Mi
+            requests:
+              cpu: 10m
+              memory: 10Mi
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: containerd-template
+        configMap:
+          name: rke-nvidia-configurator-configmap
+      - name: containerd-config
+        hostPath:
+          path: /var/lib/rancher/rke2/agent/etc/containerd
+          type: ""

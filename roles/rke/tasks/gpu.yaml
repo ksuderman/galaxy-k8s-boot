@@ -1,0 +1,48 @@
+- name: Create GPU operator namespace
+  command: /usr/local/bin/kubectl create namespace {{ item }}
+  with_items:
+    - gpu-operator
+  ignore_errors: true
+
+- name: Add nvidia helm repo
+  shell: /usr/local/bin/helm repo add nvidia https://nvidia.github.io/gpu-operator
+  ignore_errors: true
+
+- name: Update helm repos
+  shell: /usr/local/bin/helm repo update
+
+- name: Helm install nvidia GPU operator
+  command: >
+    /usr/local/bin/helm upgrade --install --reset-values nvidia-operator nvidia/gpu-operator
+    --namespace gpu-operator
+    --version "1.5.2"
+    --set operator.defaultRuntime=containerd
+    --set toolkit.env[0].name='CONTAINERD_CONFIG'
+    --set toolkit.env[0].value='/var/lib/rancher/rke2/agent/etc/containerd/config.toml'
+    --set toolkit.env[1].name='CONTAINERD_SOCKET'
+    --set toolkit.env[1].value='/run/k3s/containerd/containerd.sock'
+    --set devicePlugin.args[0]='--mig-strategy=single'
+    --set devicePlugin.args[1]='--pass-device-specs=true'
+    --set devicePlugin.args[2]='--fail-on-init-error=false'
+    --set devicePlugin.args[3]='--device-list-strategy=envvar'
+    --set devicePlugin.args[4]='--nvidia-driver-root=/run/nvidia/driver'
+  async: 30
+  poll: 0
+
+- name: Copy rke nvidia configurator manifests
+  copy:
+    src: "{{ item }}"
+    dest: /tmp/{{ item }}
+  with_items:
+    - rke_nvidia_configurator_configmap.yaml
+    - rke_nvidia_configurator_rbac.yaml
+    - rke_nvidia_configurator_daemonset.yaml
+
+- name: Apply rke nvidia configurator manifests
+  command: /usr/local/bin/kubectl apply -f /tmp/{{ item }}
+  with_items:
+    - rke_nvidia_configurator_configmap.yaml
+    - rke_nvidia_configurator_rbac.yaml
+    - rke_nvidia_configurator_daemonset.yaml
+  async: 30
+  poll: 0

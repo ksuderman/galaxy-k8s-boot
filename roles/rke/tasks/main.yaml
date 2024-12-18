@@ -1,0 +1,13 @@
+- name: Setup system
+  include_tasks: system.yaml
+
+- name: Run rke common tasks
+  include_tasks: common.yaml
+
+- name: Setup controller
+  include_tasks: controller.yaml
+  when: "'controllers' in group_names"
+
+- name: Additional setup for registration server
+  include_tasks: registration.yaml
+  when: is_rke_registration_server

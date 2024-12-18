@@ -1,0 +1,74 @@
+- name: Create CSI driver namespace
+  command: >
+    /usr/local/bin/kubectl create namespace csi-drivers
+  ignore_errors: true
+  when: kube_cloud_provider != "gce"
+
+- name: Create GCP CSI driver namespace
+  command: >
+    /usr/local/bin/kubectl create namespace gce-pd-csi-driver
+  ignore_errors: true
+  when: kube_cloud_provider == "gce"
+
+- name: Install AWS Disk CSI Driver
+  command: >
+    /usr/local/bin/helm upgrade --install aws-ebs-csi-driver https://github.com/kubernetes-sigs/aws-ebs-csi-driver/releases/download/helm-chart-aws-ebs-csi-driver-2.10.1/aws-ebs-csi-driver-2.10.1.tgz
+        --namespace csi-drivers
+  when: not kube_in_tree_provider and kube_cloud_provider == "aws"
+  async: 30
+  poll: 0
+
+- name: Install Azure Disk CSI Driver
+  command: >
+    /usr/local/bin/helm upgrade --install azuredisk-csi-driver https://github.com/kubernetes-sigs/azuredisk-csi-driver/raw/master/charts/v1.22.0/azuredisk-csi-driver-v1.22.0.tgz
+        --namespace csi-drivers
+  when: not kube_in_tree_provider and kube_cloud_provider == "azure"
+  async: 30
+  poll: 0
+
+- name: Render hostpath storage class template
+  copy:
+    src: gcp-compute-persistent-disk-csi-driver-specs-generated.yaml
+    dest: /tmp/gcp-compute-persistent-disk-csi-driver-specs-generated.yaml
+  when: not kube_in_tree_provider and kube_cloud_provider == "gce"
+
+- name: Install GCP CSI Driver
+  shell: /usr/local/bin/kubectl apply -f /tmp/gcp-compute-persistent-disk-csi-driver-specs-generated.yaml
+  when: not kube_in_tree_provider and kube_cloud_provider == "gce"
+  async: 30
+  poll: 0
+
+- name: Add OpenStack CSI Driver repo
+  command: >
+    /usr/local/bin/helm repo add cpo https://kubernetes.github.io/cloud-provider-openstack
+  when: not kube_in_tree_provider and kube_cloud_provider == "openstack"
+
+- name: Install OpenStack CSI Driver
+  command: >
+    /usr/local/bin/helm upgrade --install cinder-csi cpo/openstack-cinder-csi
+        --namespace csi-drivers
+        --set secret.filename=cloud-config
+  when: not kube_in_tree_provider and kube_cloud_provider == "openstack"
+  async: 30
+  poll: 0
+
+- name: Render hostpath storage class template
+  template:
+    src: hostpath_storage_class.yaml.j2
+    dest: /tmp/hostpath_storage_class.yaml
+
+- name: Fallback to hostpath provisioner when no cloud provider is set
+  shell: /usr/local/bin/kubectl apply -f /tmp/hostpath_storage_class.yaml
+  when: not kube_cloud_provider
+  async: 30
+  poll: 0
+
+- name: Render ebs storage class template
+  template:
+    src: ebs_storage_class.j2
+    dest: /tmp/ebs_storage_class.yml
+
+- name: Deploy ebs storage class
+  shell: /usr/local/bin/kubectl apply -f /tmp/ebs_storage_class.yml
+  async: 30
+  poll: 0
