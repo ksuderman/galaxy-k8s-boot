@@ -44,6 +44,7 @@ RUN echo "===> Installing system packages..." \
         ca-certificates \
         curl \
         python3-virtualenv \
+        python3-pip \
         docker.io \
         # used by helm installer
         gawk \
