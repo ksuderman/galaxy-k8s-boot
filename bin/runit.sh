@@ -2,7 +2,7 @@
 
 CLOUD=${CLOUD:=openstack}
 K8S=${K8S:-k3s}
-VERSION=${VERSION:-0.1.14}
+VERSION=${VERSION:-$(cat VERION)}
 
 DIR=/opt/galaxy-k8s-boot
 
