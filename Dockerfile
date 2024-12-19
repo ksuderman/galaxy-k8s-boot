@@ -23,6 +23,6 @@ COPY ./inventories/hosts.ini $APP_DIR/inventories/hosts.ini
 COPY ./templates $APP_DIR/templates
 COPY ./run.sh $APP_DIR/run.sh
 
-RUN pip install --upgrade pip && pip install --no-cache --upgrade -r requirements.txt
-CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "-e", "--break-system-packages", "--connection=local"]
+RUN pip install --upgrade pip && pip install --no-cache --upgrade --break-system-packages -r requirements.txt
+CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
 #ENTRYPOINT ["/sbin/init"]

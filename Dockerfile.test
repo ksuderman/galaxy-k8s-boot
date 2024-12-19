@@ -30,11 +30,11 @@ RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == system
 ADD . $APP_DIR
 WORKDIR $APP_DIR
 
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --upgrade pip && pip install --break-system-packages -r requirements.txt
 
 # Ensure D-Bus machine ID is generated
 RUN dbus-uuidgen --ensure
 
 # Set up entrypoint to use systemd
 #ENTRYPOINT ["/lib/systemd/systemd"]
-CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "-e", "--break-system-packages", "--connection=local"]
+CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
