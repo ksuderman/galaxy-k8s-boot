@@ -13,10 +13,6 @@
         kind: Namespace
         name: pulsar
         state: present
-    - name: Copy the values file to the remote host
-      copy:
-        src: "{{ values_file }}"
-        dest: /tmp/values.yml
     - name: Helm install Pulsar
       helm:
         name: pulsar
