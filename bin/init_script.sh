@@ -4,8 +4,8 @@
 exec > >(tee /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
 
 VOLUME_ID=vol-09e8d020c214c9d33
-RESERVED_CORES=1
-RESERVED_MEM_MB=1024
+RESERVED_CORES=2
+RESERVED_MEM_MB=6144
 
 sudo apt update
 sudo apt install -y software-properties-common git
