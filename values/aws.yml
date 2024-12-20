@@ -48,8 +48,8 @@ cvmfs:
 
 postgresql:
   persistence:
-    storageClass: nfs
+    storageClass: eb
 
 rabbitmq:
   persistence:
-    storageClassName: nfs
+    storageClassName: eb
