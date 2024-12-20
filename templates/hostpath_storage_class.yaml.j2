@@ -98,7 +98,7 @@ data:
                 "nodePathMap":[
                 {
                         "node":"DEFAULT_PATH_FOR_NON_LISTED_NODES",
-                        "paths":["/opt/local-path-provisioner"]
+                        "paths":["{{ eb_disk_path }}"]
                 }
                 ]
         }
@@ -147,4 +147,3 @@ data:
           containers:
           - name: helper-pod
             image: busybox
-
