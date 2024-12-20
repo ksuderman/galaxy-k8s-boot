@@ -19,6 +19,11 @@ push:
 run:
 	docker run -it $(REPO)/$(IMAGE):$(VERSION) bash
 
+env:
+	python3 -m venv .venv
+	. .venv/bin/activate
+	pip install -r requirements.txt
+
 clean:
 	docker rmi --force $(REPO)/$(IMAGE):$(VERSION)
 

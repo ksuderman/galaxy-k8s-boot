@@ -33,11 +33,14 @@ RUN echo "===> Installing system packages..." \
 #=================================
 FROM $BASE_IMAGE
 
-ENV KUBE_LATEST_VERSION=v1.19.0
+#ENV KUBE_LATEST_VERSION=v1.19.0
+ENV KUBE_LATEST_VERSION=v1.31.3
 ENV RKE_IN_DOCKER=true
 ENV PYTHONUNBUFFERED 1
 ARG DEBIAN_FRONTEND=noninteractive
 ARG WORK_DIR
+ARG KUBE_CLOUD_PROVIDER=openstack
+ARG K8S_PROVIDER=rke
 
 RUN echo "===> Installing system packages..." \
     && apt-get -qq update && apt-get install -y --no-install-recommends \
