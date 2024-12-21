@@ -19,7 +19,7 @@
     - name: Render the elastic block storage class
       k8s:
         template:
-          path: block_storage_class.yml.j2
+          path: block_storage_storageclass.yml.j2
         state: present
 
     - name: Create csi-drivers namespace
