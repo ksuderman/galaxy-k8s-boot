@@ -1,4 +1,5 @@
-FROM ubuntu:24.04
+ARG BASE_VERSION=20.04
+FROM ubuntu:$BASE_VERSION
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -22,6 +23,8 @@ COPY *.yml $APP_DIR/
 COPY ./inventories/hosts.ini $APP_DIR/inventories/hosts.ini
 COPY ./templates $APP_DIR/templates
 COPY ./run.sh $APP_DIR/run.sh
+COPY ./bin $APP_DIR/bin
+COPY ./roles $APP_DIR/roles
 
 RUN pip install --upgrade pip && pip install --no-cache --upgrade --break-system-packages -r requirements.txt
 CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
