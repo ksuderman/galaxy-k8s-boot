@@ -6,7 +6,7 @@
   roles:
     - role: rke
       tags: ["controller", "agent", "rke"]
-  when: k8s_provider == "rke"
+      when: k8s_provider == "rke"
 
 - name: Setup K3S
   import_playbook: k3s/site.yml
