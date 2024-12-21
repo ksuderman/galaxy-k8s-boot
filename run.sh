@@ -2,10 +2,10 @@
 
 if [[ $# > 0 ]] ; then
   case $1 in
-    k3s:
+    k3s)
       playbook=playbook-k3s.yml
       ;;
-    rke:
+    rke)
       playbook=playbook-rke.yml
       ;;
     -h|--help)
@@ -20,5 +20,5 @@ if [[ $# > 0 ]] ; then
 else
   playbook=playbook-rke.yml
 fi
-ansible-playbook -i inventories/hosts.ini -e kube_cloud_provider=openstack -e k8s_provider=rke -c local $playbook
+ansible-playbook -i inventories/hosts.ini -e kube_cloud_provider=openstack -e k8s_provider=$1 -c local $playbook
 
