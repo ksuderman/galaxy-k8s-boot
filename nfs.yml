@@ -3,7 +3,7 @@
   collections:
     - kubernetes.core
   vars:
-    storageClass: ebs
+    persistence_storage_class: block_storage
     size: "10Gi"
     default: false
     allow_expansion: true
@@ -22,12 +22,12 @@
         kind: Namespace
         name: nfs-provisioner
         state: present
-    - name: Install the Gangesha NFS Helm repository
+    - name: Install the Ganesha NFS Helm repository
       helm_repository:
         name: nfs-ganesha
         repo_url: https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
         state: present
-    - name: Helm install Gangesha NFS
+    - name: Helm install Ganesha NFS
       helm:
         name: nfs-provisioner
         namespace: nfs-provisioner
@@ -36,7 +36,7 @@
         values:
           persistence:
             enabled: true
-            storageClass: "{{ storageClass }}"
+            storageClass: "{{ persistence_storage_class }}"
             size: "{{ size }}"
           storageClass:
             create: true

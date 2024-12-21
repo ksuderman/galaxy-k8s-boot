@@ -6,60 +6,20 @@
     cluster_hostname: galaxy
     kubeconfig: ~/.kube/config
     cinder_csi_version: 2.31.2
-    ebs_volume_size: 100Gi
-    # AWS vars
-    # ebs_volume_id: vol-087781ddc9f0d4055
-    # GCP vars
-    gcp_project_id: PROJECT_ID
-    ebs_volume_id: "projects/[PROJECT_ID]/zones/us-central1-a/disks/[DISK_NAME]"
-    gce_pd_sa_name: gce-pd-csi-sa
-    gce_pd_sa_dir: /tmp/
-    gce_pd_driver_version: stable-master
+    block_storage_disk_path: /mnt/block_storage
   environment:
     KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
   tasks:
-    - name: Set facts based on cloud kube_cloud_provider
-      block:
-        - set_fact:
-            csi_driver: >
-              {% if kube_cloud_provider == "aws" %}
-              ebs.csi.aws.com
-              {% elif kube_cloud_provider == "gcp" %}
-              pd.csi.storage.gke.io
-              {% elif kube_cloud_provider == "openstack" %}
-              cinder.csi.openstack.org
-              {% else %}
-              rancher.io/local-path
-              {% endif %}
-        - set_fact:
-            sc_parameters:
-              type: >-
-                {% if kube_cloud_provider == "aws" %}
-                gp3
-                {% elif kube_cloud_provider == "gcp" %}
-                pd-balanced
-                {% else %}
-                ext4
-                {% endif %}
-      when: kube_cloud_provider is defined
-
     - name: Render the hostpath storage class template
       k8s:
         template:
           path: templates/hostpath_storage_class.yaml.j2
         state: present
 
-    - when: ebs_volume_id is defined
-      name: Render PersistentVolume
+    - name: Render the elastic block storage class
       k8s:
         template:
-          path: templates/persistent_volume.yml.j2
-        state: present
-
-    - name: Render the ebs storage class
-      k8s:
-        template:
-          path: ebs_storage_class.yml.j2
+          path: block_storage_storageclass.yml.j2
         state: present
 
     - name: Create csi-drivers namespace
@@ -67,64 +27,3 @@
         kind: Namespace
         name: csi-drivers
         state: present
-
-    - when: kube_cloud_provider == "openstack"
-      block:
-        - name: Add the Helm repository for the Cinder CSI driver
-          helm_repository:
-            name: cpo
-            repo_url: https://kubernetes.github.io/cloud-provider-openstack
-            state: present
-
-        - name: Helm install the OpenStack CSI Driver
-          helm:
-            name: cinder-csi
-            namespace: csi-drivers
-            chart_ref: cpo/openstack-cinder-csi
-            chart_version: "{{ cinder_csi_version }}"
-
-    - when: kube_cloud_provider == "gcp"
-      block:
-        - name: Clone GCP Persistent Disk CSI Driver Repository
-          ansible.builtin.git:
-            repo: https://github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver.git
-            dest: /usr/bin/src/sigs.k8s.io/gcp-compute-persistent-disk-csi-driver
-            version: master
-            depth: 1
-          become: yes
-
-        - name: Setup GCP service account for the CSI
-          shell: |
-            GOPATH=/usr/bin \
-            PROJECT={{ gcp_project_id }} \
-            GCE_PD_SA_NAME={{ gce_pd_sa_name }} \
-            GCE_PD_SA_DIR={{ gce_pd_sa_dir }} \
-            ENABLE_KMS=false \
-            ENABLE_KMS_ADMIN=false \
-            ./deploy/setup-project.sh
-          args:
-            chdir: /usr/bin/src/sigs.k8s.io/gcp-compute-persistent-disk-csi-driver
-          become: yes
-
-        - name: Deploy GCP CSI driver
-          shell: |
-            GOPATH=/usr/bin \
-            GCE_PD_SA_DIR={{ gce_pd_sa_dir }} \
-            GCE_PD_DRIVER_VERSION={{ gce_pd_driver_version }} \
-            ./deploy/kubernetes/deploy-driver.sh
-          args:
-            chdir: /usr/bin/src/sigs.k8s.io/gcp-compute-persistent-disk-csi-driver
-          become: yes
-
-    - when: kube_cloud_provider == "aws"
-      block:
-        - name: Add the AWS Helm repository
-          helm_repository:
-            name: aws-ebs-csi-driver
-            repo_url: https://kubernetes-sigs.github.io/aws-ebs-csi-driver
-            state: present
-        - name: Install AWS Disk CSI Driver
-          helm:
-            name: aws-ebs-csi-driver
-            namespace: csi-drivers
-            chart_ref: aws-ebs-csi-driver/aws-ebs-csi-driver
