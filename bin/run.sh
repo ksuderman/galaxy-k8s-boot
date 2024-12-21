@@ -15,6 +15,6 @@ docker run --privileged $VOLUMES \
        -v /var/run/dbus:/var/run/dbus   \
        -e container=docker \
        -e kube_cloud_provider=$CLOUD \
-       -e k8s_provider=$K8S  \
+       -e k8s_provider=k3s  \
        ksuderman/galaxy-k8s-boot:$VERSION
 
