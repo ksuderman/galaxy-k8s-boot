@@ -1,14 +1,14 @@
 - name: Basic setup of the node
   import_playbook: setup.yml
 
-- name: Setup Kubernetes (RKE)
+- name: Setup RKE
   hosts: rke_cluster
   roles:
     - role: rke
       tags: ["controller", "agent", "rke"]
   when: k8s_provider == "rke"
 
-- name: Setup Kubernetes (K3S)
+- name: Setup K3S
   import_playbook: k3s/site.yml
   when: k8s_provider == "k3s"
 
