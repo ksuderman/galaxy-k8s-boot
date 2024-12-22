@@ -4,7 +4,7 @@
     - kubernetes.core
   vars:
     chart: cloudve/pulsar
-    version: 0.1.1
+    version: 0.1.2
   environment:
     KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
   tasks:
