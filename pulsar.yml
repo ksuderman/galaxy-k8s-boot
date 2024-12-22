@@ -1,0 +1,24 @@
+---
+- hosts: controllers[0]
+  collections:
+    - kubernetes.core
+  vars:
+    chart: cloudve/pulsar
+    version: 0.1.1
+  environment:
+    KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
+  tasks:
+    - name: Create the pulsar namespace
+      k8s:
+        kind: Namespace
+        name: pulsar
+        state: present
+    - name: Helm install Pulsar
+      helm:
+        name: pulsar
+        namespace: pulsar
+        chart_ref: "{{ chart }}"
+        chart_version: "{{ version }}"
+        values:
+          refdata:
+            enabled: false

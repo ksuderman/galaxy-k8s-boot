@@ -25,7 +25,7 @@
     values_file: values/aws.yml
     admin_users: "suderman@jhu.edu"
     api_key: "galaxypassword"
-  when: kube_cloud_provider == "aws"
+  when: kube_cloud_provider == "aws" and application == "galaxy"
 
 - name: Install Galaxy on GCP
   import_playbook: galaxy.yml
@@ -33,7 +33,7 @@
     values_file: values/gcp.yml
     admin_users: "suderman@jhu.edu"
     api_key: "galaxypassword"
-  when: kube_cloud_provider == "gcp"
+  when: kube_cloud_provider == "gcp" and application == "galaxy"
 
 - name: Install Galaxy on OpenStack
   import_playbook: galaxy.yml
@@ -41,4 +41,8 @@
     values_file: values/openstack.yml
     admin_users: "suderman@jhu.edu"
     api_key: "galaxypassword"
-  when: kube_cloud_provider == "openstack"
+  when: kube_cloud_provider == "openstack" and application == "galaxy"
+
+- name: Install Pulsar
+  import_playbook: pulsar.yml
+  when: application == "pulsar"
