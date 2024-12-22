@@ -1,4 +1,9 @@
 ---
+- name: ensure k3s manifest dir exists
+  file:
+    path: "/var/lib/rancher/k3s/server/manifests/"
+    state: directory
+
 - name: Force traefik skip for k3s/rke (https://medium.com/@bilsted/how-to-disable-traefik-and-metrics-server-on-k3s-b7dab4ca3aae)
   copy:
     content: ""
