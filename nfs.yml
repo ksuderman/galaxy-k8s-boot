@@ -3,7 +3,7 @@
   collections:
     - kubernetes.core
   vars:
-    persistence_storage_class: block_storage
+    persistence_storage_class: blockstorage
     size: "10Gi"
     default: false
     allow_expansion: true

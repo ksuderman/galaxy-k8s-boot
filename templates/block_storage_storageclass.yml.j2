@@ -1,6 +1,6 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: block_storage
+  name: blockstorage
 provisioner: rancher.io/local-path
 volumeBindingMode: {{ pv_binding_mode | default('WaitForFirstConsumer') }}
