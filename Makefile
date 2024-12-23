@@ -1,17 +1,24 @@
 REPO=ksuderman
 IMAGE=galaxy-k8s-boot
 VERSION=$(shell cat VERSION)
+VM_NAME=dev
+VM_IP=$(shell cluster ip $(VM_NAME))
+PLATFORM="--platform linux/amd64"
 
 all: build push
 
+echo:
+	echo "IP $(VM_IP)"
+	echo "Version: $(VERSION)"
+
 build:
-	docker build -t $(REPO)/$(IMAGE):$(VERSION) .
+	docker build -t $(REPO)/$(IMAGE):$(VERSION) $(PLATFORM) .
 
 cm:
-	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.cmboot .
+	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.cmboot $(PLATFORM) .
 
 test:
-	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.test .
+	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.test $(PLATFORM) .
 
 push:
 	docker push $(REPO)/$(IMAGE):$(VERSION)
