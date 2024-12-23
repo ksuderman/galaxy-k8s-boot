@@ -1,4 +1,5 @@
-FROM ubuntu:24.04
+ARG BASE_VERSION=20.04
+FROM ubuntu:$BASE_VERSION
 
 ARG APP_DIR=/opt/galaxy-k8s-boot
 ARG KUBE_CLOUD_PROVIDER=openstack
@@ -30,7 +31,7 @@ RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == system
 ADD . $APP_DIR
 WORKDIR $APP_DIR
 
-RUN pip install --upgrade pip && pip install --break-system-packages -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Ensure D-Bus machine ID is generated
 RUN dbus-uuidgen --ensure

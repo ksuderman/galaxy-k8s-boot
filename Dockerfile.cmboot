@@ -75,7 +75,7 @@ COPY ./run.sh $APP_DIR/run.sh
 COPY ./bin $APP_DIR/bin
 COPY ./roles $APP_DIR/roles
 
-RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 ENV ANSIBLE_DEBUG=${ANSIBLE_DEBUG:--v}
 #CMD bash -c "venv/bin/ansible-playbook -e "ansible_python_interpreter=/opt/cm-boot/venv/bin/python" -i 'inventories/hosts.ini' -c local playbook.yml --tags cloudman-boot $ANSIBLE_DEBUG & wait"
 #CMD bash -c "ansible-playbook -e "ansible_python_interpreter=/usr/bin/python3" -i 'inventories/hosts.ini' -c local playbook.yml $ANSIBLE_DEBUG & wait"
