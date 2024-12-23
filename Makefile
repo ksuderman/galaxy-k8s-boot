@@ -11,6 +11,9 @@ echo:
 	echo "IP $(VM_IP)"
 	echo "Version: $(VERSION)"
 
+instance:
+	os launch ks-$(VM_NAME) --cores 16 --disk 512 --ip $(VM_IP) --user-data bin/cloud-init.sh
+
 build:
 	docker build -t $(REPO)/$(IMAGE):$(VERSION) $(PLATFORM) .
 
