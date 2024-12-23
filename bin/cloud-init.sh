@@ -3,7 +3,7 @@
 #pwd > /home/ubuntu/cloud-init.start
 #whoami >> /home/ubuntu/cloud-init.start
 cd /home/ubuntu
-git clone https://github.com/ksuderman/galaxy-k8s-boot --branch 1-dockerize-rke
+git clone https://github.com/afgane/galaxy-k8s-boot --branch 1-dockerize-rke
 cd galaxy-k8s-boot
 python3 -m venv .venv
 source .venv/bin/activate
