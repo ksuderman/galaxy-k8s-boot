@@ -4,7 +4,7 @@
     - kubernetes.core
   vars:
     chart: cloudve/pulsar
-    version: 0.1.2
+    version: 0.2.0
   environment:
     KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
   tasks:
@@ -20,5 +20,6 @@
         chart_ref: "{{ chart }}"
         chart_version: "{{ version }}"
         values:
+          api_key: "{{ pulsar_api_key }}"
           refdata:
             enabled: false
