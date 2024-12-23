@@ -3,7 +3,7 @@ IMAGE=galaxy-k8s-boot
 VERSION=$(shell cat VERSION)
 VM_NAME=dev
 VM_IP=$(shell cluster ip $(VM_NAME))
-PLATFORM="--platform linux/amd64"
+PLATFORM=--platform linux/amd64
 
 all: build push
 
