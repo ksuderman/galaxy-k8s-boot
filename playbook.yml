@@ -19,30 +19,16 @@
   vars:
     kube_cloud_provider: "{{ kube_cloud_provider }}"
 
-- name: Install Galaxy on AWS
+- name: Install Galaxy on {{ kube_cloud_provider }}
   import_playbook: galaxy.yml
   vars:
-    values_file: values/aws.yml
-    admin_users: "suderman@jhu.edu"
-    api_key: "galaxypassword"
-  when: kube_cloud_provider == "aws" and application == "galaxy"
-
-- name: Install Galaxy on GCP
-  import_playbook: galaxy.yml
-  vars:
-    values_file: values/gcp.yml
-    admin_users: "suderman@jhu.edu"
-    api_key: "galaxypassword"
-  when: kube_cloud_provider == "gcp" and application == "galaxy"
-
-- name: Install Galaxy on OpenStack
-  import_playbook: galaxy.yml
-  vars:
-    values_file: values/openstack.yml
-    admin_users: "suderman@jhu.edu"
-    api_key: "galaxypassword"
-  when: kube_cloud_provider == "openstack" and application == "galaxy"
+    values_file: "values/{{ kube_cloud_provider }}.yml"
+    galaxy_admin_users: "{{ galaxy_admin_users | default('') }}"
+    galaxy_api_key: "{{ galaxy_api_key }}"
+  when: application == "galaxy"
 
 - name: Install Pulsar
   import_playbook: pulsar.yml
+  vars:
+    pulsar_api_key: "{{ pulsar_api_key }}"
   when: application == "pulsar"
