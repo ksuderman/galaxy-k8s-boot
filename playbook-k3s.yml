@@ -12,28 +12,28 @@
 
 - name: Configure Ingress
   import_playbook: ingress.yml
-  when: kube_cloud_provider == "aws" or kube_cloud_provider == "openstack"
+#  when: kube_cloud_provider == "aws" or kube_cloud_provider == "openstack"
 
 - name: Configure storage
   import_playbook: storage.yml
   vars:
     kube_cloud_provider: "{{ kube_cloud_provider }}"
 
-- name: Install Galaxy on AWS
-  import_playbook: galaxy.yml
-  vars:
-    values_file: values/aws.yml
-    admin_users: "suderman@jhu.edu"
-    api_key: "galaxypassword"
-  when: kube_cloud_provider == "aws"
-
-- name: Install Galaxy on GCP
-  import_playbook: galaxy.yml
-  vars:
-    values_file: values/gcp.yml
-    admin_users: "suderman@jhu.edu"
-    api_key: "galaxypassword"
-  when: kube_cloud_provider == "gcp"
+#- name: Install Galaxy on AWS
+#  import_playbook: galaxy.yml
+#  vars:
+#    values_file: values/aws.yml
+#    admin_users: "suderman@jhu.edu"
+#    api_key: "galaxypassword"
+#  when: kube_cloud_provider == "aws"
+#
+#- name: Install Galaxy on GCP
+#  import_playbook: galaxy.yml
+#  vars:
+#    values_file: values/gcp.yml
+#    admin_users: "suderman@jhu.edu"
+#    api_key: "galaxypassword"
+#  when: kube_cloud_provider == "gcp"
 
 - name: Install Galaxy on OpenStack
   import_playbook: galaxy.yml
@@ -41,4 +41,4 @@
     values_file: values/openstack.yml
     admin_users: "suderman@jhu.edu"
     api_key: "galaxypassword"
-  when: kube_cloud_provider == "openstack"
+#  when: kube_cloud_provider == "openstack"

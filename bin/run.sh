@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-CLOUD=${CLOUD:=openstack}
+CLOUD=${CLOUD:-openstack}
 K8S=${K8S:-k3s}
 VERSION=${VERSION:-$(cat VERSION)}
 

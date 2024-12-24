@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
-CLOUD=${CLOUD:=openstack}
+CLOUD=${CLOUD:-openstack}
 K8S=${K8S:-k3s}
 VERSION=${VERSION:-$(cat VERSION)}
 
 DIR=/opt/galaxy-k8s-boot
 
 VOLUMES="-v ./.kube:$DIR/.kube -v ./outputs:$DIR/outputs" # -v ./inventories:$DIR/inventories"
+
+echo "Installing $CLOUD/$K8S $VERSION using $DIR"
 
 docker run -it --privileged $VOLUMES \
        --net=host  --cgroupns=host  \
