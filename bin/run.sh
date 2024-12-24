@@ -9,7 +9,7 @@ DIR=/opt/galaxy-k8s-boot
 VOLUMES="-v ./.kube:$DIR/.kube -v ./outputs:$DIR/outputs" # -v ./inventories:$DIR/inventories"
 
 docker run --privileged $VOLUMES \
-       --net=host   --cgroupns=host  \
+       --network=host   --cgroupns=host  \
        -v /sys/fs/cgroup:/sys/fs/cgroup:ro   \
        -v /run/systemd:/run/systemd   \
        -v /var/run/dbus:/var/run/dbus   \
