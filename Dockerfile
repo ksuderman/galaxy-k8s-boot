@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=ubuntu:24.04
+ARG BASE_IMAGE=ubuntu:20.04
 FROM $BASE_IMAGE
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -28,5 +28,5 @@ COPY ./bin $APP_DIR/bin
 COPY ./roles $APP_DIR/roles
 
 RUN pip install --upgrade pip && pip install --no-cache --upgrade  -r requirements.txt
-CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "$PLAYBOOK", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
+CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
 #ENTRYPOINT ["/sbin/init"]
