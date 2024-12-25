@@ -1,3 +1,5 @@
+.PHONY: k3s
+
 REPO=ksuderman
 IMAGE=galaxy-k8s-boot
 VERSION=$(shell cat VERSION)
@@ -7,24 +9,20 @@ PLATFORM=--platform linux/amd64
 
 all: build push
 
-echo:
-	echo "IP $(VM_IP)"
-	echo "Version: $(VERSION)"
-
 instance:
 	os launch ks-$(VM_NAME) --cores 16 --disk 512 --ip $(VM_IP) --user-data bin/cloud-init.sh
 
 build:
-	docker build -t $(REPO)/$(IMAGE):$(VERSION) $(PLATFORM) .
+	docker buildx build -t $(REPO)/$(IMAGE):$(VERSION) $(PLATFORM) .
 
 cm:
-	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.cmboot $(PLATFORM) .
+	docker buildx build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.cmboot $(PLATFORM) .
 
 k3s:
-	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.k3s $(PLATFORM) .
+	docker buildx build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.k3s $(PLATFORM) .
 
 test:
-	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.test $(PLATFORM) .
+	docker buildx build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.test $(PLATFORM) .
 
 push:
 	docker push $(REPO)/$(IMAGE):$(VERSION)
