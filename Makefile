@@ -13,16 +13,16 @@ instance:
 	os launch ks-$(VM_NAME) --cores 16 --disk 512 --ip $(VM_IP) --user-data bin/cloud-init.sh
 
 build:
-	docker buildx build -t $(REPO)/$(IMAGE):$(VERSION) $(PLATFORM) .
+	docker build -t $(REPO)/$(IMAGE):$(VERSION) $(PLATFORM) .
 
 cm:
-	docker buildx build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.cmboot $(PLATFORM) .
+	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.cmboot $(PLATFORM) .
 
 k3s:
-	docker buildx build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.k3s $(PLATFORM) .
+	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.k3s $(PLATFORM) .
 
 test:
-	docker buildx build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.test $(PLATFORM) .
+	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.test $(PLATFORM) .
 
 push:
 	docker push $(REPO)/$(IMAGE):$(VERSION)
