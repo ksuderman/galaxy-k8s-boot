@@ -5,7 +5,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 ARG APP_DIR=/home/ubuntu
 ARG KUBE_CLOUD_PROVIDER=openstack
-ARG K8S_PROVIDER=rke
+ARG K8S_PROVIDER=k3s
 ARG PLAYBOOK=playbook.yml
 
 RUN apt-get update \

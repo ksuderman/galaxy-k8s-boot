@@ -40,7 +40,7 @@ ENV PYTHONUNBUFFERED 1
 ARG DEBIAN_FRONTEND=noninteractive
 ARG WORK_DIR
 ARG KUBE_CLOUD_PROVIDER=openstack
-ARG K8S_PROVIDER=rke
+ARG K8S_PROVIDER=k3s
 
 RUN echo "===> Installing system packages..." \
     && apt-get -qq update && apt-get install -y --no-install-recommends \
