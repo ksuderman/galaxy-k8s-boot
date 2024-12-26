@@ -63,16 +63,16 @@ RUN echo "===> Installing system packages..." \
 COPY --from=stage1 $WORK_DIR $WORK_DIR
 
 WORKDIR /opt/galaxy-k8s-boot
-COPY requirements.txt $APP_DIR/requirements.txt
-COPY ./k3s $APP_DIR/k3s
-COPY ./rke $APP_DIR/rke
-COPY ./values $APP_DIR/values
-COPY *.yml $APP_DIR/
-COPY ./inventories/hosts.ini $APP_DIR/inventories/hosts.ini
-COPY ./templates $APP_DIR/templates
-COPY ./run.sh $APP_DIR/run.sh
-COPY ./bin $APP_DIR/bin
-COPY ./roles $APP_DIR/roles
+COPY requirements.txt $WORK_DIR/requirements.txt
+COPY ./k3s $WORK_DIR/k3s
+COPY ./rke $WORK_DIR/rke
+COPY ./values $WORK_DIR/values
+COPY *.yml $WORK_DIR/
+COPY ./inventories/hosts.ini $WORK_DIR/inventories/hosts.ini
+COPY ./templates $WORK_DIR/templates
+COPY ./run.sh $WORK_DIR/run.sh
+COPY ./bin $WORK_DIR/bin
+COPY ./roles $WORK_DIR/roles
 
 RUN pip install --no-cache-dir -r requirements.txt
 ENV ANSIBLE_DEBUG=${ANSIBLE_DEBUG:--v}
