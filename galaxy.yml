@@ -10,10 +10,10 @@
     admin_users: "suderman@jhu.edu"
     api_key: galaxypassword
   tasks:
-  - name: Install openshift
-    pip:
-      name: openshift
-      state: present
+#  - name: Install openshift
+#    pip:
+#      name: openshift
+#      state: present
   - name: Create the galaxy namespace
     k8s:
       kind: Namespace

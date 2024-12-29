@@ -5,10 +5,10 @@
   vars:
     version: 4.2.5
   tasks:
-    - pip:
-        name: openshift
-        state: present
-      #become: yes
+#    - pip:
+#        name: openshift
+#        state: present
+#      #become: yes
     - name: Create namespace for nginx ingress
       #become: yes
       k8s:

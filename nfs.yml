@@ -10,10 +10,10 @@
     reclaim: Delete
     version: 1.8.0
   tasks:
-    - name: Install openshift
-      pip:
-        name: openshift
-        state: present
+#    - name: Install openshift
+#      pip:
+#        name: openshift
+#        state: present
     - name: Create the NFS namespace
       k8s:
         kind: Namespace
