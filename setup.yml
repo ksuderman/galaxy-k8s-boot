@@ -15,7 +15,7 @@
       pip:
         name: openshift
         state: present
-        break_system_packages: yes
+#        break_system_packages: yes
     - name: Check if the instance needs a reboot.
       stat: 
         path: /var/run/reboot-required
