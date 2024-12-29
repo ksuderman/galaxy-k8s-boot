@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-provider=k3ss
+provider=k3s
 if [[ $# > 0 ]] ; then
   case $1 in
     k3s|rke)
