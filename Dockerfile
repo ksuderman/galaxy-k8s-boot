@@ -27,6 +27,7 @@ COPY ./run.sh $APP_DIR/run.sh
 COPY ./bin $APP_DIR/bin
 COPY ./roles $APP_DIR/roles
 
-RUN pip install --break-system-packages --upgrade pip && pip install --no-cache --upgrade --break-system-packages -r requirements.txt
+#RUN pip install --break-system-packages --upgrade pip &&
+RUN pip install --no-cache --upgrade --break-system-packages -r requirements.txt
 CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
 #ENTRYPOINT ["/sbin/init"]
