@@ -34,6 +34,7 @@
         mode: 0644
 
 - name: Enable and check K3s service
+  become: true
   systemd:
     name: k3s
     daemon_reload: yes
