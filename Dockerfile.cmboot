@@ -74,6 +74,6 @@ COPY ./run.sh $WORK_DIR/run.sh
 COPY ./bin $WORK_DIR/bin
 COPY ./roles $WORK_DIR/roles
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 ENV ANSIBLE_DEBUG=${ANSIBLE_DEBUG:--v}
 CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
