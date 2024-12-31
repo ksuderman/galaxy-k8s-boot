@@ -36,6 +36,9 @@ push:
 run:
 	docker run -it $(REPO)/$(IMAGE):$(VERSION) bash
 
+pull:
+	git pull origin $(shell git branch --show-current)
+	
 env:
 	python3 -m venv .venv
 	. .venv/bin/activate
