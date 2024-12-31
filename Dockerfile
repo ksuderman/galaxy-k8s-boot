@@ -27,10 +27,10 @@ COPY ./roles $APP_DIR/roles
 
 FROM stage-1 as ubuntu-20
 #RUN pip install --break-system-packages --upgrade pip &&
-RUN pip install --no-cache --upgrade -r requirements.txt
+RUN pip install --no-cache --upgrade -r requirements-$MAJOR_VERSION.txt
 
 FROM stage-1 as ubuntu-24
-RUN pip install --no-cache --upgrade --break-system-packages -r requirements.txt
+RUN pip install --no-cache --upgrade --break-system-packages -r requirements-$MAJOR_VERSION.txt
 
 FROM ubuntu-$MAJOR_VERSION as final
 ARG KUBE_CLOUD_PROVIDER=openstack

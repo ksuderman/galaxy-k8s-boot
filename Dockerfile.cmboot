@@ -75,11 +75,11 @@ COPY ./bin $WORK_DIR/bin
 COPY ./roles $WORK_DIR/roles
 
 FROM stage2 as ubuntu-20
-#RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
+#RUN pip install --no-cache-dir --break-system-packages -r requirements-$MAJOR_VERSION.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 FROM stage2 as ubuntu-24
-RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
+RUN pip install --no-cache-dir --break-system-packages -r requirements-$MAJOR_VERSION.txt
 #RUN pip install --no-cache-dir -r requirements.txt
 
 FROM ubuntu-$MAJOR_VERSION as final
