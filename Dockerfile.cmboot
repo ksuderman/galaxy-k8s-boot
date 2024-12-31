@@ -1,4 +1,5 @@
-ARG BASE_IMAGE=ubuntu:20.04
+ARG MAJOR_VERSION=20
+ARG BASE_IMAGE=ubuntu:$MAJOR_VERSION.04
 ARG WORK_DIR=/opt/galaxy-k8s-boot
 
 #=================================
@@ -30,8 +31,8 @@ RUN echo "===> Installing system packages..." \
 
 #=================================
 # STAGE 2
-#=================================
-FROM $BASE_IMAGE
+#================================
+FROM $BASE_IMAGE as stage2
 
 #ENV KUBE_LATEST_VERSION=v1.19.0
 ENV KUBE_LATEST_VERSION=v1.31.3
@@ -39,8 +40,6 @@ ENV RKE_IN_DOCKER=true
 ENV PYTHONUNBUFFERED 1
 ARG DEBIAN_FRONTEND=noninteractive
 ARG WORK_DIR
-ARG KUBE_CLOUD_PROVIDER=openstack
-ARG K8S_PROVIDER=k3s
 
 RUN echo "===> Installing system packages..." \
     && apt-get -qq update && apt-get install -y --no-install-recommends \
@@ -75,6 +74,16 @@ COPY ./run.sh $WORK_DIR/run.sh
 COPY ./bin $WORK_DIR/bin
 COPY ./roles $WORK_DIR/roles
 
+FROM stage2 as ubuntu-20
+#RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+FROM stage2 as ubuntu-24
 RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
+#RUN pip install --no-cache-dir -r requirements.txt
+
+FROM ubuntu-$MAJOR_VERSION as final
+ARG KUBE_CLOUD_PROVIDER=openstack
+ARG K8S_PROVIDER=k3s
 ENV ANSIBLE_DEBUG=${ANSIBLE_DEBUG:--v}
 CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
