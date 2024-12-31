@@ -14,7 +14,7 @@ RUN apt-get update \
 #    && apt-get install -y dbus systemd systemd-sysv systemd-cron rsyslog iproute2 python3 python3-pip python3-venv \
 WORKDIR $APP_DIR
 
-COPY requirements.txt $APP_DIR/requirements.txt
+COPY requirements*.txt $APP_DIR/
 COPY ./k3s $APP_DIR/k3s
 COPY ./rke $APP_DIR/rke
 COPY ./values $APP_DIR/values
