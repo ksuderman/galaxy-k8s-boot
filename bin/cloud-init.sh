@@ -5,6 +5,8 @@ NAME=galaxy-k8s-boot
 REPO=${REPO:-https://github.com/$OWNER/$NAME.git}
 BRANCH=${BRANCH:-1-dockerize-rke}
 
+apt update
+apt install -y docker-buildx
 cd /home/ubuntu
 git clone $REPO --branch $BRANCH
 cd $NAME
