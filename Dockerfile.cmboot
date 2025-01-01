@@ -47,6 +47,7 @@ RUN echo "===> Installing system packages..." \
         curl \
         python3-virtualenv \
         python3-pip \
+        python3-openshift \
         docker.io \
         # used by helm installer
         gawk \
@@ -75,11 +76,11 @@ COPY ./bin $WORK_DIR/bin
 COPY ./roles $WORK_DIR/roles
 
 FROM stage2 as ubuntu-20
-#RUN pip install --no-cache-dir --break-system-packages -r requirements-$MAJOR_VERSION.txt
+#RUN pip install --no-cache-dir --break-system-packages -r requirements-20.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 FROM stage2 as ubuntu-24
-RUN pip install --no-cache-dir --break-system-packages -r requirements-$MAJOR_VERSION.txt
+RUN pip install --no-cache-dir --break-system-packages -r requirements-24.txt
 #RUN pip install --no-cache-dir -r requirements.txt
 
 FROM ubuntu-$MAJOR_VERSION as final
