@@ -23,7 +23,7 @@ build24:
 	docker buildx build -t $(REPO)/$(IMAGE):$(VERSION) $(PLATFORM) --build-arg MAJOR_VERSION=24  .
 
 cm:
-	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.cmboot $(PLATFORM) --build-arg MAJOR_VERSION=$MAJOR_VERSION .
+	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.cmboot $(PLATFORM) --build-arg MAJOR_VERSION=24 .
 
 k3s:
 	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.k3s $(PLATFORM) .
