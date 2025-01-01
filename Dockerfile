@@ -22,7 +22,7 @@ COPY ./k3s $APP_DIR/k3s
 COPY ./rke $APP_DIR/rke
 COPY ./values $APP_DIR/values
 COPY *.yml $APP_DIR/
-COPY ./inventories/hosts.ini $APP_DIR/inventories/hosts.ini
+COPY ./inventories/*.ini $APP_DIR/inventories/
 COPY ./templates $APP_DIR/templates
 COPY ./run.sh $APP_DIR/run.sh
 COPY ./bin $APP_DIR/bin

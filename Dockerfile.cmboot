@@ -63,12 +63,12 @@ RUN echo "===> Installing system packages..." \
 COPY --from=stage1 $WORK_DIR $WORK_DIR
 
 WORKDIR /opt/galaxy-k8s-boot
-COPY requirements.txt $WORK_DIR/requirements.txt
+COPY requirements*.txt $WORK_DIR/
 COPY ./k3s $WORK_DIR/k3s
 COPY ./rke $WORK_DIR/rke
 COPY ./values $WORK_DIR/values
 COPY *.yml $WORK_DIR/
-COPY ./inventories/hosts.ini $WORK_DIR/inventories/hosts.ini
+COPY ./inventories/*.ini $WORK_DIR/inventories/
 COPY ./templates $WORK_DIR/templates
 COPY ./run.sh $WORK_DIR/run.sh
 COPY ./bin $WORK_DIR/bin
