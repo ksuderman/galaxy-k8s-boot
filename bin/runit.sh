@@ -12,6 +12,7 @@ echo "Installing $CLOUD/$K8S $VERSION using $DIR"
 
 docker run -it --privileged $VOLUMES \
        --net=host  --cgroupns=host  \
+       -v /etc/systemd/system:/etc/systemd/system   \
        -v /sys/fs/cgroup:/sys/fs/cgroup:ro   \
        -v /run/systemd:/run/systemd   \
        -v /var/run/dbus:/var/run/dbus   \

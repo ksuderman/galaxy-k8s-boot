@@ -1,19 +1,19 @@
 - name: Basic setup of the node
   import_playbook: setup.yml
 
-#- name: Setup RKE
-#  hosts: rke_cluster
-#  roles:
-#    - role: rke
-#      tags: ["controller", "agent", "rke"]
-##      when: k8s_provider == "rke"
+- name: Setup RKE
+  hosts: rke_cluster
+  roles:
+    - role: rke
+      tags: ["controller", "agent", "rke"]
+      when: k8s_provider == "rke"
 
 #- name: Setup RKE
 #  import_playbook: rke/main.yml
 
 - name: Setup K3S
   import_playbook: k3s/site.yml
-##  when: k8s_provider == "k3s"
+  when: k8s_provider == "k3s"
 
 - name: Install Helm
   import_playbook: helm.yml

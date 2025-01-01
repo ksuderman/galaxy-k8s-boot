@@ -6,7 +6,7 @@ FROM $BASE_IMAGE as stage-1
 ARG DEBIAN_FRONTEND=noninteractive
 ARG APP_DIR=/home/ubuntu
 ARG KUBE_CLOUD_PROVIDER=openstack
-ARG K8S_PROVIDER=k3s
+ARG K8S_PROVIDER=rke
 ARG PLAYBOOK=playbook.yml
 
 RUN apt-get update \
@@ -48,4 +48,4 @@ ARG KUBE_CLOUD_PROVIDER=openstack
 ARG K8S_PROVIDER=k3s
 ARG PLAYBOOK=playbook.yml
 
-CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
+CMD ["ansible-playbook", "-i", "inventories/localhost.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]

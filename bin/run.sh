@@ -10,6 +10,7 @@ VOLUMES="-v ./.kube:$DIR/.kube -v ./outputs:$DIR/outputs" # -v ./inventories:$DI
 
 docker run --privileged $VOLUMES \
        --network=host   --cgroupns=host  \
+       -v /etc/systemd/system:/etc/systemd/system   \
        -v /sys/fs/cgroup:/sys/fs/cgroup:ro   \
        -v /run/systemd:/run/systemd   \
        -v /var/run/dbus:/var/run/dbus   \
