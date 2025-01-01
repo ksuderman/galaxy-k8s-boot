@@ -10,16 +10,17 @@ MAJOR_VERSION=20
 
 all: build push
 
-vm: instance
+vm20: instance
+	os launch ks-$(VM_NAME) --image Featured-Ubuntu20 --cores 16 --disk 512 --ip $(VM_IP) --user-data bin/cloud-init.sh
 
-instance:
-	os launch ks-$(VM_NAME) --cores 16 --disk 512 --ip $(VM_IP) --user-data bin/cloud-init.sh
+vm24:
+	os launch ks-$(VM_NAME) --image Featured-Ubuntu24 --cores 16 --disk 512 --ip $(VM_IP) --user-data bin/cloud-init.sh
 
 build20:
 	docker build -t $(REPO)/$(IMAGE):$(VERSION) $(PLATFORM) --build-arg MAJOR_VERSION=20 --target ubuntu-20 .
 
 build24:
-	docker build -t $(REPO)/$(IMAGE):$(VERSION) $(PLATFORM) --build-arg MAJOR_VERSION=24 --target ubuntu-24 .
+	docker buildx build -t $(REPO)/$(IMAGE):$(VERSION) $(PLATFORM) --build-arg MAJOR_VERSION=24  .
 
 cm:
 	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.cmboot $(PLATFORM) --build-arg MAJOR_VERSION=$MAJOR_VERSION .
