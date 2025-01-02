@@ -6,11 +6,14 @@ VERSION=$(shell cat VERSION)
 VM_NAME=dev
 VM_IP=$(shell cluster ip $(VM_NAME))
 PLATFORM=--platform linux/amd64
-MAJOR_VERSION=20
+MAJOR_VERSION=24
 
 all: build push
 
-vm20: instance
+vm:
+	os launch ks-$(VM_NAME) --image Featured-Ubuntu$(MAJOR_VERSION) --cores 16 --disk 512 --ip $(VM_IP) --user-data bin/cloud-init.sh
+
+vm20:
 	os launch ks-$(VM_NAME) --image Featured-Ubuntu20 --cores 16 --disk 512 --ip $(VM_IP) --user-data bin/cloud-init.sh
 
 vm24:
