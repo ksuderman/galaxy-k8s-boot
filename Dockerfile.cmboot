@@ -1,6 +1,8 @@
 ARG MAJOR_VERSION=20
 ARG BASE_IMAGE=ubuntu:$MAJOR_VERSION.04
 ARG WORK_DIR=/opt/galaxy-k8s-boot
+ARG KUBE_CLOUD_PROVIDER=openstack
+ARG K8S_PROVIDER=rke
 
 #=================================
 # STAGE 1
@@ -9,6 +11,9 @@ FROM $BASE_IMAGE as stage1
 
 ENV PYTHONUNBUFFERED 1
 ARG DEBIAN_FRONTEND=noninteractive
+ARG KUBE_CLOUD_PROVIDER=openstack
+ARG K8S_PROVIDER=rke
+
 ARG WORK_DIR
 
 RUN echo "===> Installing system packages..." \
@@ -36,6 +41,9 @@ FROM $BASE_IMAGE as stage2
 
 #ENV KUBE_LATEST_VERSION=v1.19.0
 ENV KUBE_LATEST_VERSION=v1.31.3
+ARG KUBE_CLOUD_PROVIDER=openstack
+ARG K8S_PROVIDER=rke
+
 ENV RKE_IN_DOCKER=true
 ENV PYTHONUNBUFFERED 1
 ARG DEBIAN_FRONTEND=noninteractive
@@ -85,6 +93,6 @@ RUN pip install --no-cache-dir --break-system-packages -r requirements-24.txt
 
 FROM ubuntu-$MAJOR_VERSION as final
 ARG KUBE_CLOUD_PROVIDER=openstack
-ARG K8S_PROVIDER=k3s
+ARG K8S_PROVIDER=rke
 ENV ANSIBLE_DEBUG=${ANSIBLE_DEBUG:--v}
 CMD ["ansible-playbook", "-i", "inventories/localhost.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
