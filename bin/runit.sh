@@ -6,12 +6,13 @@ VERSION=${VERSION:-$(cat VERSION)}
 
 DIR=/opt/galaxy-k8s-boot
 
-VOLUMES="-v ./.kube:$DIR/.kube -v ./outputs:$DIR/outputs" # -v ./inventories:$DIR/inventories"
+#VOLUMES="-v ./.kube:$DIR/.kube -v ./outputs:$DIR/outputs" # -v ./inventories:$DIR/inventories"
+VOLUMES=""
 
 echo "Installing $CLOUD/$K8S $VERSION using $DIR"
 
 docker run -it --privileged $VOLUMES \
-       --net=host  --cgroupns=host  \
+       --network=host  --cgroupns=host  \
        -v /etc/systemd/system:/etc/systemd/system   \
        -v /sys/fs/cgroup:/sys/fs/cgroup:ro   \
        -v /run/systemd:/run/systemd   \

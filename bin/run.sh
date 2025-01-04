@@ -8,7 +8,7 @@ DIR=/opt/galaxy-k8s-boot
 
 VOLUMES="-v ./.kube:$DIR/.kube -v ./outputs:$DIR/outputs" # -v ./inventories:$DIR/inventories"
 
-docker run --privileged $VOLUMES \
+docker run --privileged \
        --network=host   --cgroupns=host  \
        -v /etc/systemd/system:/etc/systemd/system   \
        -v /sys/fs/cgroup:/sys/fs/cgroup:ro   \
@@ -16,6 +16,6 @@ docker run --privileged $VOLUMES \
        -v /var/run/dbus:/var/run/dbus   \
        -e container=docker \
        -e kube_cloud_provider=$CLOUD \
-       -e k8s_provider=k3s  \
+       -e k8s_provider=$K8S  \
        ksuderman/galaxy-k8s-boot:$VERSION
 
