@@ -41,7 +41,7 @@ ARG KUBE_CLOUD_PROVIDER
 ARG K8S_PROVIDER
 ARG PLAYBOOK
 ARG INVENTORY
-RUN pip install --no-cache --upgrade -r requirements-24.txt
+RUN pip install --no-cache --upgrade --break-system-packages -r requirements-24.txt
 
 FROM ubuntu-$MAJOR_VERSION as final
 ARG KUBE_CLOUD_PROVIDER
