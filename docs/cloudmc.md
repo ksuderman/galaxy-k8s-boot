@@ -94,3 +94,7 @@ such custom user preferences. This can be done by:
                   type: text
                   required: False
     ```
+
+Once configured, the user preferences will be visible in Galaxy under User -> Preferences -> Manage Information.
+
+![screenshot of user preferences](user_preferences.png)
