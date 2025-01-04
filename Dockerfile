@@ -8,7 +8,7 @@ ARG APP_DIR=/home/ubuntu
 ARG KUBE_CLOUD_PROVIDER=openstack
 ARG K8S_PROVIDER=rke
 ARG PLAYBOOK=playbook.yml
-ARG INVENTORY=inventories/localhost.ini
+ARG INVENTORY=inventories/hosts.ini
 
 RUN apt-get update \
     && apt-get install -y apt-utils dbus systemd systemd-sysv systemd-cron rsyslog iproute2 python3 python3-pip python3-venv openssh-client curl \
