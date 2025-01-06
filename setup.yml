@@ -15,11 +15,6 @@
           - nfs-common
         gcp_packages:
           - golang
-    - name: Install openshift
-      pip:
-        name: openshift
-        state: present
-        extra_args: "--break-system-packages"
     - name: Check if the instance needs a reboot.
       stat:
         path: /var/run/reboot-required

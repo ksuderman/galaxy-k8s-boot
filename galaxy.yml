@@ -14,11 +14,6 @@
   environment:
     KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
   tasks:
-    - name: Install openshift
-      pip:
-        name: openshift
-        state: present
-        extra_args: "--break-system-packages"
     - name: Create the galaxy namespace
       k8s:
         kind: Namespace

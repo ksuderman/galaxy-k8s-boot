@@ -7,11 +7,6 @@
   environment:
     KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
   tasks:
-    - pip:
-        name: openshift
-        state: present
-        extra_args: "--break-system-packages"
-      #become: yes
     - name: Create namespace for nginx ingress
       #become: yes
       k8s:
