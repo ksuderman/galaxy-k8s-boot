@@ -48,4 +48,4 @@ ARG KUBE_CLOUD_PROVIDER
 ARG K8S_PROVIDER
 ARG PLAYBOOK
 ARG INVENTORY
-CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
+CMD ["ansible-playbook", "-i", "inventories/gcp.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
