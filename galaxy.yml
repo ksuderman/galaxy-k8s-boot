@@ -7,8 +7,8 @@
     version: 5.17.0
     image: quay.io/galaxyproject/galaxy-min
     tag: 24.1
-    admin_users: "suderman@jhu.edu"
-    api_key: galaxypassword
+    galaxy_admin_users: "suderman@jhu.edu"
+    galaxy_api_key: galaxypassword
     job_max_cores: 1
     job_max_mem: 4
   environment:
@@ -40,8 +40,8 @@
           configs:
             galaxy.yml:
               galaxy:
-                admin_users: "{{ admin_users }}"
-                master_api_key: "{{ api_key }}"
+                admin_users: "{{ galaxy_admin_users }}"
+                master_api_key: "{{ galaxy_api_key }}"
           image:
             repository: "{{ image }}"
             tag: "{{ tag }}"
