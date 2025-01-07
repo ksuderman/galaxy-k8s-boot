@@ -1,19 +1,3 @@
-configs:
-  galaxy.yml:
-    galaxy:
-      admin_users: suderman@jhu.edu,afgane@gmail.com
-      master_api_key: galaxypassword
-      brand: AWS
-
-# Temporary values for the development
-jobs:
-  rules:
-    tpv_rules_local.yml:
-      destinations:
-        k8s:
-          max_cores: 1
-          max_mem: 4
-
 ingress:
   enabled: true
   ingressClassName: ""
@@ -24,8 +8,8 @@ ingress:
   hosts:
   - host: ~
     paths:
-    - path: /galaxy
-  path: /galaxy
+    - path: /
+  path: /
 
 persistence:
   storageClass: nfs

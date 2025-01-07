@@ -10,6 +10,7 @@
   tasks:
     - name: Install Helm
       ansible.builtin.shell:
+        executable: /bin/bash
         cmd: "set -o pipefail && curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash -s"
         creates: /usr/local/bin/helm
       become: true

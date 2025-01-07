@@ -20,9 +20,3 @@
         template:
           path: block_storage_storageclass.yml.j2
         state: present
-
-    - name: Create csi-drivers namespace
-      kubernetes.core.k8s:
-        kind: Namespace
-        name: csi-drivers
-        state: present
