@@ -2,7 +2,7 @@
 
 To integrate with CloudMC, three main steps are required.
 
-1.  When the VM is launched, port 80 must be open and the AWS metadata service v1 should be enabled.
+1.  When the VM is launched, root file system should be at least 30GB, port 80 must be open, and on AWS, metadata service v1 should be enabled.
 
 2.  Block storage should be attached and mounted at `/mnt/block_storage`. The minimum size of the disk should be 100GB.
     Sample script:
