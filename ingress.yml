@@ -1,32 +1,25 @@
 ---
-- hosts: controllers[0]
-  collections:
-    - kubernetes.core
+- name: Configure Ingress
+  hosts: controllers[0]
   vars:
     version: 4.2.5
   environment:
     KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
   tasks:
-    - pip:
-        name: openshift
-        state: present
-        extra_args: "--break-system-packages"
-      #become: yes
     - name: Create namespace for nginx ingress
-      #become: yes
-      k8s:
+      kubernetes.core.k8s:
         kind: Namespace
         name: ingress-nginx
         state: present
 
     - name: Add helm repo for nginx ingress
-      helm_repository:
+      kubernetes.core.helm_repository:
         name: ingress-nginx
         state: present
         repo_url: https://kubernetes.github.io/ingress-nginx
 
     - name: Helm install nginx ingress controller
-      helm:
+      kubernetes.core.helm:
         name: ingress-nginx
         namespace: ingress-nginx
         chart_ref: ingress-nginx/ingress-nginx
@@ -43,8 +36,7 @@
               type: "ClusterIP"
             watchIngressWithoutClass: true
     - name: "Fix for issue https://github.com/kubernetes/ingress-nginx/issues/5401"
-      k8s:
+      kubernetes.core.k8s:
         name: ingress-nginx-admission
-        # namespace: ingress-nginx
         kind: ValidatingWebhookConfiguration
         state: absent

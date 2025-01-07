@@ -26,12 +26,13 @@ sudo apt install ansible
 
 ## Launching the VM
 
-When launching a VM, use Ubuntu 24.04 image, attach a security group with ports
-22 and 80 open, and on AWS enable V1 metadata service. Also attach a block
-storage disk (minimum size of the disk should be 100GB), create a file system on
-the disk, and mount it (see commands below). By default, the playbook expects
-the disk to be mounted at `/mnt/block_storage` but this is configurable via
-`block_storage_disk_path` variable in the inventory file.
+When launching a VM, use Ubuntu 24.04 image, root file system should be at least
+30GB, attach a security group with ports 22 and 80 open, and on AWS enable V1
+metadata service. Also attach a block storage disk (minimum size of the disk
+should be 100GB), create a file system on the disk, and mount it (see commands
+below). By default, the playbook expects the disk to be mounted at
+`/mnt/block_storage` but this is configurable via `block_storage_disk_path`
+variable in the inventory file.
 
 ```bash
 sudo mkfs -t ext4 /dev/nvme1n1

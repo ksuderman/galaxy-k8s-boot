@@ -1,11 +1,12 @@
 ---
-- hosts: nodes
+- name: Basic setup of the node
+  hosts: nodes
   tasks:
     - name: Install system packages
-      apt:
+      ansible.builtin.apt:
         name: "{{ install_packages }}"
         state: present
-        update_cache: yes
+        update_cache: true
       become: true
       vars:
         install_packages: "{{ base_packages + (gcp_packages if kube_cloud_provider == 'gcp' else []) }}"
@@ -15,16 +16,11 @@
           - nfs-common
         gcp_packages:
           - golang
-    - name: Install openshift
-      pip:
-        name: openshift
-        state: present
-        extra_args: "--break-system-packages"
     - name: Check if the instance needs a reboot.
-      stat:
+      ansible.builtin.stat:
         path: /var/run/reboot-required
       register: f
     - name: Reboot if needed
-      reboot:
-      become: yes
+      ansible.builtin.reboot:
+      become: true
       when: f.stat.exists
