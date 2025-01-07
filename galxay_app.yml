@@ -1,7 +1,6 @@
 ---
-- hosts: controllers[0]
-  collections:
-    - kubernetes.core
+- name: Setup the Galaxy application
+  hosts: controllers[0]
   vars:
     chart: cloudve/galaxy
     version: 5.17.0
@@ -15,16 +14,19 @@
     KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
   tasks:
     - name: Create the galaxy namespace
-      k8s:
+      kubernetes.core.k8s:
         kind: Namespace
         name: galaxy
         state: present
+
     - name: Copy the values file to the remote host
-      copy:
+      ansible.builtin.copy:
         src: "{{ values_file }}"
         dest: /tmp/values.yml
+        mode: '0644'
+
     - name: Helm install Galaxy
-      helm:
+      kubernetes.core.helm:
         name: galaxy
         namespace: galaxy
         chart_ref: "{{ chart }}"

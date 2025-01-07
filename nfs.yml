@@ -1,7 +1,6 @@
 ---
-- hosts: controllers[0]
-  collections:
-    - kubernetes.core
+- name: Setup NFS Provisioner
+  hosts: controllers[0]
   vars:
     persistence_storage_class: blockstorage
     size: "10Gi"
@@ -13,17 +12,17 @@
     KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
   tasks:
     - name: Create the NFS namespace
-      k8s:
+      kubernetes.core.k8s:
         kind: Namespace
         name: nfs-provisioner
         state: present
     - name: Install the Ganesha NFS Helm repository
-      helm_repository:
+      kubernetes.core.helm_repository:
         name: nfs-ganesha
         repo_url: https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
         state: present
     - name: Helm install Ganesha NFS
-      helm:
+      kubernetes.core.helm:
         name: nfs-provisioner
         namespace: nfs-provisioner
         chart_ref: nfs-ganesha/nfs-server-provisioner
