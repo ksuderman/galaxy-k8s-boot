@@ -58,17 +58,28 @@ bin/inventory.sh --name my-server --ip 1.2.3.4 --key ~/.ssh/my-key.pem > invento
 
 If running the playbook on the server itself, there is `inventories/locahost` file available that captures the necessary variables.
 
-## Running the playbooks
+## Running the playbook
+
+### Installing Galaxy
 
 Once the inventory file is created, we can run the playbooks to deploy the Kubernetes cluster and the Galaxy instance. The playbook takes the arguments
 
 - `kube_cloud_provider`: must be one of `gcp`, `aws`, or `openstack`
 
 ```bash
-ansible-playbook -i inventories/my-server.ini playbooks/playbook.yml --extra-vars "kube_cloud_provider=aws"
+ansible-playbook -i inventories/my-server.ini playbook.yml --extra-vars "kube_cloud_provider=aws" --extra-vars "application=galaxy" --extra-vars "galaxy_api_key=changeme" --extra-vars "galaxy_admin_users=email@address.com"
 ```
 
-Once the playbook completes, the Galaxy instance will be available at `http://<server-ip>/galaxy/` after a few minutes.
+Once the playbook completes, the Galaxy instance will be available at `http://<server-ip>/` after a few minutes.
+
+### Installing Pulsar
+
+The playbook can set up a Pulsar node instead of Galaxy. The invocation process is the same with the only difference being the `application` variable.
+
+```bash
+ansible-playbook -i inventories/my-server.ini playbook.yml --extra-vars "kube_cloud_provider=aws" --extra-vars "application=pulsar" --extra-vars "pulsar_api_key=changeme"
+```
+
 
 ## Managing the Kubernetes cluster
 

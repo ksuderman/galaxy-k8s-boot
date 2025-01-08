@@ -20,11 +20,11 @@
     kube_cloud_provider: "{{ kube_cloud_provider }}"
 
 - name: Install Galaxy on {{ kube_cloud_provider }}
-  import_playbook: galaxy.yml
+  import_playbook: galaxy_app.yml
   vars:
     values_file: "values/{{ kube_cloud_provider }}.yml"
-    galaxy_admin_users: "{{ galaxy_admin_users | default('') }}"
-    galaxy_api_key: "{{ galaxy_api_key }}"
+    gxy_admin_users: "{{ galaxy_admin_users | default('') }}"
+    gxy_api_key: "{{ galaxy_api_key }}"
   when: application == "galaxy"
 
 - name: Install Pulsar

@@ -16,11 +16,13 @@
         kind: Namespace
         name: nfs-provisioner
         state: present
+
     - name: Install the Ganesha NFS Helm repository
       kubernetes.core.helm_repository:
         name: nfs-ganesha
         repo_url: https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
         state: present
+
     - name: Helm install Ganesha NFS
       kubernetes.core.helm:
         name: nfs-provisioner
