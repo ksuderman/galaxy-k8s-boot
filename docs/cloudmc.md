@@ -56,6 +56,7 @@ def register_pulsar(pulsar_hostname: str, pulsar_api_key: str, user_emails: list
     }
     try:
         result = requests.post(pulsar_endpoint, json=pulsar_data, headers=headers)
+        result.raise_for_status()
         print(f"Successfully registered the pulsar instance: {result}")
     except Exception as e:
         print(f"Failed to register the pulsar instance: {e}")
