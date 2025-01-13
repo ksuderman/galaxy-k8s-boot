@@ -38,13 +38,12 @@ preferences in Galaxy as key-value pairs.
 ```python
 import requests
 
-# Initialize GalaxyInstance with the Galaxy server URL and the bootstrap admin API key
 galaxy_url = "https://usegalaxy.ca"
 admin_api_key = "preshared_admin_api_key"
 
 def register_pulsar(pulsar_hostname: str, pulsar_api_key: str, user_emails: list[str]):
     """
-    Update a specific user's preferences.
+    Register a pulsar instance for a set of users.
     """
     pulsar_endpoint = f"{galaxy_url}/api/pulsar"
     pulsar_data = {
@@ -61,7 +60,7 @@ def register_pulsar(pulsar_hostname: str, pulsar_api_key: str, user_emails: list
     except Exception as e:
         print(f"Failed to register the pulsar instance: {e}")
 
-# Update the desired user's preferences
+# Register the puslar for a specific user
 user_email = "cilogon_email_address@gmail.com"
 register_pulsar("http://<public_ip_or_hostname_of_instance>/", "<PULSAR_API_KEY>", [user_email])
 
