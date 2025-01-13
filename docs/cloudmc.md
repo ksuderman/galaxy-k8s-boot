@@ -32,39 +32,39 @@ If 'pulsar' was specified, the playbook will setup Pulsar instead. Specify the `
 Upon completion of the playbook, Pulsar will respond on port 80 in approximately 2-3 minutes. CloudMC will then need to convey the `PULSAR_API_KEY` and the
 ip address/host name of the Pulsar instance to usegalaxy.ca, so that usegalaxy.ca can start routing jobs to it.
 
-This can be done using the BioBlend API, using the sample code below. The `PULSAR_HOST` and `PULSAR_API_KEY` can be saved to the corresponding user's
+This can be done using the requests library, using the sample code below. The `PULSAR_HOST` and `PULSAR_API_KEY` can be saved to the corresponding user's
 preferences in Galaxy as key-value pairs.
 
 ```python
-from bioblend.galaxy import GalaxyInstance
+import requests
 
 # Initialize GalaxyInstance with the Galaxy server URL and the bootstrap admin API key
 galaxy_url = "https://usegalaxy.ca"
 admin_api_key = "preshared_admin_api_key"
-gi_bootstrap = GalaxyInstance(url=galaxy_url, key=admin_api_key)
 
-def set_user_preference(galaxy_instance, user_email, preference_key, preference_value):
+def register_pulsar(pulsar_hostname: str, pulsar_api_key: str, user_emails: list[str]):
     """
     Update a specific user's preferences.
     """
-    users = galaxy_instance.users.get_users(f_email=user_email)
-    if not users:
-        print(f"User with email {user_email} not found.")
-        return
-
-    user_id = users[0]['id']
-    user_data = {preference_key: preference_value}
-
+    pulsar_endpoint = f"{galaxy_url}/api/pulsar"
+    pulsar_data = {
+        "hostname": pulsar_hostname,
+        "pulsarApiKey": pulsar_api_key,
+        "users":  user_emails,
+    }
+    headers = {
+        "Authorization": f"Bearer {admin_api_key}",
+    }
     try:
-        result = galaxy_instance.users.update_user(user_id, user_data=user_data)
-        print(f"Successfully updated preferences for user {user_email}: {result}")
+        result = requests.post(pulsar_endpoint, json=pulsar_data, headers=headers)
+        print(f"Successfully registered the pulsar instance: {result}")
     except Exception as e:
-        print(f"Failed to update preferences for user {user_email}: {e}")
+        print(f"Failed to register the pulsar instance: {e}")
 
 # Update the desired user's preferences
 user_email = "cilogon_email_address@gmail.com"
-set_user_preference(gi_bootstrap, user_email, "accp|pulsar_host", "http://<public_ip_or_hostname_of_instance>/")
-set_user_preference(gi_bootstrap, user_email, "accp|pulsar_api_key", "<PULSAR_API_KEY>")
+register_pulsar("http://<public_ip_or_hostname_of_instance>/", "<PULSAR_API_KEY>", [user_email])
+
 ```
 
 ## Configuring Galaxy to accept ACCP settings
