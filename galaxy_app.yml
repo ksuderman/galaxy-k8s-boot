@@ -36,24 +36,6 @@
         dest: /tmp/values.yml
         mode: '0644'
 
-    - name: Wait for webhook pod to be ready
-      kubernetes.core.k8s_info:
-        kind: Pod
-        namespace: galaxy-deps
-        label_selectors:
-          - app.kubernetes.io/name=cloudnative-pg
-      register: webhook_pod
-      until: >-
-        webhook_pod.resources is defined and
-        webhook_pod.resources | length > 0 and
-        webhook_pod.resources[0].status is defined and
-        webhook_pod.resources[0].status.phase == "Running" and
-        webhook_pod.resources[0].status.containerStatuses is defined and
-        webhook_pod.resources[0].status.containerStatuses | length > 0 and
-        webhook_pod.resources[0].status.containerStatuses[0].ready
-      retries: 30
-      delay: 5
-
     - name: Helm install Galaxy
       kubernetes.core.helm:
         name: galaxy
