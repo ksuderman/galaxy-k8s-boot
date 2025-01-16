@@ -24,18 +24,18 @@ while [[ $# > 0 ]] ; do
   shift
 done
 
-#docker run --privileged \
-#       --network=host   --cgroupns=host  \
-#       -v /etc/systemd/system:/etc/systemd/system   \
-#       -v /sys/fs/cgroup:/sys/fs/cgroup:ro   \
-#       -v /run/systemd:/run/systemd   \
-#       -v /var/run/dbus:/var/run/dbus   \
-#       -e container=docker \
-#       -e kube_cloud_provider=$CLOUD \
-#       -e k8s_provider=$K8S  \
-#       ksuderman/galaxy-k8s-boot:$VERSION
-
 docker run --privileged \
+       --network=host   --cgroupns=host  \
+       -v /etc/systemd/system:/etc/systemd/system   \
+       -v /sys/fs/cgroup:/sys/fs/cgroup:ro   \
+       -v /run/systemd:/run/systemd   \
+       -v /var/run/dbus:/var/run/dbus   \
+       -e container=docker \
        -e kube_cloud_provider=$CLOUD \
        -e k8s_provider=$K8S  \
        ksuderman/galaxy-k8s-boot:$VERSION
+
+#docker run --privileged \
+#       -e kube_cloud_provider=$CLOUD \
+#       -e k8s_provider=$K8S  \
+#       ksuderman/galaxy-k8s-boot:$VERSION
