@@ -20,25 +20,25 @@ vm24:
 	os launch ks-$(VM_NAME) --image Featured-Ubuntu24 --cores 16 --disk 512 --ip $(VM_IP) --user-data bin/cloud-init.sh
 
 build20:
-	docker build -t $(REPO)/$(IMAGE):$(VERSION) $(PLATFORM) --build-arg MAJOR_VERSION=20 --target ubuntu-20 .
+	sudo docker build -t $(REPO)/$(IMAGE):$(VERSION) $(PLATFORM) --build-arg MAJOR_VERSION=20 --target ubuntu-20 .
 
 build24:
-	docker buildx build -t $(REPO)/$(IMAGE):$(VERSION) $(PLATFORM) --build-arg MAJOR_VERSION=24  .
+	sudo docker buildx build -t $(REPO)/$(IMAGE):$(VERSION) $(PLATFORM) --build-arg MAJOR_VERSION=24  .
 
 cm:
-	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.cmboot $(PLATFORM) --build-arg MAJOR_VERSION=24 .
+	sudo docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.cmboot $(PLATFORM) --build-arg MAJOR_VERSION=24 .
 
 k3s:
-	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.k3s $(PLATFORM) .
+	sudo docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.k3s $(PLATFORM) .
 
 test:
-	docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.test $(PLATFORM) .
+	sudo docker build -t $(REPO)/$(IMAGE):$(VERSION) -f Dockerfile.test $(PLATFORM) .
 
 push:
-	docker push $(REPO)/$(IMAGE):$(VERSION)
+	sudo docker push $(REPO)/$(IMAGE):$(VERSION)
 
 run:
-	docker run -it $(REPO)/$(IMAGE):$(VERSION) bash
+	sudo docker run -it $(REPO)/$(IMAGE):$(VERSION) bash
 
 pull:
 	git pull origin $(shell git branch --show-current)
@@ -49,7 +49,7 @@ env:
 	pip install -r requirements.txt
 
 clean:
-	docker rmi --force $(REPO)/$(IMAGE):$(VERSION)
+	sudo docker rmi --force $(REPO)/$(IMAGE):$(VERSION)
 
 clean-all:
-	docker rmi --force $(shell docker images -q)
+	sudo docker rmi --force $(shell docker images -q)
