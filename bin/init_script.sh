@@ -19,7 +19,7 @@ sudo apt install -y software-properties-common git
 sudo apt-add-repository --yes --update ppa:ansible/ansible
 sudo apt install -y ansible
 
-git clone https://github.com/ksuderman/galaxy-k8s-boot.git
+git clone https://github.com/galaxyproject/galaxy-k8s-boot.git
 cd galaxy-k8s-boot
 
 sed -i "s|extra_server_args=\"--tls-san localhost --disable traefik --v=4\"|extra_server_args=\"--tls-san $(curl -s http://169.254.169.254/latest/meta-data/public-ipv4) --disable traefik --v=4\"|" inventories/localhost
