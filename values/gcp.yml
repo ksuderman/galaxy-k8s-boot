@@ -1,22 +1,3 @@
-configs:
-  galaxy.yml:
-    galaxy:
-      admin_users: suderman@jhu.edu,afgane@gmail.com
-      master_api_key: galaxypassword
-      brand: Google
-
-# Temporary values for the development
-jobs:
-  rules:
-    tpv_rules_local.yml:
-      destinations:
-        k8s:
-          max_cores: 1
-          max_mem: 4
-
-service:
-  type: LoadBalancer
-  port: 80
 ingress:
   enabled: false
   ingressClassName: ""
@@ -27,11 +8,13 @@ ingress:
   hosts:
   - host: ~
     paths:
-    - path: /galaxy
-  path: /galaxy
+    - path: /
+  path: /
+
 persistence:
   storageClass: nfs
   size: 20Gi
+
 cvmfs:
   deployPostInstallFix: true
   cvmfscsi:
@@ -46,9 +29,15 @@ cvmfs:
         pvc:
           name: cvmfs-alien-cache
     logVerbosityLevel: 5
+
 postgresql:
   persistence:
-    storageClass: nfs
+    storageClass: blockstorage
+
 rabbitmq:
   persistence:
-    storageClassName: nfs
+    storageClassName: blockstorage
+
+service:
+  type: LoadBalancer
+  port: 80

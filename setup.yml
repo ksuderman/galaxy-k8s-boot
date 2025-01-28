@@ -9,7 +9,7 @@
         update_cache: true
       become: true
       vars:
-        install_packages: "{{ base_packages + (gcp_packages if kube_cloud_provider == 'gcp' else []) }}"
+        install_packages: "{{ base_packages + (gcp_packages if cloud_provider == 'gcp' else []) }}"
         base_packages:
           - python3
           - python3-pip

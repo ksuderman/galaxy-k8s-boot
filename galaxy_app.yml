@@ -47,5 +47,8 @@
                   k8s:
                     max_cores: "{{ job_max_cores }}"
                     max_mem: "{{ job_max_mem }}"
+          service:
+            type: "{{ 'LoadBalancer' if cloud_provider == 'gcp' else 'ClusterIP' }}"
+            port: 80
 #        postgresql:
 #          galaxyDatabasePassword: galaxydbpassword

@@ -62,22 +62,42 @@ If running the playbook on the server itself, there is `inventories/locahost` fi
 
 ### Installing Galaxy
 
-Once the inventory file is created, we can run the playbooks to deploy the Kubernetes cluster and the Galaxy instance. The playbook takes the arguments
+Once the inventory file is created, we can run the playbooks to deploy the
+Kubernetes cluster and the Galaxy instance. The playbook takes the arguments:
 
-- `kube_cloud_provider`: must be one of `gcp`, `aws`, or `openstack`
+- `cloud_provider`: must be one of `gcp`, `aws`, or `openstack`
+- `chart_values_file`: Optional. Path relative to `values` subfolder containing
+  values that will be used to configure the Galaxy Helm chart. The default is
+  `accp.yml`.
 
 ```bash
-ansible-playbook -i inventories/my-server.ini playbook.yml --extra-vars "kube_cloud_provider=aws" --extra-vars "application=galaxy" --extra-vars "galaxy_api_key=changeme" --extra-vars "galaxy_admin_users=email@address.com"
+ansible-playbook -i inventories/my-server.ini playbook.yml --extra-vars "cloud_provider=aws" --extra-vars "application=galaxy" --extra-vars "galaxy_api_key=changeme" --extra-vars "galaxy_admin_users=email@address.com"
 ```
 
 Once the playbook completes, the Galaxy instance will be available at `http://<server-ip>/` after a few minutes.
+
+### Adding users
+
+By default, user registration is disabled on the Galaxy instance. To add users, you can use the `bin/add_user.sh` script. The script takes the following arguments:
+
+- `host`: The IP address of the Galaxy server
+- `galaxy_api_key`: The API key for the Galaxy admin user
+- `email`: The email address of the Galaxy user to be added
+- `password`: The password for the Galaxy user
+- `username`: The username for the Galaxy user
+
+Run the script with:
+
+```bash
+bin/add_user.sh <host> <galaxy_api_key> <email> <password> <username>
+```
 
 ### Installing Pulsar
 
 The playbook can set up a Pulsar node instead of Galaxy. The invocation process is the same with the only difference being the `application` variable.
 
 ```bash
-ansible-playbook -i inventories/my-server.ini playbook.yml --extra-vars "kube_cloud_provider=aws" --extra-vars "application=pulsar" --extra-vars "pulsar_api_key=changeme"
+ansible-playbook -i inventories/my-server.ini playbook.yml --extra-vars "cloud_provider=aws" --extra-vars "application=pulsar" --extra-vars "pulsar_api_key=changeme"
 ```
 
 
