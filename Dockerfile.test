@@ -1,41 +1,52 @@
-ARG BASE_VERSION=20.04
-FROM ubuntu:$BASE_VERSION
+ARG MAJOR_VERSION=24
+ARG BASE_IMAGE=ubuntu:$MAJOR_VERSION.04
 
-ARG APP_DIR=/opt/galaxy-k8s-boot
-ARG KUBE_CLOUD_PROVIDER=openstack
-ARG K8S_PROVIDER=rke
+FROM $BASE_IMAGE as stage-1
 
-# Prevent interaction from apt
-ENV DEBIAN_FRONTEND=noninteractive
+ARG DEBIAN_FRONTEND=noninteractive
+ARG APP_DIR=/home/ubuntu
+#ARG KUBE_CLOUD_PROVIDER=openstack
+#ARG K8S_PROVIDER=rke
+#ARG PLAYBOOK=playbook.yml
+#ARG INVENTORY=inventories/hosts.ini
 
-RUN apt-get update && apt-get install -y \
-    dbus \
-    systemd \
-    systemd-sysv \
-    iproute2 \
-    curl \
-    python3 \
-    python3-pip \
+RUN apt-get update \
+    && apt-get install -y apt-utils dbus systemd systemd-sysv systemd-cron rsyslog iproute2 python3 python3-pip python3-venv openssh-client curl \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Remove unnecessary systemd services
-RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == systemd-tmpfiles-setup.service ] || rm -f $i; done); \
-    rm -f /lib/systemd/system/multi-user.target.wants/*; \
-    rm -f /lib/systemd/system/local-fs.target.wants/*; \
-    rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
-    rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
-    rm -f /lib/systemd/system/basic.target.wants/*; \
-    rm -f /lib/systemd/system/anaconda.target.wants/*
-
-ADD . $APP_DIR
+#    && apt-get install -y dbus systemd systemd-sysv systemd-cron rsyslog iproute2 python3 python3-pip python3-venv \
 WORKDIR $APP_DIR
 
-RUN pip install --upgrade pip && pip install -r requirements.txt
+COPY requirements*.txt $APP_DIR/
+COPY ./k3s $APP_DIR/k3s
+COPY ./rke $APP_DIR/rke
+COPY ./values $APP_DIR/values
+COPY *.yml $APP_DIR/
+COPY ./inventories/*.ini $APP_DIR/inventories/
+COPY ./templates $APP_DIR/templates
+COPY ./run.sh $APP_DIR/run.sh
+COPY ./bin $APP_DIR/bin
+COPY ./roles $APP_DIR/roles
 
-# Ensure D-Bus machine ID is generated
-RUN dbus-uuidgen --ensure
+FROM stage-1 as ubuntu-20
+#ARG KUBE_CLOUD_PROVIDER
+#ARG K8S_PROVIDER
+#ARG PLAYBOOK
+#ARG INVENTORY
+RUN pip install --no-cache --upgrade -r requirements-20.txt
 
-# Set up entrypoint to use systemd
-#ENTRYPOINT ["/lib/systemd/systemd"]
-CMD ["ansible-playbook", "-i", "inventories/hosts.ini", "playbook.yml", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
+FROM stage-1 as ubuntu-24
+#ARG KUBE_CLOUD_PROVIDER
+#ARG K8S_PROVIDER
+#ARG PLAYBOOK
+#ARG INVENTORY
+RUN pip install --no-cache --upgrade --break-system-packages -r requirements-24.txt
+
+FROM ubuntu-$MAJOR_VERSION as final
+ARG KUBE_CLOUD_PROVIDER=aws
+ARG K8S_PROVIDER=rke
+ARG PLAYBOOK=playbook.yml
+ARG INVENTORY=inventories/localhost.ini
+CMD ["ansible-playbook", "-i", "$INVENTORY", "$PLAYBOOK", "-e", "kube_cloud_provider=$KUBE_CLOUD_PROVIDER", "-e", "k8s_provider=$K8S_PROVIDER", "--connection=local"]
+
