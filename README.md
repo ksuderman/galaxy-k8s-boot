@@ -65,13 +65,12 @@ If running the playbook on the server itself, there is `inventories/locahost` fi
 Once the inventory file is created, we can run the playbooks to deploy the
 Kubernetes cluster and the Galaxy instance. The playbook takes the arguments:
 
-- `cloud_provider`: must be one of `gcp`, `aws`, or `openstack`
 - `chart_values_file`: Optional. Path relative to `values` subfolder containing
   values that will be used to configure the Galaxy Helm chart. The default is
   `accp.yml`.
 
 ```bash
-ansible-playbook -i inventories/my-server.ini playbook.yml --extra-vars "cloud_provider=aws" --extra-vars "application=galaxy" --extra-vars "galaxy_api_key=changeme" --extra-vars "galaxy_admin_users=email@address.com"
+ansible-playbook -i inventories/my-server.ini playbook.yml --extra-vars "application=galaxy" --extra-vars "galaxy_api_key=changeme" --extra-vars "galaxy_admin_users=email@address.com"
 ```
 
 Once the playbook completes, the Galaxy instance will be available at `http://<server-ip>/` after a few minutes.
@@ -97,7 +96,7 @@ bin/add_user.sh <host> <galaxy_api_key> <email> <password> <username>
 The playbook can set up a Pulsar node instead of Galaxy. The invocation process is the same with the only difference being the `application` variable.
 
 ```bash
-ansible-playbook -i inventories/my-server.ini playbook.yml --extra-vars "cloud_provider=aws" --extra-vars "application=pulsar" --extra-vars "pulsar_api_key=changeme"
+ansible-playbook -i inventories/my-server.ini playbook.yml --extra-vars "application=pulsar" --extra-vars "pulsar_api_key=changeme"
 ```
 
 

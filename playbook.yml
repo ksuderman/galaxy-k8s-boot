@@ -12,7 +12,6 @@
 
 - name: Configure Ingress
   import_playbook: ingress.yml
-  when: cloud_provider == "aws" or cloud_provider == "openstack"
 
 - name: Configure storage
   import_playbook: storage.yml
