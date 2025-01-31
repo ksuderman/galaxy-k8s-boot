@@ -11,16 +11,11 @@ APPLICATION=galaxy
 GALAXY_API_KEY=changeme
 PULSAR_API_KEY=changeme
 USER=ubuntu
-HOST=$(curl -s ipconfig.me)
+HOST=$(curl -Ls ipconfig.me)
 
 #-------------------------------
 RESERVED_CORES=2
 RESERVED_MEM_MB=6144
-
-if [[ ! -e /mnt/block_storage ]] ; then
-  mdkir /mnt/block_storage
-fi
-mount /dev/sdc /mnt/block_storage
 
 sudo apt update
 sudo apt install -y software-properties-common git
