@@ -25,7 +25,7 @@ sudo apt install -y ansible
 git clone https://github.com/ksuderman/galaxy-k8s-boot.git --branch azure
 cd galaxy-k8s-boot
 
-cat inventories/locahost.template | sed "s/__USER__/$USER/" | sed "s/__HOST__/$HOST/" > inventories/localhost
+cat inventories/localhost.template | sed "s/__USER__/$USER/" | sed "s/__HOST__/$HOST/" > inventories/localhost
 
 #sed -i "s|extra_server_args=\"--tls-san localhost --disable traefik --v=4\"|extra_server_args=\"--tls-san $(curl -s http://169.254.169.254/latest/meta-data/public-ipv4) --disable traefik --v=4\"|" inventories/localhost
 
