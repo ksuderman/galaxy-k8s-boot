@@ -22,8 +22,8 @@ sudo apt install -y software-properties-common git
 sudo apt-add-repository --yes --update ppa:ansible/ansible
 sudo apt install -y ansible
 
-git clone https://github.com/ksuderman/galaxy-k8s-boot.git --branch azure
-cd galaxy-k8s-boot
+#git clone https://github.com/ksuderman/galaxy-k8s-boot.git --branch azure
+#cd galaxy-k8s-boot
 
 cat inventories/localhost.template | sed "s/__USER__/$USER/" | sed "s/__HOST__/$HOST/" > inventories/localhost
 
