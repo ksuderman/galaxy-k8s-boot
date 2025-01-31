@@ -12,7 +12,7 @@
 
 - name: Configure Ingress
   import_playbook: ingress.yml
-  when: kube_cloud_provider == "aws" or kube_cloud_provider == "openstack"
+  when: kube_cloud_provider == "aws" or kube_cloud_provider == "openstack" ot kube_cloud_provider == "azure"
 
 - name: Configure storage
   import_playbook: storage.yml
