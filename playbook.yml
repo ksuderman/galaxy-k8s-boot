@@ -12,17 +12,14 @@
 
 - name: Configure Ingress
   import_playbook: ingress.yml
-  when: kube_cloud_provider == "aws" or kube_cloud_provider == "openstack"
 
 - name: Configure storage
   import_playbook: storage.yml
-  vars:
-    kube_cloud_provider: "{{ kube_cloud_provider }}"
 
-- name: Install Galaxy on {{ kube_cloud_provider }}
+- name: Install Galaxy
   import_playbook: galaxy_app.yml
   vars:
-    values_file: "values/{{ kube_cloud_provider }}.yml"
+    values_file: "values/{{ chart_values_file | default('accp.yml') }}"
     gxy_admin_users: "{{ galaxy_admin_users | default('') }}"
     gxy_api_key: "{{ galaxy_api_key }}"
   when: application == "galaxy"

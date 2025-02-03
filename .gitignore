@@ -1,5 +1,6 @@
 .idea/
 .venv/
 .vscode/
+.prettierignore
 k3s/outputs/
 ansible.cfg

@@ -9,14 +9,11 @@
         update_cache: true
       become: true
       vars:
-        install_packages: "{{ base_packages + (gcp_packages if kube_cloud_provider == 'gcp' else []) }}"
-        base_packages:
+        install_packages:
           - python3
           - python3-pip
           - python3-openshift  # Required by the Ansible Kubernetes module
           - nfs-common
-        gcp_packages:
-          - golang
 
     - name: Check if the instance needs a reboot.
       ansible.builtin.stat:
