@@ -20,8 +20,8 @@ sudo apt install -y software-properties-common git
 sudo apt-add-repository --yes --update ppa:ansible/ansible
 sudo apt install -y ansible
 
-git clone https://github.com/galaxyproject/galaxy-k8s-boot.git
-cd galaxy-k8s-boot
+git clone https://github.com/galaxyproject/galaxy-k8s-boot.git /home/$ANSIBLE_USER/galaxy-k8s-boot
+cd /home/$ANSIBLE_USER/galaxy-k8s-boot
 
 cat inventories/localhost.template | sed "s/__HOST__/$(curl -s ifconfig.me)/" | sed "s/__USER__/$ANSIBLE_USER/" > inventories/localhost
 
