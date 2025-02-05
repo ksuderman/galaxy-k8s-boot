@@ -56,7 +56,3 @@ case $command in
     exit 1
     ;;
 esac
-
-#az vm create --resource-group JH-RIT-ANVIL-TEST-RG --name ks-dev --image Canonical:ubuntu-24_04-lts:ubuntu-pro:latest --size Standard_D16ds_v5 --admin-username ubuntu --ssh-key-values /Users/suderman/.ssh/ks-cluster.pub --os-disk-size-gb 30 --output table --custom-data bin/azure.yml
-#az vm open-port --resource-group JH-RIT-ANVIL-TEST-RG --name ks-dev --port 22 --priority 1001
-#az vm open-port --resource-group JH-RIT-ANVIL-TEST-RG --name ks-dev --port 80 --priority 1002
