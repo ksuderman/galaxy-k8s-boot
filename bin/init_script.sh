@@ -10,7 +10,7 @@ exec > >(tee /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&
 APPLICATION=galaxy
 GALAXY_API_KEY=changeme
 PULSAR_API_KEY=changeme
-ANSIBLE_USER=azureuser
+ANSIBLE_USER=ubuntu
 #-------------------------------
 RESERVED_CORES=2
 RESERVED_MEM_MB=6144
