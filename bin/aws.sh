@@ -73,11 +73,11 @@ case $command in
     ;;
   stop)
     echo "Stopping $NAME..."
-		ID=$(aws ec2 describe-instances \
-    			--filters "Name=tag:Name,Values=$NAME" \
-    			          "Name=instance-state-name,Values=running" \
-    			--query "Reservations[*].Instances[*].InstanceId" \
-    			--output text)
+    ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$NAME" \
+                      "Name=instance-state-name,Values=running" \
+            --query "Reservations[*].Instances[*].InstanceId" \
+            --output text)
     if [[ -z $ID ]] ; then
       echo "No running vm found."
       exit 1
