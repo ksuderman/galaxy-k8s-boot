@@ -2,7 +2,6 @@
 - name: Setup the Galaxy application
   hosts: controllers[0]
   vars:
-    kubeconfig: ~/.kube/config
     chart: cloudve/galaxy
     version: 5.17.0
     image: quay.io/galaxyproject/galaxy-min
@@ -10,7 +9,7 @@
     job_max_cores: 1
     job_max_mem: 4
   environment:
-    KUBECONFIG: "{{ kubeconfig }}"
+    KUBECONFIG: "{{ '/root' if ansible_user == 'root' else '/home/' + ansible_user }}/.kube/config"
   tasks:
     - name: Create the galaxy namespace
       kubernetes.core.k8s:

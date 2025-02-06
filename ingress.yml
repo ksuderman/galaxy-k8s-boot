@@ -2,10 +2,9 @@
 - name: Configure Ingress
   hosts: controllers[0]
   vars:
-    kubeconfig: ~/.kube/config
     version: 4.2.5
   environment:
-    KUBECONFIG: "{{ kubeconfig }}"
+    KUBECONFIG: "{{ '/root' if ansible_user == 'root' else '/home/' + ansible_user }}/.kube/config"
   tasks:
     - name: Create namespace for nginx ingress
       kubernetes.core.k8s:

@@ -2,11 +2,10 @@
 - name: Install Pulsar
   hosts: controllers[0]
   vars:
-    kubeconfig: ~/.kube/config
     chart: cloudve/pulsar
     version: 0.2.0
   environment:
-    KUBECONFIG: "{{ kubeconfig }}"
+    KUBECONFIG: "{{ '/root' if ansible_user == 'root' else '/home/' + ansible_user }}/.kube/config"
   tasks:
     - name: Create the Pulsar namespace
       kubernetes.core.k8s:
