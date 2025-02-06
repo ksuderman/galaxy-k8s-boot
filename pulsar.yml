@@ -5,6 +5,8 @@
     kubeconfig: ~/.kube/config
     chart: cloudve/pulsar
     version: 0.2.0
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
   tasks:
     - name: Create the Pulsar namespace
       kubernetes.core.k8s:

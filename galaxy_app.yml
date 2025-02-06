@@ -9,6 +9,8 @@
     tag: 24.1
     job_max_cores: 1
     job_max_mem: 4
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
   tasks:
     - name: Create the galaxy namespace
       kubernetes.core.k8s:
