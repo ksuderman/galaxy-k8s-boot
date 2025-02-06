@@ -29,5 +29,3 @@ master_ip='localhost'
 k3s_version='v1.31.2+k3s1'
 systemd_dir=/etc/systemd/system
 extra_server_args="--tls-san __HOST__ --disable traefik --v=4"
-ansible_environment:
-    HOME: "{{ '/root' if ansible_user == 'root' else '/home/' + ansible_user }}"

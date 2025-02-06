@@ -9,7 +9,7 @@
     reclaim: Delete
     version: 1.8.0
   environment:
-    KUBECONFIG: "{{ lookup('env', 'HOME') }}/.kube/config"
+    KUBECONFIG: "{{ '/root' if ansible_user == 'root' else '/home/' + ansible_user }}/.kube/config"
   tasks:
     - name: Create the NFS namespace
       kubernetes.core.k8s:
