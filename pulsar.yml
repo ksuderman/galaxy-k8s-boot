@@ -4,8 +4,6 @@
   vars:
     chart: cloudve/pulsar
     version: 0.2.0
-  environment:
-    KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
   tasks:
     - name: Create the Pulsar namespace
       kubernetes.core.k8s:

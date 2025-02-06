@@ -3,8 +3,6 @@
   hosts: controllers[0]
   vars:
     version: 4.2.5
-  environment:
-    KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
   tasks:
     - name: Create namespace for nginx ingress
       kubernetes.core.k8s:
