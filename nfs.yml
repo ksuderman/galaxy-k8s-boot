@@ -2,6 +2,7 @@
 - name: Setup NFS Provisioner
   hosts: controllers[0]
   vars:
+    kubeconfig: ~/.kube/config
     persistence_storage_class: blockstorage
     size: "10Gi"
     default: false

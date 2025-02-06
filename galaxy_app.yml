@@ -2,6 +2,7 @@
 - name: Setup the Galaxy application
   hosts: controllers[0]
   vars:
+    kubeconfig: ~/.kube/config
     chart: cloudve/galaxy
     version: 5.17.0
     image: quay.io/galaxyproject/galaxy-min

@@ -2,6 +2,7 @@
 - name: Configure Ingress
   hosts: controllers[0]
   vars:
+    kubeconfig: ~/.kube/config
     version: 4.2.5
   tasks:
     - name: Create namespace for nginx ingress
