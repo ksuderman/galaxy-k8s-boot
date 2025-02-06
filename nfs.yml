@@ -2,7 +2,6 @@
 - name: Setup NFS Provisioner
   hosts: controllers[0]
   vars:
-    kubeconfig: ~/.kube/config
     persistence_storage_class: blockstorage
     size: "10Gi"
     default: false
@@ -10,7 +9,7 @@
     reclaim: Delete
     version: 1.8.0
   environment:
-    KUBECONFIG: "{{ kubeconfig }}"
+    KUBECONFIG: "{{ lookup('env', 'HOME') }}/.kube/config"
   tasks:
     - name: Create the NFS namespace
       kubernetes.core.k8s:
