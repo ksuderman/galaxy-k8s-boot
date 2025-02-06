@@ -7,10 +7,10 @@ fi
 
 # Name of the instance to be created
 NAME=ks-dev
-# Name of the SSJ key pair to use. This key pair must already exist in the AWS account.
+# Name of the SSH key pair to use. This key pair must already exist in the AWS account.
 KEY=ks-galaxy-aws
 
-DISK=300
+DISK_SIZE_GB=300
 # Security group to use. This security group must already exist in the AWS
 # account and allow incoming traffic on ports 22, 80, and 6443.
 GROUP=ks-dev-sg
@@ -48,7 +48,7 @@ mapping=$(cat << EOF
   {
     "DeviceName": "/dev/sdb",
     "Ebs": {
-      "VolumeSize": $DISK,
+      "VolumeSize": $DISK_SIZE_GB,
       "VolumeType": "gp3"
     }
   }
@@ -85,7 +85,7 @@ case $command in
     aws ec2 terminate-instances --instance-ids $ID
     ;;
   *)
-    echo 'Usage: bin/azure.sh start|stop'
+    echo 'Usage: bin/aws.sh start|stop'
     exit 1
     ;;
 esac

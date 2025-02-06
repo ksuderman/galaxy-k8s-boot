@@ -66,10 +66,10 @@ Users can either edit the script files to set these variables as desired or spec
 
 ## Usage
 
-Starting an VM:
+Starting a VM:
 ```bash
 bin/aws.sh start
-bin/aws.sh start --name my-vm --key my-ssh-key --image ami-0c55b159cbfafe1f0 --group my-security-group --type t2.micro
+bin/aws.sh start --name my-vm --key my-ssh-key --image ami-0c55b159cbfafe1f0 --group my-security-group --type m6a.2xlarge
 
 bin/azure.sh start
 bin/azure.sh start --name my-vm \
