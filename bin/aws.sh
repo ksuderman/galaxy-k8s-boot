@@ -16,6 +16,7 @@ DISK_SIZE_GB=300
 GROUP=ks-dev-sg
 IMAGE=ami-0e2c8caa4b6378d8c
 TYPE=m6i.4xlarge
+YAML=aws.yml
 
 DIR=$(dirname $(realpath $0))
 
@@ -28,6 +29,7 @@ while [[ $# > 0 ]]; do
     -g|--group) GROUP=$2 ; shift ;;
     -i|--image) IMAGE=$2 ; shift ;;
     -t|--type) SIZE=$2 ; shift ;;
+    -y|--yaml) YAML=$2 ; shift ;;
     *)
       echo "Unknown option: $1"
       exit 1
@@ -69,7 +71,7 @@ case $command in
       --block-device-mappings "$mapping" \
       --count 1 \
       --output json \
-      --user-data file://$DIR/aws.yml
+      --user-data file://$DIR/$YAML
     ;;
   stop)
     echo "Stopping $NAME..."
