@@ -25,7 +25,7 @@ agents
 
 [all:vars]
 ansible_user='__USER__'
-master_ip='localhost'
+master_ip='__HOST__'
 k3s_version='v1.31.2+k3s1'
 systemd_dir=/etc/systemd/system
 extra_server_args="--tls-san __HOST__ --disable traefik --v=4"
