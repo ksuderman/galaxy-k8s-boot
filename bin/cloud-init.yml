@@ -1,0 +1,30 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+package_reboot_if_required: true
+package_repository: ppa:ansible/ansible
+packages:
+  - git
+  - ansible
+write_files:
+  - path: /run/cloud-init.sh
+    content: |
+      #!/bin/bash
+      set -e
+      #-------------------------------
+      # CloudMC configuration
+      #-------------------------------
+      # Application is either galaxy or pulsar
+      APPLICATION=galaxy
+      GALAXY_API_KEY=changeme
+      PULSAR_API_KEY=changeme
+      #-------------------------------
+      RESERVED_CORES=2
+      RESERVED_MEM_MB=6144
+      cd galaxy-k8s-boot
+      ansible-playbook -i inventories/localhost playbook.yml --extra-vars "job_max_cores=$(($(nproc) - $RESERVED_CORES))" --extra-vars "job_max_mem=$(($(free -m | awk '/^Mem:/{print $2}') - $RESERVED_MEM_MB))" --extra-vars "application=$APPLICATION" --extra-vars "galaxy_api_key=$GALAXY_API_KEY" --extra-vars "pulsar_api_key=$PULSAR_API_KEY"
+run_cmd:
+  - ["sh", "-c", "/run/cloud-init.sh"]
+
+
+

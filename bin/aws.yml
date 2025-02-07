@@ -1,0 +1,31 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+package_reboot_if_required: true
+package_repository: ppa:ansible/ansible
+packages:
+  - software-properties-common
+  - git
+  - ansible
+disk_setup:
+  /dev/nvme1n1:
+    table_type: 'mbr'
+    layout:
+      - 100
+    overwrite: true
+fs_setup:
+    - label: 'block_storage'
+      filesystem: 'ext4'
+      device: '/dev/nvme1n1'
+mounts:
+    - ["/dev/nvme1n1", "/mnt/block_storage", "ext4", "defaults", "0", "2"]
+runcmd:
+  - cat /dev/urandom | tr -dc 'a-zA-Z0-9_+-' | head -c 32 > /run/galaxy_api_key
+  - cat /dev/urandom | tr -dc 'a-zA-Z0-9_+-' | head -c 32 > /run/pulsar_api_key
+  - git clone https://github.com/ksuderman/galaxy-k8s-boot.git --branch ks-testing /run/galaxy-k8s-boot
+  - cd /run/galaxy-k8s-boot && cat inventories/localhost.template | sed "s/__HOST__/$(curl -s ifconfig.me)/g" | sed "s/__USER__/ubuntu/" > inventories/localhost
+  - cd /run/galaxy-k8s-boot && ansible-playbook -i inventories/localhost playbook.yml --extra-vars "job_max_cores=$(($(nproc) - 2))" --extra-vars "job_max_mem=$(($(free -m | awk '/^Mem:/{print $2}') - 6144))" --extra-vars "application=galaxy" --extra-vars "galaxy_api_key=$(cat /run/galaxy_api_key)" --extra-vars "pulsar_api_key=$(cat /run/pulsar_api_key)"
+
+
+
+
