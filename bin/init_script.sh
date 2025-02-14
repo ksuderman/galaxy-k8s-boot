@@ -12,7 +12,7 @@ GALAXY_API_KEY=changeme
 PULSAR_API_KEY=changeme
 #-------------------------------
 RESERVED_CORES=2
-RESERVED_MEM_MB=6144
+RESERVED_MEM_GB=6
 
 sudo apt update
 sudo apt install -y software-properties-common git
@@ -24,4 +24,4 @@ cd /home/$USER/galaxy-k8s-boot
 
 cat inventories/localhost.template | sed "s/__HOST__/$(curl -s ifconfig.me)/" | sed "s/__USER__/$USER/" > inventories/localhost
 
-ansible-playbook -i inventories/localhost playbook.yml --extra-vars "job_max_cores=$(($(nproc) - $RESERVED_CORES))" --extra-vars "job_max_mem=$(($(free -m | awk '/^Mem:/{print $2}') - $RESERVED_MEM_MB))" --extra-vars "application=$APPLICATION" --extra-vars "galaxy_api_key=$GALAXY_API_KEY" --extra-vars "pulsar_api_key=$PULSAR_API_KEY"
+ansible-playbook -i inventories/localhost playbook.yml --extra-vars "job_max_cores=$(($(nproc) - $RESERVED_CORES))" --extra-vars "job_max_mem=$(($(free -g | awk '/^Mem:/{print $2}') - $RESERVED_MEM_GB))" --extra-vars "application=$APPLICATION" --extra-vars "galaxy_api_key=$GALAXY_API_KEY" --extra-vars "pulsar_api_key=$PULSAR_API_KEY"
