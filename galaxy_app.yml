@@ -3,9 +3,7 @@
   hosts: controllers[0]
   vars:
     chart: cloudve/galaxy
-    version: 6.0.0
-    image: quay.io/galaxyproject/galaxy-min
-    tag: 24.2
+    version: 6.1.0
     job_max_cores: 1
     job_max_mem: 4
   environment:
@@ -50,9 +48,6 @@
               galaxy:
                 admin_users: "{{ gxy_admin_users }}"
                 master_api_key: "{{ gxy_api_key }}"
-          image:
-            repository: "{{ image }}"
-            tag: "{{ tag }}"
           jobs:
             rules:
               tpv_rules_local.yml:
