@@ -19,7 +19,7 @@
 - name: Install Galaxy
   import_playbook: galaxy_app.yml
   vars:
-    values_file: "values/{{ chart_values_file | default('accp.yml') }}"
+    values_file: "{{ chart_values_file | default('values/accp.yml') }}"
     gxy_admin_users: "{{ galaxy_admin_users | default('') }}"
     gxy_api_key: "{{ galaxy_api_key }}"
   when: application == "galaxy"
