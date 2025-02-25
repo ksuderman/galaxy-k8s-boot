@@ -15,7 +15,8 @@ jobs:
       uses: ksuderman/galaxy-k8s-action@master
       with:
         api-key: secret
-
+        playbook-repo: ${{ github.event.pull_request.head.repo.full_name }}
+        playbook-ref: ${{ github.event.pull_request.head.ref }}
 
     - name: Create a Galaxy user
       run: |
