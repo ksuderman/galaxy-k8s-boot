@@ -16,14 +16,6 @@ jobs:
       with:
         api-key: secret
 
-    - name: Check the nodes
-      run: |
-        sudo kubectl get nodes
-        sudo kubectl describe nodes
-        sudo kubectl get pods -A
-
-    - name: Get the Galaxy version
-      run: curl -s http://localhost/api/version | jq
 
     - name: Create a Galaxy user
       run: |
