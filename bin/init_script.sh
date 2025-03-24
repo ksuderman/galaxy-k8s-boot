@@ -12,7 +12,7 @@ GALAXY_API_KEY=changeme
 PULSAR_API_KEY=changeme
 #-------------------------------
 RESERVED_CORES=2
-RESERVED_MEM_GB=6
+RESERVED_MEM_GB=9
 
 sudo apt update
 sudo apt install -y software-properties-common git
