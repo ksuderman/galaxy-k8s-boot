@@ -23,3 +23,5 @@
           api_key: "{{ pulsar_api_key }}"
           refdata:
             enabled: false
+          persistence:
+            storageClass: "blockstorage"
