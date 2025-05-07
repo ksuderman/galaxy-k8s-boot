@@ -25,3 +25,9 @@
             enabled: false
           persistence:
             storageClass: "blockstorage"
+            accessModes:
+              - ReadWriteOnce
+          securityContext:
+            # apptainer needs privileged mode to run within the pulsar container.
+            # docker runs a privileged container as a sidecar.
+            privileged: true
