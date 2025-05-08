@@ -13,6 +13,20 @@
         name: pulsar
         state: present
 
+    - name: Helm install pulsar-deps
+      kubernetes.core.helm:
+        name: pulsar-deps
+        namespace: pulsar
+        chart_ref: "cloudve/galaxy-deps"
+        chart_version: "1.0.0"
+        values:
+          cvmfs:
+            deploy: true
+          postgresql:
+            deploy: false
+          rabbitmq:
+            deploy: false
+
     - name: Helm install Pulsar
       kubernetes.core.helm:
         name: pulsar
@@ -22,7 +36,7 @@
         values:
           api_key: "{{ pulsar_api_key }}"
           refdata:
-            enabled: false
+            enabled: true
           persistence:
             storageClass: "blockstorage"
             accessModes:
