@@ -35,6 +35,8 @@
             service:
               type: "ClusterIP"
             watchIngressWithoutClass: true
+            config:
+              proxy-body-size: "100G"
     - name: "Fix for issue https://github.com/kubernetes/ingress-nginx/issues/5401"
       kubernetes.core.k8s:
         name: ingress-nginx-admission
