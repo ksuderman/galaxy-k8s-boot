@@ -11,8 +11,8 @@ ingress:
     - path: /
   path: /
 
-image:
-  tag: "24.2.4"
+#image:
+#  tag: "25.0.1"
 
 jobs:
   rules:
@@ -56,12 +56,16 @@ configs:
       show_welcome_with_login: true
       allow_user_creation: false
   job_conf.yml:
-    tools:
-      - id: toolshed.g2.bx.psu.edu/repos/iuc/metaphlan/metaphlan/.*
-        embed_metadata_in_job: true
     runners:
       k8s:
         k8s_cleanup_job: never
+  job_metrics_conf.yml:
+    - type: core
+    - type: cgroup
+    - type: cpuinfo
+    - type: meminfo
+    - type: uname
+
 extraFileMappings:
   /galaxy/server/static/welcome.html:
     applyToWeb: true
