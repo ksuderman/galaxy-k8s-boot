@@ -22,6 +22,10 @@ jobs:
           cores: 16
           mem: 96
 
+resources:
+  limits:
+    memory: 64G
+
 persistence:
   storageClass: nfs
   size: 20Gi

@@ -23,7 +23,8 @@ runcmd:
   - cat /dev/urandom | tr -dc 'a-zA-Z0-9_+-' | head -c 32 > /run/galaxy_api_key
   - echo galaxypassword > /run/galaxy_api_key
   - cat /dev/urandom | tr -dc 'a-zA-Z0-9_+-' | head -c 32 > /run/pulsar_api_key
-  - git clone --single-branch --branch metaphlan https://github.com/ksuderman/galaxy-k8s-boot.git /run/galaxy-k8s-boot
+#  - git clone --single-branch --branch metaphlan https://github.com/ksuderman/galaxy-k8s-boot.git /run/galaxy-k8s-boot
+  - git clone https://github.com/galaxyproject/galaxy-k8s-boot.git /run/galaxy-k8s-boot
   - ip=$(curl -s ifconfig.me) && cd /run/galaxy-k8s-boot && cat inventories/localhost.template | sed "s/__HOST__/$ip/g" | sed "s/__USER__/ubuntu/" | sed "s/localhost/$ip/g" > inventories/localhost
   - cd /run/galaxy-k8s-boot && ansible-playbook -i inventories/localhost playbook.yml --extra-vars "job_max_cores=$(($(nproc) - 2))" --extra-vars "job_max_mem=$(($(free -m | awk '/^Mem:/{print $2}') - 6144))" --extra-vars "application=galaxy" --extra-vars "galaxy_api_key=$(cat /run/galaxy_api_key)" --extra-vars "pulsar_api_key=$(cat /run/pulsar_api_key)" -e "galaxy_admin_users=admin@example.com"
 
