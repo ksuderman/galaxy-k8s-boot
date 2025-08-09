@@ -59,7 +59,7 @@ configs:
       require_login: true
       show_welcome_with_login: true
       allow_user_creation: false
-      job_parameters_config_file: /galaxy/server/config/job_resource_params_conf.xml
+      job_resource_params_file: /galaxy/server/config/job_resource_params_conf.xml
       job_metrics:
         - type: core
         - type: cgroup
