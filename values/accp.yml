@@ -59,17 +59,17 @@ configs:
       require_login: true
       show_welcome_with_login: true
       allow_user_creation: false
-      job_parameters_config_file: job_resource_params_conf.xml
+      job_parameters_config_file: /galaxy/server/config/job_resource_params_conf.xml
       job_metrics:
         - type: core
         - type: cgroup
         - type: cpuinfo
         - type: meminfo
         - type: uname
-#  job_conf.yml:
-#    runners:
-#      k8s:
-#        k8s_cleanup_job: never
+  job_conf.yml:
+    runners:
+      k8s:
+        k8s_cleanup_job: never
 #    tools:
 #      - id: toolshed.g2.bx.psu.edu/repos/iuc/metaphlan/metaphlan/.*
 #        embed_metadata_in_job: true
