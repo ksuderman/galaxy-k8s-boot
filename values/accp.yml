@@ -11,8 +11,9 @@ ingress:
     - path: /
   path: /
 
-#image:
-#  tag: "25.0.1"
+image:
+  repository: ksuderman/galaxy-min
+  tag: "25.0-fda"
 
 jobs:
   rules:
