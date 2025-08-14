@@ -7,6 +7,11 @@ packages:
   - software-properties-common
   - git
   - ansible
+users:
+  - name: ubuntu
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCfOooDqFPAeeYYdXzY6BNSFga5QjdXAorwTWXmaTUv49qQWGcEioIlXTFo0bPSekd7ZHUyi6qJ7RaODNZkligwCkhg9+4jwAF8pvsTRH77MU9NC9Im3nz9hqzSvvfpGHpXoVmWoWt1SdI5+T3dHf05dsGm30/rJYa0E1/mZw+cKlsxkQXbxUhanoqnstADvd26yBYkN7lQpyRBTDwcOGX939M1E5qo1J2gSbtWQJVoZ3dNQk5pf88tCH5lZVIHbBQLgDY/MknSRp8hbZALvA4WMOSBCC7+fAVhYpwKb0ALmtX3eERi16gCSUAZrJmgIafmSvSDdhUa2eOUy5he2SB1
 runcmd:
   - mkdir /mnt/block_storage
   - ansible-galaxy collection install kubernetes.core
