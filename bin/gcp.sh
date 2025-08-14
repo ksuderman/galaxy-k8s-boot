@@ -80,7 +80,7 @@ case $command in
         ;;
     esac
     echo "Running gcp create with $CORES cores and user data $USER_DATA"
-    gcp create $NAME --cores $CORES --user-data $USER_DATA --user ubuntu --key ~/.ssh/ks-cluster.pub --ip ks-dev-ip
+    gcp create $NAME --cores $CORES --user-data $USER_DATA --ip ks-dev-ip
     ;;
   stop)
     terminate $NAME
