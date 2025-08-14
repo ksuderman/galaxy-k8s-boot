@@ -23,6 +23,23 @@
         repo_url: https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner/
         state: present
 
+#    - name: Helm install Ganesha NFS
+#      kubernetes.core.helm:
+#        name: nfs-provisioner
+#        namespace: nfs-provisioner
+#        chart_ref: nfs-ganesha/nfs-server-provisioner
+#        chart_version: "{{ version }}"
+#        values:
+#          persistence:
+#            enabled: true
+#            storageClass: "{{ persistence_storage_class }}"
+#            size: "{{ size }}"
+#          storageClass:
+#            create: true
+#            defaultClass: "{{ default }}"
+#            allowVolumeExpansion: "{{ allow_expansion }}"
+#            reclaimPolicy: "{{ reclaim }}"
+
     - name: Helm install Ganesha NFS
       kubernetes.core.helm:
         name: nfs-provisioner
@@ -30,6 +47,8 @@
         chart_ref: nfs-ganesha/nfs-server-provisioner
         chart_version: "{{ version }}"
         values:
+          service:
+            type: LoadBalancer
           persistence:
             enabled: true
             storageClass: "{{ persistence_storage_class }}"
@@ -39,3 +58,9 @@
             defaultClass: "{{ default }}"
             allowVolumeExpansion: "{{ allow_expansion }}"
             reclaimPolicy: "{{ reclaim }}"
+            mountOptions:
+              - nfsvers=4.2
+              - retrans=2
+              - timeo=30
+              - lock        # Enable NFS locking
+              - hard        # Ensure reliable locking

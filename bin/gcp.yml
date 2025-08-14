@@ -9,6 +9,7 @@ packages:
   - ansible
 runcmd:
   - mkdir /mnt/block_storage
+  - ansible-galaxy collection install kubernetes.core
 #  - cat /dev/urandom | tr -dc 'a-zA-Z0-9_+-' | head -c 32 > /run/galaxy_api_key
   - echo galaxypassword > /run/galaxy_api_key
   - cat /dev/urandom | tr -dc 'a-zA-Z0-9_+-' | head -c 32 > /run/pulsar_api_key

@@ -8,11 +8,6 @@ fi
 DIR=$(dirname $(realpath $0))
 
 CORES=16
-DISK_SIZE_GB=300
-# Security group to use. This security group must already exist in the AWS
-# account and allow incoming traffic on ports 22, 80, and 6443.
-GROUP=ks-dev-sg
-IMAGE=ami-0e2c8caa4b6378d8c
 TYPE=n2-standard-8
 NAME=ks-dev-galaxy
 
@@ -84,7 +79,8 @@ case $command in
         exit 1
         ;;
     esac
-      gcp create --cores $CORES --name $NAME --user-data $USER_DATA
+    echo "Running gcp create with $CORES cores and user data $USER_DATA"
+    gcp create $NAME --cores $CORES --user-data $USER_DATA --user ubuntu --key ~/.ssh/ks-cluster.pub --ip ks-dev-ip
     ;;
   stop)
     terminate $NAME
