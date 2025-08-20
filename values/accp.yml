@@ -13,7 +13,7 @@ ingress:
 
 image:
   repository: ksuderman/galaxy-min
-  tag: "24.2.0-fda"
+  tag: "25.0-fda"
 
 jobs:
   rules:
