@@ -16,7 +16,7 @@ image:
 #  tag: "25.0-fda"
 #  tag: "24.2.0-fda"
   repository: quay.io/galaxyproject/galaxy-min
-  tag: "24.2.0"
+  tag: "25.0.2"
 
 #setupJob:
 #  securityContext:
