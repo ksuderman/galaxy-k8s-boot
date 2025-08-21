@@ -13,14 +13,14 @@ ingress:
 
 image:
   repository: ksuderman/galaxy-min
-#  tag: "25.0-fda"
-  tag: "24.2.0-fda"
+  tag: "25.0-fda"
+#  tag: "24.2.0-fda"
 #  repository: quay.io/galaxyproject/galaxy-min
 #  tag: "24.2.0"
 
-setupJob:
-  securityContext:
-    runAsUser: 0
+#setupJob:
+#  securityContext:
+#    runAsUser: 0
 jobs:
   rules:
     tpv_rules_local.yml:
