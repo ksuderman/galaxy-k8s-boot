@@ -1,0 +1,19 @@
+---
+- name: Include base packages installation
+  ansible.builtin.include_tasks: base_packages.yml
+  when: install_base_packages | default(true)
+
+- name: Include system configuration
+  ansible.builtin.include_tasks: system_config.yml
+  when: install_base_packages | default(true)
+
+- name: Include K3s binary installation
+  ansible.builtin.include_tasks: k3s_binary.yml
+  when: install_k3s_binary | default(true)
+
+- name: Include Helm installation
+  ansible.builtin.include_tasks: helm.yml
+  when: install_helm | default(true)
+
+- name: Include cleanup tasks
+  ansible.builtin.include_tasks: cleanup.yml
