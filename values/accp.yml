@@ -64,9 +64,10 @@ configs:
   job_conf.yml:
     runners:
       k8s:
-        k8s_run_as_group_id: '101'
-        k8s_run_as_user_id: '101'
-        k8s_supplemental_group_id: '101'
+        k8s_fs_group_id: '10001'
+        k8s_run_as_group_id: '10001'
+        k8s_run_as_user_id: '10001'
+        k8s_supplemental_group_id: '10001'
   galaxy.yml:
     galaxy:
       require_login: true
