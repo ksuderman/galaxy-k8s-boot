@@ -12,11 +12,11 @@ ingress:
   path: /
 
 image:
-#  repository: ksuderman/galaxy-min
+  repository: ksuderman/galaxy-min
 #  tag: "25.0-fda"
-#  tag: "24.2.0-fda"
-  repository: quay.io/galaxyproject/galaxy-min
-  tag: "24.2.1-uid"
+  tag: "24.2.0-fda"
+#  repository: quay.io/galaxyproject/galaxy-min
+#  tag: "24.2.1-uid"
 
 #setupJob:
 #  securityContext:
