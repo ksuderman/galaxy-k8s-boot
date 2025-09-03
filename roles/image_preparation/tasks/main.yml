@@ -7,9 +7,9 @@
   ansible.builtin.include_tasks: system_config.yml
   when: install_base_packages | default(true)
 
-- name: Include K3s binary installation
-  ansible.builtin.include_tasks: k3s_binary.yml
-  when: install_k3s_binary | default(true)
+- name: Include RKE2 prerequisites installation
+  ansible.builtin.include_tasks: rke2_prerequisites.yml
+  when: install_rke2_prerequisites | default(true)
 
 - name: Include Helm installation
   ansible.builtin.include_tasks: helm.yml

@@ -35,6 +35,10 @@
         chart_version: "{{ version }}"
         values:
           api_key: "{{ pulsar_api_key }}"
+          resources:
+            requests:
+              cpu: 0.5
+              memory: 1Gi
           refdata:
             enabled: true
           persistence:

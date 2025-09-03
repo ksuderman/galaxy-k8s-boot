@@ -1,31 +1,25 @@
-[controllers]
+[masters]
 127.0.0.1 ansible_connection=local ansible_python_interpreter="/usr/bin/python3"
 
-[agents]
+[workers]
 
+
+[k8s_cluster:children]
+masters
+workers
+
+# Legacy groups for compatibility
+[controllers:children]
+masters
+
+[agents:children]
+workers
 
 [nodes:children]
-controllers
-agents
-
-[rke_cluster:children]
-controllers
-agents
-
-# Groups needed for the k3s playbook
-[master:children]
-controllers
-
-[node:children]
-agents
-
-[k3s_cluster:children]
-controllers
-agents
+masters
+workers
 
 [all:vars]
 ansible_user='ubuntu'
-master_ip='localhost'
-k3s_version='v1.31.2+k3s1'
-systemd_dir=/etc/systemd/system
-extra_server_args="--tls-san localhost --disable traefik --v=4"
+rke2_version='v1.33.4+rke2r1'
+rke2_token='defaultSecret12345'

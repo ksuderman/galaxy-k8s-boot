@@ -2,7 +2,7 @@
 
 Use this repo to deploy Galaxy. The repo contains Ansible playbooks to prepare a
 cloud image and deploy a Galaxy instance. Galaxy is deployed on a Kubernetes
-cluster using K3s. The playbooks work on GCP, AWS, and OpenStack (e.g.,
+cluster using RKE2. The playbooks work on GCP, AWS, and OpenStack (e.g.,
 Jetstream2).
 
 ## Overview
@@ -13,7 +13,7 @@ This repo is divided into two main parts:
    cloud image with all necessary components pre-installed. See [Image
    Preparation](docs/ImagePreparation.md) for details.
 2. **Deployment**: This part contains playbooks to deploy the prepared image
-   onto a Kubernetes cluster. The deployment playbook can also be used without a
+   onto a RKE2 Kubernetes cluster. The deployment playbook can also be used without a
    prepared image, but using a prepared image speeds up the deployment process.
    Documentation for the deployment process can be found below (Note: this part
    of the documentation is currently out of date so will require some
@@ -52,11 +52,11 @@ variable in the inventory file.
 You can use the following command to launch a VM:
 
 ```bash
-gcloud compute instances create ea-k3s-c1 \
+gcloud compute instances create ea-rke2-c \
   --project=anvil-and-terra-development \
   --zone=us-east4-c \
   --machine-type=e2-standard-4 \
-  --image=galaxy-k8s-boot-v2025-08-12 \
+  --image=galaxy-k8s-boot-v2025-09-02 \
   --image-project=anvil-and-terra-development \
   --boot-disk-size=100GB \
   --boot-disk-type=pd-balanced \
@@ -73,6 +73,8 @@ sudo mkfs -t ext4 /dev/nvme1n1
 sudo mkdir /mnt/block_storage
 sudo mount /dev/nvme1n1 /mnt/block_storage
 ```
+
+## TODO: Update docs below. Currently out of sync with the code.
 
 ### Automated deployment
 
@@ -104,7 +106,7 @@ Kubernetes cluster and the Galaxy instance. The playbook takes the arguments:
   `accp.yml`.
 
 ```bash
-ansible-playbook -i inventories/my-server.ini playbook.yml --extra-vars "application=galaxy" --extra-vars "galaxy_api_key=changeme" --extra-vars "galaxy_admin_users=email@address.com"
+ansible-playbook -i inventories/my-server.ini deploy-galaxy.yml --extra-vars "application=galaxy" --extra-vars "galaxy_api_key=changeme" --extra-vars "galaxy_admin_users=email@address.com"
 ```
 
 Once the playbook completes, the Galaxy instance will be available at `http://<server-ip>/` after a few minutes.

@@ -1,5 +1,5 @@
 ---
-# Configure essential kernel parameters and system settings required for Kubernetes/K3s to function properly.
+# Configure essential kernel parameters and system settings required for Kubernetes/RKE2 to function properly.
 # These settings enable container networking, disable swap, and configure bridge netfilter for pod communication.
 
 - name: Enable IPv4 forwarding
@@ -52,6 +52,15 @@
   ansible.builtin.command: swapoff -a
   become: true
   changed_when: false
+
+- name: Create /mnt/block_storage directory
+  ansible.builtin.file:
+    path: /mnt/block_storage
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'
+  become: true
 
 - name: Create .kube directory for ubuntu user
   ansible.builtin.file:

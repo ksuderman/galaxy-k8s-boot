@@ -1,6 +1,7 @@
 ---
 - name: Setup NFS Provisioner
   hosts: controllers[0]
+  gather_facts: false  # Use facts from main deploy.yml playbook
   vars:
     persistence_storage_class: blockstorage
     size: "10Gi"
@@ -11,6 +12,17 @@
   environment:
     KUBECONFIG: "{{ '/root' if ansible_user == 'root' else '/home/' + ansible_user }}/.kube/config"
   tasks:
+    - name: Stop conflicting host NFS services
+      systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop:
+        - rpc-statd.service
+        - rpcbind.service
+      ignore_errors: true
+      become: true
+
     - name: Create the NFS namespace
       kubernetes.core.k8s:
         kind: Namespace
@@ -30,6 +42,8 @@
         chart_ref: nfs-ganesha/nfs-server-provisioner
         chart_version: "{{ version }}"
         values:
+          service:
+            type: LoadBalancer
           persistence:
             enabled: true
             storageClass: "{{ persistence_storage_class }}"
@@ -39,3 +53,9 @@
             defaultClass: "{{ default }}"
             allowVolumeExpansion: "{{ allow_expansion }}"
             reclaimPolicy: "{{ reclaim }}"
+            mountOptions:
+              - nfsvers=4.2
+              - retrans=2
+              - timeo=30
+              - lock        # Enable NFS locking
+              - hard        # Ensure reliable locking

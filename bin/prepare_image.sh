@@ -30,8 +30,8 @@ EXAMPLES:
     # Basic usage for GCP
     $0 -i inventories/my_image_prep
 
-    # With custom K3s version
-    $0 -i inventories/my_image_prep -e "k3s_version=v1.29.0+k3s1"
+    # With custom RKE2 version
+    $0 -i inventories/my_image_prep -e "rke2_version=v1.33.4+rke2r1"
 
     # Dry run to see what would be done
     $0 -i inventories/my_image_prep --dry-run
