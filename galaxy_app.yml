@@ -19,7 +19,7 @@
       kubernetes.core.helm:
         name: galaxy-deps
         namespace: galaxy-deps
-        chart_ref: "cloudve/galaxy-deps"
+        chart_ref: "ksuderman/galaxy-deps"
         chart_version: "1.0.0"
 
     - name: Create the galaxy namespace

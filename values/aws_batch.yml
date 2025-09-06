@@ -67,6 +67,15 @@ configs:
         k8s_run_as_group_id: '10001'
         k8s_run_as_user_id: '10001'
         k8s_supplemental_group_id: '10001'
+      aws_batch:
+        load: galaxy.jobs.runners.aws:AWSBatchJobRunner
+        workers: 2
+        # AWS region where your Batch resources are located
+        region: us-east-1
+        # Optional: AWS credentials (prefer IAM roles for EKS)
+        aws_access_key_id: YOUR_ACCESS_KEY_ID
+        aws_secret_access_key: YOUR_SECRET_ACCESS_KEY
+
   galaxy.yml:
     galaxy:
       require_login: true
