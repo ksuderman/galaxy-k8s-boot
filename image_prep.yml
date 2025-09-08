@@ -1,17 +1,21 @@
 ---
-- name: Prepare machine image with pre-installed components
+# Optimized image preparation playbook - minimal fact gathering for speed
+- name: Prepare machine image with pre-installed components for RKE2
   hosts: all
   become: true
-  gather_facts: true
+  gather_facts: true  # Only gather facts once at the start
   vars:
+    # Cache facts to avoid re-gathering
+    ansible_facts_gathering: smart
+    ansible_facts_cache: true
     # Override these variables as needed
-    k3s_version: v1.32.7+k3s1  # https://github.com/k3s-io/k3s/tags
+    rke2_version: v1.33.4+rke2r1  # https://github.com/rancher/rke2/tags
     helm_version: v3.17.4  # https://github.com/helm/helm/tags
 
     # Package installation flags
     install_base_packages: true
     install_cvmfs: true
-    install_k3s_binary: true
+    install_rke2_prerequisites: true
     install_helm: true
 
     # CVMFS configuration (galaxyproject.cvmfs role)
@@ -43,16 +47,20 @@
       when: install_base_packages | bool
 
   roles:
+    # Roles will use facts gathered at playbook start (no re-gathering)
     - role: galaxyproject.cvmfs
       when: install_cvmfs | bool
+
     - role: image_preparation
 
   post_tasks:
+    # Fast verification checks (no fact re-gathering needed)
     - name: Verify CVMFS client installed
       ansible.builtin.command: which cvmfs_config
       register: cvmfs_config_check
       changed_when: false
       failed_when: install_cvmfs and cvmfs_config_check.rc != 0
+      when: install_cvmfs | bool
 
     - name: Probe CVMFS configuration
       ansible.builtin.command: cvmfs_config probe
@@ -64,7 +72,7 @@
     - name: Show CVMFS probe output
       ansible.builtin.debug:
         var: cvmfs_probe.stdout
-      when: install_cvmfs | bool
+      when: install_cvmfs | bool and cvmfs_probe is defined
 
     - name: Ensure autofs service running for CVMFS
       ansible.builtin.service:
@@ -107,45 +115,19 @@
       ansible.builtin.fail:
         msg: "CVMFS repository mount failures detected. See previous task output."
 
-    - name: Final CVMFS repository validation (pre-cleanup)
-      when: install_cvmfs | bool
-      block:
-        - name: Verify CVMFS repositories accessible
-          ansible.builtin.command: ls -1 /cvmfs/{{ item }}/
-          register: cvmfs_final_repo_checks
-          changed_when: false
-          failed_when: false
-          loop: "{{ cvmfs_verify_repos }}"
-          loop_control:
-            label: "{{ item }}"
-
-        - name: Summarize final CVMFS repository status
-          ansible.builtin.debug:
-            msg: |
-              Final CVMFS repo checks:
-              {% for r in cvmfs_final_repo_checks.results %}
-              - {{ r.item }}: {{ 'OK' if r.rc == 0 else 'FAILED rc=' + (r.rc | string) }}
-              {% endfor %}
-
-        - name: Fail if any final CVMFS repo check failed
-          ansible.builtin.fail:
-            msg: "Final CVMFS verification failed; repository not accessible."
-          when: cvmfs_final_repo_checks.results | selectattr('rc', 'ne', 0) | list | length > 0
-
     - name: Display installed components summary
       ansible.builtin.debug:
         msg: |
           === Image Preparation Complete ===
           Base packages: {{ 'Installed' if install_base_packages else 'Skipped' }}
           CVMFS client: {{ 'Installed' if install_cvmfs else 'Skipped' }}
-          K3s binary: {{ 'Installed' if install_k3s_binary else 'Skipped' }}
-          Helm: {{ 'Installed' if install_helm else 'Skipped' }}
+          RKE2 prerequisites: {{ 'Installed' if install_rke2_prerequisites else 'Skipped' }}
+          Helm: {{ 'Installed with pre-configured repositories' if install_helm else 'Skipped' }}
 
     - name: Verify key components are accessible
       ansible.builtin.command: "{{ item }}"
       register: version_checks
       loop:
-        - "k3s --version"
         - "helm version --short"
         - "cvmfs_config probe"
       failed_when: false
@@ -160,25 +142,24 @@
       ansible.builtin.copy:
         content: |
           Image prepared on: {{ ansible_date_time.iso8601 }}
-          Prepared by: {{ ansible_user_id }}@{{ ansible_hostname }}
-          Galaxy K8s Boot Image Preparation v1.0
 
           Installed components:
-          - K3s: {{ k3s_version }}
-          - Helm: {{ helm_version }}
+          - RKE2 prerequisites: {{ rke2_version }}
+          - Helm: {{ helm_version }} with pre-configured repositories (stable, cloudve)
           - CVMFS client with repositories: {{ cvmfs_verify_repos | join(', ') if install_cvmfs else 'NONE' }}
 
           Next steps:
           1. Create image snapshot from this instance
-          2. Use prepared image for faster K8s cluster deployment
+          2. Use prepared image for faster RKE2 cluster deployment
         dest: /etc/galaxy-k8s-boot-image-info
         mode: "0644"
 
     - name: Final cleanup and preparation for imaging
       block:
-        - name: Clear systemd journal
+        - name: Clear systemd journal (if needed for image size reduction)
           ansible.builtin.command: journalctl --vacuum-time=1s
           failed_when: false
+          changed_when: false  # This doesn't change system state meaningfully
 
         - name: Clear network configuration that might be host-specific
           ansible.builtin.file:

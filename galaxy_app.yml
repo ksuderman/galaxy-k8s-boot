@@ -1,6 +1,7 @@
 ---
 - name: Setup the Galaxy application
   hosts: controllers[0]
+  gather_facts: false  # Use facts from main deploy.yml playbook
   vars:
     chart: cloudve/galaxy
     version: 6.1.0

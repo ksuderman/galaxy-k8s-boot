@@ -8,7 +8,7 @@ NAME=$(basename $0)
 
 user=ubuntu
 key=~/.ssh/id_rsa
-version=1.31.2
+version=1.33.4
 ip=
 name=
 
@@ -18,25 +18,25 @@ function hi() {
 }
 
 function usage() {
-	less -RX << EOF 
-	
+	less -RX << EOF
+
 $(hi NAME)
     $NAME
-	 
+
 $(hi DESCRIPTION)
-    Generate an Ansible inventory file.
+    Generate an Ansible inventory file for RKE2 deployment.
 
 $(hi SYNOPSIS)
     $NAME [OPTIONS]
-	
+
 $(hi OPTIONS)
     $(hi -i)|$(hi --ip)      public ip address of the server. Required.
     $(hi -k)|$(hi --key)     path to the public SSH key used to connect to the server. Default is $(hi $key).
     $(hi -n)|$(hi --name)    hostname for the server. Required.
     $(hi -u)|$(hi --user)    username used to connect to the server.  Default is $(hi $user).
-    $(hi -v)|$(hi --version) kubernetes version to be installed. Default is $(hi $version).
-    $(hi -h)|$(hi --help)    print this help message and exit.	
-    
+    $(hi -v)|$(hi --version) RKE2 version to be installed. Default is $(hi $version).
+    $(hi -h)|$(hi --help)    print this help message and exit.
+
 Press $(hi Q) to exit
 
 EOF
@@ -44,7 +44,7 @@ EOF
 
 while [[ $# > 0 ]] ; do
 	case $1 in
-		-n|--name) 
+		-n|--name)
 			name=$2
 			shift
 			;;

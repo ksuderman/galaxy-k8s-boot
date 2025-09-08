@@ -6,7 +6,7 @@ The playbook in this repo provides is used to build a VM image for deploying
 Galaxy. Having a custom image allows for faster deployments and a more
 consistent environment. The playbook is designed to work with Ubuntu. Once
 built, the image can be used to quickly deploy Galaxy instances on Kubernetes
-clusters using K3s.
+clusters using RKE2.
 
 Many sample commands are provided that are specific to GCP, but the playbook can
 be adapted for other cloud providers like AWS or OpenStack (e.g., Jetstream2).
@@ -27,7 +27,7 @@ The process will set up the following components on the image:
 - NFS client for storage support
 
 ### Kubernetes Components
-- **K3s binary**: Latest stable version with kubectl/crictl symlinks
+- **RKE2 prerequisites**: Required system packages and configurations
 - **Helm**: Latest version for package management
 
 ### CVMFS Client
@@ -43,7 +43,7 @@ roles/image_preparation/
 │   ├── main.yml             # Orchestrates all tasks
 │   ├── base_packages.yml    # Ubuntu package installation
 │   ├── system_config.yml    # Kernel and system settings
-│   ├── k3s_binary.yml       # K3s installation
+│   ├── rke2_prerequisites.yml # RKE2 prerequisites installation
 │   ├── helm.yml             # Helm installation
 │   └── cleanup.yml          # Image cleanup
 
@@ -60,15 +60,15 @@ bin/prepare_image.sh         # Helper script
 
 ### 1. Launch a Ubuntu Instance
 
-Get the desired base Ubuntu image. The code has been tested with the Ubuntu 24.04.
+Get the latest base Ubuntu image (pick the `amd64` variant). The code has been
+tested with the Ubuntu 24.04.
 
 ```bash
 gcloud compute images list \
   --project=ubuntu-os-cloud \
   --filter="family=ubuntu-minimal-2404-lts AND status=READY" \
   --format="value(name)" \
-  --sort-by="~creationTimestamp" \
-  --limit=1
+  --sort-by="~creationTimestamp"
 ```
 
 Update the `--image` parameter in the instance creation command, as well as
@@ -79,7 +79,7 @@ gcloud compute instances create ea-mi \
   --project=anvil-and-terra-development \
   --zone=us-east4-b \
   --machine-type=n1-standard-2 \
-  --image=ubuntu-minimal-2404-noble-amd64-v20250818 \
+  --image=ubuntu-minimal-2404-noble-amd64-v20250828 \
   --image-project=ubuntu-os-cloud \
   --boot-disk-size=99GB \
   --tags=http-server,https-server \
@@ -108,7 +108,7 @@ gcloud compute instances stop ea-mi --zone=us-east4-b
 Create the image, updating the name and source disk as needed:
 
 ```bash
-gcloud compute images create galaxy-k8s-boot-v2025-08-20 \
+gcloud compute images create galaxy-k8s-boot-v2025-09-02 \
   --source-disk=ea-mi \
   --source-disk-zone=us-east4-b \
   --family=galaxy-k8s-boot \
@@ -126,8 +126,8 @@ documentation.
 Override variables in inventory or command line:
 
 ```bash
-# Different K3s version
--e "k3s_version=v1.33.4+k3s1"
+# Different RKE2 version
+-e "rke2_version=v1.33.4+rke2r1"
 
 # Different Helm version
 -e "helm_version=v3.18.6"

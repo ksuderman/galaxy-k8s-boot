@@ -1,8 +1,8 @@
 - name: Basic setup of the node
   import_playbook: setup.yml
 
-- name: Setup Kubernetes
-  import_playbook: k3s/site.yml
+- name: Setup RKE2 Kubernetes cluster
+  import_playbook: rke2_setup.yml
 
 - name: Install Helm
   import_playbook: helm.yml

@@ -1,0 +1,86 @@
+---
+# Pre-install RKE2 in the base image for faster deployments
+# This installs RKE2 binaries but leaves them disabled until runtime configuration
+
+- name: Install RKE2 prerequisite packages
+  ansible.builtin.apt:
+    name:
+      - curl
+      - iptables
+      - apparmor-utils
+    state: present
+  become: true
+
+- name: Create RKE2 directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /etc/rancher/rke2
+    - /var/lib/rancher/rke2
+    - /usr/local/bin
+  become: true
+
+- name: Download RKE2 installation script
+  ansible.builtin.get_url:
+    url: https://get.rke2.io
+    dest: /tmp/install-rke2.sh
+    mode: '0755'
+  become: true
+
+- name: Install RKE2 binaries
+  ansible.builtin.shell: |
+    INSTALL_RKE2_VERSION="{{ rke2_version | default('v1.33.4+rke2r1') }}" \
+    INSTALL_RKE2_TYPE=server \
+    /tmp/install-rke2.sh
+  args:
+    creates: /usr/local/bin/rke2
+  become: true
+
+- name: Create kubectl symlink
+  ansible.builtin.file:
+    src: /var/lib/rancher/rke2/bin/kubectl
+    dest: /usr/local/bin/kubectl
+    state: link
+    force: true
+  become: true
+
+- name: Disable RKE2 service auto-start (will be configured at runtime)
+  ansible.builtin.systemd:
+    name: rke2-server
+    enabled: false
+    masked: false
+    daemon_reload: true
+  become: true
+
+- name: Create RKE2 config template directory
+  ansible.builtin.file:
+    path: /etc/rancher/rke2/templates
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: Create basic RKE2 config template
+  ansible.builtin.copy:
+    content: |
+      # RKE2 config template - will be populated at runtime
+      # This file is used by the deploy playbook to generate the actual config
+      write-kubeconfig-mode: "0644"
+      tls-san:
+        - 127.0.0.1
+        - localhost
+      disable:
+        - rke2-traefik
+        - rke2-ingress-nginx
+      cni:
+        - canal
+    dest: /etc/rancher/rke2/templates/config.yaml.template
+    mode: '0644'
+  become: true
+
+- name: Clean up installation script
+  ansible.builtin.file:
+    path: /tmp/install-rke2.sh
+    state: absent
+  become: true

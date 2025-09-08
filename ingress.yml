@@ -1,6 +1,7 @@
 ---
 - name: Configure Ingress
-  hosts: controllers[0]
+  hosts: masters[0]
+  gather_facts: false  # Use facts from main deploy.yml playbook
   vars:
     version: 4.2.5
   environment:
