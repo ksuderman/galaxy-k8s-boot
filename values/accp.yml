@@ -13,7 +13,7 @@ ingress:
 
 image:
   repository: ksuderman/galaxy-min
-  tag: "25.1-biom1"
+  tag: "25.1-batch"
 #  repository: quay.io/galaxyproject/galaxy-min
 #  tag: "24.2.1-uid"
 
