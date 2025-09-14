@@ -30,6 +30,8 @@
         chart_ref: nfs-ganesha/nfs-server-provisioner
         chart_version: "{{ version }}"
         values:
+          service:
+            type: LoadBalancer
           persistence:
             enabled: true
             storageClass: "{{ persistence_storage_class }}"
