@@ -32,6 +32,43 @@
         values:
           service:
             type: LoadBalancer
+            # Expose all required NFS and locking ports
+            ports:
+              nfs: 2049
+              mountd: 20048
+              rpcbind: 111
+              nlm: 32765
+            # Ensure session affinity for locking
+            sessionAffinity: ClientIP
+            sessionAffinityConfig:
+              clientIP:
+                timeoutSeconds: 10800
+          mountOptions:
+            - nfsvers=4.1
+            - vers=4.1
+            - hard
+            - intr
+            - rsize=1048576
+            - wsize=1048576
+            - timeo=600
+            - retrans=2
+            - locks         # Enable NFS locking
+            - local_lock=all # Use all locking mechanisms
+          # Enable NFS locking services
+          env:
+            - name: ENABLE_NFS_V4
+              value: "yes"
+            - name: ENABLE_NLM
+              value: "yes"
+            - name: GRACE_PERIOD
+              value: "90"
+          # Additional container settings for locking
+          securityContext:
+            privileged: true
+            capabilities:
+              add:
+                - SYS_ADMIN
+                - DAC_READ_SEARCH
           persistence:
             enabled: true
             storageClass: "{{ persistence_storage_class }}"

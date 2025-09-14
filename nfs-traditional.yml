@@ -1,0 +1,169 @@
+---
+- name: Setup Traditional NFS Server
+  hosts: controllers[0]
+  vars:
+    persistence_storage_class: blockstorage
+    size: "10Gi"
+    nfs_image: "k8s.gcr.io/volume-nfs:0.8"
+  environment:
+    KUBECONFIG: "{{ '/root' if ansible_user == 'root' else '/home/' + ansible_user }}/.kube/config"
+  tasks:
+    - name: Create the NFS namespace
+      kubernetes.core.k8s:
+        kind: Namespace
+        name: nfs-server
+        state: present
+
+    - name: Create NFS Server PVC
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: nfs-server-pvc
+            namespace: nfs-server
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: "{{ size }}"
+            storageClassName: "{{ persistence_storage_class }}"
+
+    - name: Create NFS Server Deployment
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: nfs-server
+            namespace: nfs-server
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: nfs-server
+            template:
+              metadata:
+                labels:
+                  app: nfs-server
+              spec:
+                containers:
+                - name: nfs-server
+                  image: "{{ nfs_image }}"
+                  ports:
+                  - containerPort: 2049
+                    name: nfs
+                  - containerPort: 20048
+                    name: mountd
+                  - containerPort: 111
+                    name: rpcbind
+                  - containerPort: 32765
+                    name: nlm
+                  - containerPort: 32767
+                    name: nlm-udp
+                    protocol: UDP
+                  env:
+                  - name: SHARED_DIRECTORY
+                    value: /exports
+                  # Enable all NFS locking services
+                  - name: SYNC
+                    value: "true"
+                  - name: FSID
+                    value: "0"
+                  - name: CROSSMNT
+                    value: "true"
+                  - name: NO_ROOT_SQUASH
+                    value: "true"
+                  securityContext:
+                    privileged: true
+                    capabilities:
+                      add:
+                        - SYS_ADMIN
+                        - SETUID
+                        - SETGID
+                        - DAC_READ_SEARCH
+                        - DAC_OVERRIDE
+                  volumeMounts:
+                  - name: nfs-storage
+                    mountPath: /exports
+                  readinessProbe:
+                    exec:
+                      command:
+                      - "/bin/sh"
+                      - "-c"
+                      - "showmount -e localhost"
+                    initialDelaySeconds: 30
+                    periodSeconds: 10
+                  livenessProbe:
+                    exec:
+                      command:
+                      - "/bin/sh"
+                      - "-c"
+                      - "rpcinfo -p localhost | grep nfs"
+                    initialDelaySeconds: 30
+                    periodSeconds: 30
+                volumes:
+                - name: nfs-storage
+                  persistentVolumeClaim:
+                    claimName: nfs-server-pvc
+
+    - name: Create NFS Server Service
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: nfs-server
+            namespace: nfs-server
+          spec:
+            type: LoadBalancer
+            sessionAffinity: ClientIP
+            sessionAffinityConfig:
+              clientIP:
+                timeoutSeconds: 10800
+            ports:
+            - port: 2049
+              targetPort: 2049
+              name: nfs
+              protocol: TCP
+            - port: 111
+              targetPort: 111
+              name: rpcbind
+              protocol: TCP
+            - port: 20048
+              targetPort: 20048
+              name: mountd
+              protocol: TCP
+            - port: 32765
+              targetPort: 32765
+              name: nlm
+              protocol: TCP
+            - port: 32767
+              targetPort: 32767
+              name: nlm-udp
+              protocol: UDP
+            selector:
+              app: nfs-server
+
+    - name: Create NFS Storage Class
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: nfs
+          provisioner: manual
+          parameters:
+            archiveOnDelete: "false"
+          mountOptions:
+            - vers=4.1
+            - hard
+            - intr
+            - rsize=1048576
+            - wsize=1048576
+            - timeo=600
+            - retrans=2
+            - locks
+            - local_lock=all
+            - fsc  # Enable local caching

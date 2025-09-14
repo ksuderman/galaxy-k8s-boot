@@ -1,0 +1,44 @@
+    execution:
+      default: tpv_dispatcher
+      environments:
+        tpv_dispatcher:
+          container_monitor: false
+          docker_default_container_id: 'quay.io/galaxyproject/galaxy-min:25.0.rc1'
+          function: map_tool_to_destination
+          rules_module: tpv.rules
+          runner: dynamic
+          tpv_config_files:
+          - https://gxy.io/tpv/db.yml
+          - lib/galaxy/jobs/rules/tpv_rules_local.yml
+          type: python
+    handling:
+      assign:
+      - db-skip-locked
+    runners:
+      k8s:
+        k8s_cleanup_job: never
+        k8s_data_volume_claim: 'galaxy-galaxy-pvc:/galaxy/server/database'
+        k8s_fs_group_id: '10001'
+        k8s_galaxy_instance_id: 'galaxy'
+        k8s_interactivetools_ingress_annotations: |
+          
+          cert-manager.io/cluster-issuer: letsencrypt-prod
+          nginx.ingress.kubernetes.io/proxy-body-size: 10G
+          nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+        k8s_interactivetools_use_ssl: true
+        k8s_job_ttl_secs_after_finished: 90
+        k8s_namespace: 'galaxy'
+        k8s_persistent_volume_claims: |-
+          galaxy-galaxy-pvc/config:/galaxy/server/database/config:r,galaxy-galaxy-pvc/tmp:/galaxy/server/database/tmp:rw,galaxy-galaxy-pvc/tool-data:/galaxy/server/database/tool-data:rw,galaxy-galaxy-pvc/tools:/galaxy/server/database/tools:r,galaxy-galaxy-pvc/shed_tools:/galaxy/server/database/shed_tools:r,galaxy-refdata-gxy-pvc/data.galaxyproject.org:/cvmfs/data.galaxyproject.org:r,galaxy-galaxy-pvc/cvmfsclone:/cvmfs/cloud.galaxyproject.org:r
+        k8s_pod_priority_class: |-
+          galaxy-job-priority
+        k8s_pull_policy: IfNotPresent
+        k8s_run_as_group_id: '10001'
+        k8s_run_as_user_id: '10001'
+        k8s_supplemental_group_id: '10001'
+        k8s_use_service_account: true
+        k8s_working_volume_claim: 'galaxy-galaxy-pvc:/galaxy/server/database'
+        load: galaxy.jobs.runners.kubernetes:KubernetesJobRunner
+      local:
+        load: galaxy.jobs.runners.local:LocalJobRunner
+        workers: 4
