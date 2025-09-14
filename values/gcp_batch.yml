@@ -100,7 +100,15 @@ extraFileMappings:
               </div>
           </body>
       </html>
-
+extraVolumes:
+  - name: gcp_batch_key
+    secret:
+      secretName: gcp-batch-key
+      defaultMode: 0400
+extraVolumeMounts:
+  - name: gcp-batch-key
+    mountPath: /etc/secrets/galaxy
+    readOnly: true
 configs:
   job_conf.yml:
     runners:
@@ -110,7 +118,7 @@ configs:
         # Basic GCP settings
         project_id: anvil-and-terra-development
         region: us-east1
-        service_account_file: /path/to/service-account-key.json
+        service_account_file: /etc/secrets/galaxy/key.json
 
         # NFS configuration (required)
         nfs_server: 10.0.0.100  # NFS server IP or hostname
