@@ -59,17 +59,6 @@ rabbitmq:
   persistence:
     storageClassName: blockstorage
 
-  galaxy.yml:
-    galaxy:
-      require_login: false
-      show_welcome_with_login: true
-      allow_user_creation: true
-      job_metrics:
-        - type: core
-        - type: cgroup
-        - type: cpuinfo
-        - type: meminfo
-        - type: uname
 extraFileMappings:
   /galaxy/server/static/welcome.html:
     applyToWeb: true
@@ -101,7 +90,7 @@ extraFileMappings:
           </body>
       </html>
 extraVolumes:
-  - name: gcp_batch_key
+  - name: gcp-batch-key
     secret:
       secretName: gcp-batch-key
       defaultMode: 0400
@@ -110,6 +99,17 @@ extraVolumeMounts:
     mountPath: /etc/secrets/galaxy
     readOnly: true
 configs:
+  galaxy.yml:
+    galaxy:
+      require_login: false
+      show_welcome_with_login: true
+      allow_user_creation: true
+      job_metrics:
+        - type: core
+        - type: cgroup
+        - type: cpuinfo
+        - type: meminfo
+        - type: uname
   job_conf.yml:
     runners:
       gcp_batch:
