@@ -107,16 +107,16 @@
               app: nfs-server
 
     # Wait for NFS server to be ready
-    - name: Wait for NFS server to be ready
+    - name: Wait for NFS server LoadBalancer to get external IP
       kubernetes.core.k8s_info:
         api_version: v1
         kind: Service
         name: nfs-server
         namespace: nfs-provisioner
-        wait: true
-        wait_condition:
-          type: LoadBalancer
-        wait_timeout: 600
+      register: nfs_service_check
+      until: nfs_service_check.resources[0].status.loadBalancer.ingress is defined and nfs_service_check.resources[0].status.loadBalancer.ingress | length > 0
+      retries: 30
+      delay: 10
 
     - name: Get NFS server IP
       kubernetes.core.k8s_info:

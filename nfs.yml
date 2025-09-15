@@ -44,8 +44,8 @@
               clientIP:
                 timeoutSeconds: 10800
           mountOptions:
-            - nfsvers=4.1
-            - vers=4.1
+            - nfsvers=4.2
+            - vers=4.2
             - hard
             - intr
             - rsize=1048576
