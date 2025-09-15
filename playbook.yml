@@ -8,7 +8,7 @@
   import_playbook: helm.yml
 
 - name: Install NFS
-  import_playbook: nfs-traditional.yml
+  import_playbook: nfs-subdir.yml
   #import_playbook: nfs.yml
 
 - name: Configure Ingress
