@@ -130,6 +130,59 @@
       set_fact:
         nfs_server_ip: "{{ nfs_service.resources[0].status.loadBalancer.ingress[0].ip }}"
 
+    # Create RBAC for NFS Subdir Provisioner
+    - name: Create NFS Provisioner ServiceAccount
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: nfs-subdir-external-provisioner
+            namespace: nfs-provisioner
+
+    - name: Create NFS Provisioner ClusterRole
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRole
+          metadata:
+            name: nfs-subdir-external-provisioner-runner
+          rules:
+          - apiGroups: [""]
+            resources: ["nodes"]
+            verbs: ["get", "list", "watch"]
+          - apiGroups: [""]
+            resources: ["persistentvolumes"]
+            verbs: ["get", "list", "watch", "create", "delete"]
+          - apiGroups: [""]
+            resources: ["persistentvolumeclaims"]
+            verbs: ["get", "list", "watch", "update"]
+          - apiGroups: ["storage.k8s.io"]
+            resources: ["storageclasses"]
+            verbs: ["get", "list", "watch"]
+          - apiGroups: [""]
+            resources: ["events"]
+            verbs: ["create", "update", "patch"]
+          - apiGroups: [""]
+            resources: ["configmaps", "endpoints", "pods"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+    - name: Create NFS Provisioner ClusterRoleBinding
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: run-nfs-subdir-external-provisioner
+          subjects:
+          - kind: ServiceAccount
+            name: nfs-subdir-external-provisioner
+            namespace: nfs-provisioner
+          roleRef:
+            kind: ClusterRole
+            name: nfs-subdir-external-provisioner-runner
+            apiGroup: rbac.authorization.k8s.io
+
     # Now deploy the subdir provisioner that uses the NFS server
     - name: Helm install NFS Subdir Provisioner
       kubernetes.core.helm:
@@ -138,6 +191,13 @@
         chart_ref: nfs-subdir-external-provisioner/nfs-subdir-external-provisioner
         chart_version: "{{ version }}"
         values:
+          # Use the service account we created
+          serviceAccount:
+            create: false
+            name: nfs-subdir-external-provisioner
+          # RBAC configuration
+          rbac:
+            create: false  # We created RBAC manually above
           nfs:
             server: "{{ nfs_server_ip }}"
             path: /
