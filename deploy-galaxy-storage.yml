@@ -1,0 +1,101 @@
+---
+- name: Deploy Galaxy Storage
+  hosts: controllers[0]
+  environment:
+    KUBECONFIG: "{{ '/root' if ansible_user == 'root' else '/home/' + ansible_user }}/.kube/config"
+  tasks:
+    - name: Get NFS server IP
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Service
+        name: nfs-server
+        namespace: nfs-server
+      register: nfs_service
+
+    - name: Set NFS server IP
+      set_fact:
+        nfs_server_ip: "{{ nfs_service.resources[0].status.loadBalancer.ingress[0].ip }}"
+
+    - name: Display NFS server IP
+      debug:
+        msg: "NFS Server IP: {{ nfs_server_ip }}"
+
+    - name: Create Galaxy namespace
+      kubernetes.core.k8s:
+        kind: Namespace
+        name: galaxy-ns
+        state: present
+
+    - name: Create Galaxy PersistentVolume
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: PersistentVolume
+          metadata:
+            name: galaxy-pv
+            labels:
+              app: galaxy
+          spec:
+            capacity:
+              storage: 100Gi
+            volumeMode: Filesystem
+            accessModes:
+              - ReadWriteMany
+            persistentVolumeReclaimPolicy: Retain
+            storageClassName: nfs
+            mountOptions:
+              - vers=4.1
+              - hard
+              - intr
+              - rsize=1048576
+              - wsize=1048576
+              - timeo=600
+              - retrans=2
+              - locks
+              - local_lock=all
+              - fsc
+            nfs:
+              server: "{{ nfs_server_ip }}"
+              path: /
+
+    - name: Create Galaxy PersistentVolumeClaim
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: galaxy-pvc
+            namespace: galaxy-ns
+          spec:
+            accessModes:
+              - ReadWriteMany
+            resources:
+              requests:
+                storage: 100Gi
+            storageClassName: nfs
+            selector:
+              matchLabels:
+                app: galaxy
+
+    - name: Wait for PVC to be bound
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: PersistentVolumeClaim
+        name: galaxy-pvc
+        namespace: galaxy-ns
+        wait: true
+        wait_condition:
+          type: Bound
+        wait_timeout: 120
+
+    - name: Display PVC status
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: PersistentVolumeClaim
+        name: galaxy-pvc
+        namespace: galaxy-ns
+      register: pvc_status
+
+    - name: Show PVC binding status
+      debug:
+        msg: "PVC Status: {{ pvc_status.resources[0].status.phase }}"

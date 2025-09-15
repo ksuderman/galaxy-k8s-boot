@@ -1,0 +1,130 @@
+---
+- name: Setup Rook NFS Operator
+  hosts: controllers[0]
+  vars:
+    persistence_storage_class: blockstorage
+    size: "10Gi"
+    rook_version: v1.12.0
+  environment:
+    KUBECONFIG: "{{ '/root' if ansible_user == 'root' else '/home/' + ansible_user }}/.kube/config"
+  tasks:
+    - name: Create Rook NFS namespace
+      kubernetes.core.k8s:
+        kind: Namespace
+        name: rook-nfs-system
+        state: present
+
+    - name: Install Rook NFS Operator
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: rook-nfs-operator-config
+            namespace: rook-nfs-system
+          data:
+            ROOK_LOG_LEVEL: "INFO"
+
+    - name: Download and apply Rook NFS operator
+      uri:
+        url: "https://raw.githubusercontent.com/rook/rook/{{ rook_version }}/deploy/examples/nfs/operator.yaml"
+        return_content: yes
+      register: rook_operator_yaml
+
+    - name: Apply Rook NFS operator
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ rook_operator_yaml.content | from_yaml_all | list }}"
+
+    - name: Wait for Rook NFS operator to be ready
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: rook-nfs-operator
+        namespace: rook-nfs-system
+        wait: true
+        wait_condition:
+          type: Available
+          status: "True"
+        wait_timeout: 300
+
+    - name: Create NFS Server instance
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: nfs.rook.io/v1alpha1
+          kind: NFSServer
+          metadata:
+            name: galaxy-nfs
+            namespace: rook-nfs-system
+          spec:
+            replicas: 1
+            exports:
+            - name: galaxy-data
+              server:
+                accessMode: ReadWriteMany
+                squash: "none"  # Disable root squashing for Galaxy
+                allowedClients:
+                - name: galaxy-access
+                  clients: ["*"]
+                  accessMode: "ReadWrite"
+                  squash: "none"
+                  noSuid: false
+            # Use persistent storage
+            annotations:
+              rook: nfs
+            # Storage configuration
+            storage:
+              storageClassName: "{{ persistence_storage_class }}"
+              size: "{{ size }}"
+
+    - name: Create NFS Server Service
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: galaxy-nfs-service
+            namespace: rook-nfs-system
+          spec:
+            type: LoadBalancer
+            sessionAffinity: ClientIP
+            sessionAffinityConfig:
+              clientIP:
+                timeoutSeconds: 10800
+            ports:
+            - port: 2049
+              targetPort: 2049
+              name: nfs
+            - port: 111
+              targetPort: 111
+              name: rpcbind
+            - port: 20048
+              targetPort: 20048
+              name: mountd
+            selector:
+              app: rook-nfs
+              nfs_cluster: galaxy-nfs
+
+    - name: Create Storage Class for NFS
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: rook-nfs
+          provisioner: rook.io/nfs-provisioner
+          parameters:
+            exportName: galaxy-data
+            nfsServerName: galaxy-nfs
+            nfsServerNamespace: rook-nfs-system
+          mountOptions:
+            - vers=4.1
+            - hard
+            - intr
+            - rsize=1048576
+            - wsize=1048576
+            - timeo=600
+            - retrans=2
+            - locks
+            - local_lock=all

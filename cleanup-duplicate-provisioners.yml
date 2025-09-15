@@ -1,0 +1,91 @@
+---
+- name: Cleanup Duplicate Local Path Provisioners
+  hosts: controllers[0]
+  environment:
+    KUBECONFIG: "{{ '/root' if ansible_user == 'root' else '/home/' + ansible_user }}/.kube/config"
+  tasks:
+    - name: Delete duplicate local-path-provisioner deployment (custom namespace)
+      kubernetes.core.k8s:
+        state: absent
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: local-path-provisioner
+            namespace: local-path-storage
+      ignore_errors: yes
+
+    - name: Delete custom local-path-storage namespace
+      kubernetes.core.k8s:
+        state: absent
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: local-path-storage
+      ignore_errors: yes
+
+    - name: Delete duplicate local-path ConfigMap (custom namespace)
+      kubernetes.core.k8s:
+        state: absent
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: local-path-config
+            namespace: local-path-storage
+      ignore_errors: yes
+
+    - name: Delete duplicate local-path ServiceAccount (custom namespace)
+      kubernetes.core.k8s:
+        state: absent
+        definition:
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: local-path-provisioner-service-account
+            namespace: local-path-storage
+      ignore_errors: yes
+
+    - name: Delete duplicate local-path ClusterRole
+      kubernetes.core.k8s:
+        state: absent
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRole
+          metadata:
+            name: local-path-provisioner-role
+      ignore_errors: yes
+
+    - name: Delete duplicate local-path ClusterRoleBinding
+      kubernetes.core.k8s:
+        state: absent
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: local-path-provisioner-bind
+      ignore_errors: yes
+
+    - name: Display remaining provisioner pods
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: kube-system
+        label_selectors:
+          - "app=local-path-provisioner"
+      register: provisioner_pods
+
+    - name: Show remaining local-path provisioner pods
+      debug:
+        msg: "Found {{ provisioner_pods.resources | length }} local-path-provisioner pods in kube-system (this should be 1)"
+        
+    - name: Display storage classes
+      kubernetes.core.k8s_info:
+        api_version: storage.k8s.io/v1
+        kind: StorageClass
+      register: storage_classes
+
+    - name: Show available storage classes
+      debug:
+        msg: "Available storage classes: {{ storage_classes.resources | map(attribute='metadata.name') | list }}"

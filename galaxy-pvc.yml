@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: galaxy-pvc
+  namespace: galaxy-ns  # Adjust namespace as needed
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi  # Must match PV capacity
+  storageClassName: nfs
+  selector:
+    matchLabels:
+      app: galaxy

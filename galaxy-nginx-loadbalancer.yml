@@ -1,0 +1,41 @@
+#---
+#apiVersion: v1
+#kind: Service
+#metadata:
+#  name: nfs-loadbalancer
+#  namespace: galaxy
+#  labels:
+#    app.kubernetes.io/name: nfs
+#    app.kubernetes.io/component: server
+#  annotations:
+#    # Add cloud provider specific annotations as needed
+#    # For GCP:
+#    cloud.google.com/load-balancer-type: Internal
+#    # For AWS:
+#    # service.beta.kubernetes.io/aws-load-balancer-type: nlb
+#    # For Azure:
+#    # service.beta.kubernetes.io/azure-load-balancer-resource-group: myResourceGroup
+#spec:
+#  type: LoadBalancer
+#  ports:
+#    - name: nfs
+#      port: 2049
+#      targetPort: 2049
+#      protocol: TCP
+#  selector:
+#    app.kubernetes.io/name: nfs
+#    app.kubernetes.io/component: server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nfs-server-loadbalancer
+  namespace: nfs-provisioner
+  annotations:
+    cloud.google.com/load-balancer-type: "Internal"
+spec:
+  type: LoadBalancer
+  ports:
+  - name: nfs
+    port: 2049
+    protocol: TCP

@@ -1,0 +1,5 @@
+configs:
+  job_conf.yml:
+    runners:
+      gcp_batch:
+        nfs_server: 10.150.0.5

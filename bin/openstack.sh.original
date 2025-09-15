@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+
+if [[ $# -eq 0 ]] ; then
+  echo 'Usage: bin/openstack.sh start|stop galaxy|pulsar'
+  exit 1
+fi
+
+
+DISK_SIZE_GB=300
+FLAVOR=m3.medium
+IMAGE="Featured-Ubuntu24"
+IP=149.165.150.77
+# Name of the SSH key pair to use. This key pair must already exist on OpenStack
+KEY=ks-cluster
+
+# These values should not be changed on Jetstream
+GROUP=exosphere
+NETWORK=auto_allocated_network
+
+DIR=$(dirname $(realpath $0))
+NAME=ks-dev-galaxy
+
+command=
+app=
+#shift
+while [[ $# > 0 ]]; do
+  case $1 in
+    start|stop) command=$1 ;;
+    galaxy|pulsar) app=$1 ;;
+    -c|--cores)
+      case $2 in
+        1) FLAVOR=m3.tiny ;;
+        2) FLAVOR=m3.small ;;
+        4) FLAVOR=m3.quad ;;
+        8) FLAVOR=m3.medium ;;
+        16) FLAVOR=m3.large ;;
+        32) FLAVOR=m3.xl ;;
+        64) FLAVOR=m3.2xl ;;
+        *)
+          echo "Invalid number of --cores. Select a power of two between 1 and 64"
+          exit 1
+          ;;
+      esac
+#      echo "Set cores == $2"
+      shift
+      ;;
+    -d|--disk) DISK_SIZE_GB=$2 ; shift ;;
+    -g|--group) GROUP=$2 ; shift ;;
+    -i|--image) IMAGE=$2 ; shift ;;
+    --ip) IP=$2 ; shift ;;
+    -k|--key) KEY=$2 ; shift ;;
+    -n|--name) NAME=$2 ; shift ;;
+    --network) NETWORK=$2 ; shift ;;
+    *)
+      echo "Unknown option: $1"
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+if [[ -z $command ]] ; then
+  echo "Error: missing command."
+  echo 'Usage: bin/aws.sh [start|stop] [galaxy|pulsar]'
+  exit 1
+fi
+if [[ -z $app ]] ; then
+  echo "Error: missing app."
+  echo "Usage: bin/aws.sh $command [galaxy|pulsar]"
+  exit 1
+fi
+
+function terminate() {
+  echo "Unimplemented"
+}
+
+case $command in
+  start)
+    echo "Starting $NAME..."
+    case $app in
+      galaxy)
+        #TYPE=m6i.4xlarge
+        USER_DATA=$DIR/openstack.yml
+        ;;
+      pulsar)
+        TYPE=m3.quad
+        USER_DATA=$DIR/pulsar.yml
+        ;;
+      *)
+        echo "Unknown app: $app"
+        exit 1
+        ;;
+    esac
+		# Get the network ID dynamically
+#		echo "Looking up network: $NETWORK"
+#		NETWORK_ID=$(openstack network show $NETWORK -f value -c id 2>/dev/null)
+#		if [[ -z "$NETWORK_ID" ]]; then
+#		  echo "Error: Network '$NETWORK' not found"
+#		  echo "Available networks:"
+#		  openstack network list
+#		  exit 1
+#		fi
+#		echo "Network ID: $NETWORK_ID"
+#		echo "Assigning IP: $IP"
+#
+#		# Verify IP is in valid range
+#		echo "Checking IP allocation pools for network:"
+#		openstack subnet list --network $NETWORK -c "Name" -c "Subnet" -c "Allocation Pools"
+#
+#		# Create server with auto-assigned IP (without waiting for complete boot)
+		echo "Creating server with auto-assigned IP from: $NETWORK"
+		openstack server create \
+		  --image $IMAGE \
+		  --flavor $FLAVOR \
+		  --network $NETWORK \
+		  --security-group $GROUP \
+		  --key-name $KEY \
+		  --user-data $USER_DATA \
+		  --boot-from-volume $DISK_SIZE_GB \
+		  $NAME
+		
+		# Wait for server to be ACTIVE and have network interfaces
+		echo "Waiting for server to be ACTIVE with network interfaces..."
+		while true; do
+		  status=$(openstack server show $NAME -f value -c status)
+		  addresses=$(openstack server show $NAME -f value -c addresses)
+		  echo "Current status: $status, Addresses: $addresses"
+		  
+		  if [[ "$status" == "ACTIVE" ]] && [[ -n "$addresses" ]]; then
+		    echo "Server ready for floating IP assignment"
+		    break
+		  elif [[ "$status" == "ERROR" ]]; then
+		    echo "Server creation failed"
+		    exit 1
+		  fi
+		  sleep 10
+		done
+		
+		# Assign floating IP immediately
+		if [[ -n "$IP" ]]; then
+		  echo "Assigning floating IP: $IP"
+		  openstack server add floating ip $NAME $IP
+		  
+		  # Verify assignment
+		  echo "Verifying floating IP assignment..."
+		  openstack server show $NAME -c addresses -c status
+		else
+		  echo "No floating IP specified"
+		  openstack server show $NAME -c addresses -c status
+		fi
+    ;;
+  stop)
+    openstack server delete $NAME
+    ;;
+  *)
+    echo 'Usage: bin/openstack.sh start|stop galaxy|pulsar'
+    exit 1
+    ;;
+esac
+

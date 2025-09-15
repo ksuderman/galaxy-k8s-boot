@@ -1,0 +1,62 @@
+---
+- name: Disable k3s Local Path Provisioner
+  hosts: controllers[0]
+  environment:
+    KUBECONFIG: "{{ '/root' if ansible_user == 'root' else '/home/' + ansible_user }}/.kube/config"
+  tasks:
+    - name: Delete local-path-provisioner deployment
+      kubernetes.core.k8s:
+        state: absent
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: local-path-provisioner
+            namespace: kube-system
+
+    - name: Delete local-path storage class
+      kubernetes.core.k8s:
+        state: absent
+        definition:
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: local-path
+
+    - name: Delete local-path ConfigMap
+      kubernetes.core.k8s:
+        state: absent
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: local-path-config
+            namespace: kube-system
+
+    - name: Delete local-path ServiceAccount
+      kubernetes.core.k8s:
+        state: absent
+        definition:
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: local-path-provisioner-service-account
+            namespace: kube-system
+
+    - name: Delete local-path ClusterRole
+      kubernetes.core.k8s:
+        state: absent
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRole
+          metadata:
+            name: local-path-provisioner-role
+
+    - name: Delete local-path ClusterRoleBinding
+      kubernetes.core.k8s:
+        state: absent
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: local-path-provisioner-bind

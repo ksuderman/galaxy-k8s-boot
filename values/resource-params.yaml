@@ -1,0 +1,20 @@
+configs:
+  galaxy.yml:
+    galaxy:
+      job_resource_params_file: /galaxy/server/config/job_resource_params_conf.xml
+  job_conf.yml:
+    resources:
+      default: default
+      groups:
+        default: [ processors, mem, time ]
+    tools:
+      - class: local
+        resources: default
+      - class: requires_galaxy
+        resources: default
+  job_resource_params_conf.xml: |
+      <parameters>
+          <param label="Processors" name="processors" type="integer" min="1" max="62" value="4" help="Number of processing cores, 'ppn' value (1-62). Leave blank to use default value." />
+          <param label="Memory" name="mem" type="integer" min="1" max="250" value="16" help="Memory size in gigabytes, 'pmem' value (1-250). Leave blank to use default value." />
+          <param label="Wall Time" name="time" type="integer" min="1" max="744" value="24" help="Maximum job time in hours, 'walltime' value (1-744). Leave blank to use default value." />
+      </parameters>
