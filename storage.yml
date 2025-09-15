@@ -8,14 +8,11 @@
   environment:
     KUBECONFIG: "{{ '/root' if ansible_user == 'root' else '/home/' + ansible_user }}/.kube/config"
   tasks:
-    - name: Render the hostpath storage class template
-      kubernetes.core.k8s:
-        template:
-          path: templates/hostpath_storage_class.yaml.j2
-        state: present
-
+    # Use k3s built-in local-path provisioner instead of creating duplicate
+    # Removed: templates/hostpath_storage_class.yaml.j2 (causes duplicate provisioner)
+    
     - name: Render the elastic block storage class
       kubernetes.core.k8s:
         template:
-          path: block_storage_storageclass.yml.j2
+          path: templates/block_storage_storageclass.yml.j2
         state: present
