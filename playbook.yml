@@ -7,15 +7,15 @@
 - name: Install Helm
   import_playbook: helm.yml
 
+- name: Configure storage
+  import_playbook: storage.yml
+
 - name: Install NFS
   import_playbook: nfs-subdir.yml
   #import_playbook: nfs.yml
 
 - name: Configure Ingress
   import_playbook: ingress.yml
-
-- name: Configure storage
-  import_playbook: storage.yml
 
 - name: Install Galaxy
   import_playbook: galaxy_app.yml
