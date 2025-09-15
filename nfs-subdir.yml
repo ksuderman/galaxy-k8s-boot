@@ -1,0 +1,163 @@
+---
+- name: Setup NFS Subdir External Provisioner
+  hosts: controllers[0]
+  vars:
+    persistence_storage_class: blockstorage
+    size: "10Gi"
+    version: 4.0.18
+  environment:
+    KUBECONFIG: "{{ '/root' if ansible_user == 'root' else '/home/' + ansible_user }}/.kube/config"
+  tasks:
+    - name: Create the NFS namespace
+      kubernetes.core.k8s:
+        kind: Namespace
+        name: nfs-provisioner
+        state: present
+
+    - name: Install the NFS Subdir Provisioner Helm repository
+      kubernetes.core.helm_repository:
+        name: nfs-subdir-external-provisioner
+        repo_url: https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
+        state: present
+
+    # First deploy a traditional NFS server
+    - name: Create NFS Server PVC
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: nfs-server-pvc
+            namespace: nfs-provisioner
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: "{{ size }}"
+            storageClassName: "{{ persistence_storage_class }}"
+
+    - name: Create NFS Server Deployment
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: nfs-server
+            namespace: nfs-provisioner
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: nfs-server
+            template:
+              metadata:
+                labels:
+                  app: nfs-server
+              spec:
+                containers:
+                - name: nfs-server
+                  image: k8s.gcr.io/volume-nfs:0.8
+                  ports:
+                  - containerPort: 2049
+                  - containerPort: 20048
+                  - containerPort: 111
+                  - containerPort: 32765
+                  - containerPort: 32767
+                  env:
+                  - name: SHARED_DIRECTORY
+                    value: /exports
+                  securityContext:
+                    privileged: true
+                  volumeMounts:
+                  - name: nfs-storage
+                    mountPath: /exports
+                volumes:
+                - name: nfs-storage
+                  persistentVolumeClaim:
+                    claimName: nfs-server-pvc
+
+    - name: Create NFS Server Service
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: nfs-server
+            namespace: nfs-provisioner
+          spec:
+            type: LoadBalancer
+            sessionAffinity: ClientIP
+            sessionAffinityConfig:
+              clientIP:
+                timeoutSeconds: 10800
+            ports:
+            - port: 2049
+              name: nfs
+            - port: 111
+              name: rpcbind
+            - port: 20048
+              name: mountd
+            - port: 32765
+              name: nlm
+            - port: 32767
+              name: nlm-udp
+              protocol: UDP
+            selector:
+              app: nfs-server
+
+    # Wait for NFS server to be ready
+    - name: Wait for NFS server to be ready
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Service
+        name: nfs-server
+        namespace: nfs-provisioner
+        wait: true
+        wait_condition:
+          type: LoadBalancer
+        wait_timeout: 600
+
+    - name: Get NFS server IP
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Service
+        name: nfs-server
+        namespace: nfs-provisioner
+      register: nfs_service
+
+    - name: Set NFS server IP
+      set_fact:
+        nfs_server_ip: "{{ nfs_service.resources[0].status.loadBalancer.ingress[0].ip }}"
+
+    # Now deploy the subdir provisioner that uses the NFS server
+    - name: Helm install NFS Subdir Provisioner
+      kubernetes.core.helm:
+        name: nfs-subdir-external-provisioner
+        namespace: nfs-provisioner
+        chart_ref: nfs-subdir-external-provisioner/nfs-subdir-external-provisioner
+        chart_version: "{{ version }}"
+        values:
+          nfs:
+            server: "{{ nfs_server_ip }}"
+            path: /
+            mountOptions:
+              - vers=4.1
+              - hard
+              - intr
+              - rsize=1048576
+              - wsize=1048576
+              - timeo=600
+              - retrans=2
+              - locks
+              - local_lock=all
+              - fsc
+          storageClass:
+            create: true
+            defaultClass: false
+            name: nfs
+            allowVolumeExpansion: true
+            reclaimPolicy: Delete
+            archiveOnDelete: false
+          image:
+            tag: v4.0.2
