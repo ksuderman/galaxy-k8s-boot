@@ -7,6 +7,34 @@
   environment:
     KUBECONFIG: "{{ '/root' if ansible_user == 'root' else '/home/' + ansible_user }}/.kube/config"
   tasks:
+    - name: Wait for cluster nodes to be ready
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Node
+      register: node_info
+      until:
+        - node_info.resources | length > 0
+        - node_info.resources | selectattr('status.conditions', 'defined') | list | length == (node_info.resources | length)
+        - node_info.resources | selectattr('status.conditions', 'defined') | map(attribute='status.conditions') | flatten | selectattr('type', 'equalto', 'Ready') | selectattr('status', 'equalto', 'True') | list | length == (node_info.resources | length)
+      retries: 30
+      delay: 10
+
+    - name: Wait for essential kube-system pods to be ready
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: kube-system
+      register: kube_system_pods
+      until:
+        - kube_system_pods.resources | length > 0
+        - >-
+          (kube_system_pods.resources |
+           selectattr('status.phase', 'defined') |
+           selectattr('status.phase', 'in', ['Running', 'Succeeded']) |
+           list | length) >= 5
+      retries: 10
+      delay: 10
+
     - name: Create namespace for nginx ingress
       kubernetes.core.k8s:
         kind: Namespace
@@ -25,6 +53,8 @@
         namespace: ingress-nginx
         chart_ref: ingress-nginx/ingress-nginx
         chart_version: "{{ version }}"
+        wait: true
+        wait_timeout: "10m0s"
         values:
           controller:
             hostNetwork: true
@@ -38,6 +68,12 @@
             watchIngressWithoutClass: true
             config:
               proxy-body-size: "100G"
+            # Disable admission webhook to prevent timeout issues
+            admissionWebhooks:
+              enabled: false
+          # Disable admission webhook components that can cause timeouts
+          admissionWebhooks:
+            enabled: false
     - name: "Fix for issue https://github.com/kubernetes/ingress-nginx/issues/5401"
       kubernetes.core.k8s:
         name: ingress-nginx-admission

@@ -1,6 +1,6 @@
 - name: Install the rke2 binary
   shell:
-    cmd: curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION="{{ rke_version }}" INSTALL_RKE2_TYPE="{{ type }}" sh -
+    cmd: curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION="{{ rke_version }}" INSTALL_RKE2_TYPE="{{ type }}" sh - --enable-servicelb
     creates: /usr/local/bin/rke2
 - name: Enable and start the rke2-{{ type }}.service
   systemd:
