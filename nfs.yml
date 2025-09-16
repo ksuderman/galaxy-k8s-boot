@@ -44,6 +44,10 @@
         values:
           service:
             type: LoadBalancer
+            annotations:
+              networking.gke.io/load-balancer-type: "Internal"
+            loadBalancerSourceRanges:
+              - "10.0.0.0/8"     # Internal GCP networks only
           persistence:
             enabled: true
             storageClass: "{{ persistence_storage_class }}"

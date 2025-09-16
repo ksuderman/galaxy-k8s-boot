@@ -10,6 +10,39 @@
   environment:
     KUBECONFIG: "{{ '/root' if ansible_user == 'root' else '/home/' + ansible_user }}/.kube/config"
   tasks:
+    - name: Get NFS server service info
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Service
+        name: nfs-provisioner-nfs-server-provisioner
+        namespace: nfs-provisioner
+      register: nfs_service_info
+
+    - name: Set NFS server IP from LoadBalancer if available
+      set_fact:
+        nfs_server: "{{ nfs_service_info.resources[0].status.loadBalancer.ingress[0].ip }}"
+      when:
+        - nfs_service_info.resources | length > 0
+        - nfs_service_info.resources[0].status.loadBalancer is defined
+        - nfs_service_info.resources[0].status.loadBalancer.ingress is defined
+        - nfs_service_info.resources[0].status.loadBalancer.ingress | length > 0
+
+    - name: Fall back to internal cluster IP if LoadBalancer not ready
+      set_fact:
+        nfs_server: "{{ nfs_service_info.resources[0].spec.clusterIP }}"
+      when:
+        - nfs_service_info.resources | length > 0
+        - nfs_server is not defined
+
+    - name: Fail if NFS service not found
+      fail:
+        msg: "NFS service not found. Make sure NFS playbook ran successfully."
+      when: nfs_service_info.resources | length == 0
+
+    - name: Display NFS server access method
+      debug:
+        msg: "Using NFS server at {{ nfs_server }} ({{ 'LoadBalancer IP' if nfs_service_info.resources[0].status.loadBalancer.ingress is defined else 'Internal ClusterIP' }})"
+
     - name: Create the galaxy-deps namespace
       kubernetes.core.k8s:
         kind: Namespace
@@ -49,6 +82,10 @@
               galaxy:
                 admin_users: "{{ gxy_admin_users }}"
                 master_api_key: "{{ gxy_api_key }}"
+            job_conf.yml:
+              runners:
+                gcp_batch:
+                  nfs_server: "{{ nfs_server }}"
           jobs:
             rules:
               tpv_rules_local.yml:
