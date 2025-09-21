@@ -64,6 +64,7 @@
             - "{{ san }}"
           {% endfor %}
           bind-address: "{{ rke2_bind_address | default('0.0.0.0') }}"
+          enable-servicelb: true
           disable:
           {% for component in rke2_disable | default(['rke2-traefik', 'rke2-ingress-nginx']) %}
             - "{{ component }}"
