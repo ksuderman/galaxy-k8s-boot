@@ -64,6 +64,7 @@
             - "{{ san }}"
           {% endfor %}
           bind-address: "{{ rke2_bind_address | default('0.0.0.0') }}"
+          enable-servicelb: true
           disable:
           {% for component in rke2_disable | default(['rke2-traefik', 'rke2-ingress-nginx']) %}
             - "{{ component }}"
@@ -150,6 +151,6 @@
   import_playbook: galaxy_app.yml
   vars:
     values_file: "values/{{ chart_values_file | default('accp.yml') }}"
-    gxy_admin_users: "{{ galaxy_admin_users | default('') }}"
-    gxy_api_key: "{{ galaxy_api_key }}"
+    gxy_admin_users: "{{ galaxy_admin_users | default('admin@example.com') }}"
+    gxy_api_key: "{{ galaxy_api_key | default('galaxypassword') }}"
   when: application == "galaxy"

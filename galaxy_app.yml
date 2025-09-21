@@ -10,6 +10,39 @@
   environment:
     KUBECONFIG: "{{ '/root' if ansible_user == 'root' else '/home/' + ansible_user }}/.kube/config"
   tasks:
+    - name: Get NFS server service info
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Service
+        name: nfs-provisioner-nfs-server-provisioner
+        namespace: nfs-provisioner
+      register: nfs_service_info
+
+    - name: Set NFS server IP from LoadBalancer for GCP Batch VPC access
+      set_fact:
+        nfs_server: "{{ nfs_service_info.resources[0].status.loadBalancer.ingress[0].ip }}"
+      when:
+        - nfs_service_info.resources | length > 0
+        - nfs_service_info.resources[0].status.loadBalancer is defined
+        - nfs_service_info.resources[0].status.loadBalancer.ingress is defined
+        - nfs_service_info.resources[0].status.loadBalancer.ingress | length > 0
+
+    - name: Fall back to internal cluster IP if LoadBalancer not ready
+      set_fact:
+        nfs_server: "{{ nfs_service_info.resources[0].spec.clusterIP }}"
+      when:
+        - nfs_service_info.resources | length > 0
+        - nfs_server is not defined
+
+    - name: Fail if NFS service not found
+      fail:
+        msg: "NFS service not found. Make sure NFS playbook ran successfully."
+      when: nfs_service_info.resources | length == 0
+
+    - name: Display NFS server access method
+      debug:
+        msg: "Using NFS server at {{ nfs_server }} ({{ 'LoadBalancer IP' if nfs_service_info.resources[0].status.loadBalancer.ingress is defined else 'Internal ClusterIP' }})"
+
     - name: Create the galaxy-deps namespace
       kubernetes.core.k8s:
         kind: Namespace
@@ -49,6 +82,10 @@
               galaxy:
                 admin_users: "{{ gxy_admin_users }}"
                 master_api_key: "{{ gxy_api_key }}"
+            job_conf.yml:
+              runners:
+                gcp_batch:
+                  nfs_server: "{{ nfs_server }}"
           jobs:
             rules:
               tpv_rules_local.yml:
@@ -58,3 +95,68 @@
                     max_mem: "{{ job_max_mem }}"
 #        postgresql:
 #          galaxyDatabasePassword: galaxydbpassword
+
+    - name: Wait for Galaxy PVC to be created
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: PersistentVolumeClaim
+        name: galaxy-galaxy-pvc
+        namespace: galaxy
+        wait: true
+        wait_condition:
+          type: Bound
+          status: "True"
+        wait_timeout: 300
+
+    - name: Detect NFS export path for Galaxy PVC
+      shell: |
+        # Wait a moment for NFS export to be available
+        sleep 10
+
+        # Get NFS exports and find the PVC export path
+        showmount -e {{ nfs_server }} | grep '/export/pvc-' | head -1 | awk '{print $1}'
+      register: nfs_export_detection
+      retries: 10
+      delay: 5
+      until: nfs_export_detection.stdout != ""
+
+    - name: Set NFS export path for Galaxy database
+      set_fact:
+        nfs_export_path: "{{ nfs_export_detection.stdout }}"
+      when: nfs_export_detection.stdout != ""
+
+    - name: Display detected NFS export path
+      debug:
+        msg: "Detected NFS export path for Galaxy PVC: {{ nfs_export_path }}"
+
+    - name: Fail if NFS export path not detected
+      fail:
+        msg: "Could not detect NFS export path for Galaxy PVC. Available exports: {{ nfs_export_detection.stdout_lines | default('none') }}"
+      when: nfs_export_path is not defined or nfs_export_path == ""
+
+    - name: Update Galaxy configuration with detected NFS export path
+      kubernetes.core.helm:
+        name: galaxy
+        namespace: galaxy
+        chart_ref: "{{ chart }}"
+        chart_version: "{{ version }}"
+        values_files:
+          - /tmp/values.yml
+        values:
+          configs:
+            galaxy.yml:
+              galaxy:
+                admin_users: "{{ gxy_admin_users }}"
+                master_api_key: "{{ gxy_api_key }}"
+            job_conf.yml:
+              runners:
+                gcp_batch:
+                  nfs_server: "{{ nfs_server }}"
+                  nfs_path: "{{ nfs_export_path }}"
+          jobs:
+            rules:
+              tpv_rules_local.yml:
+                destinations:
+                  k8s:
+                    max_cores: "{{ job_max_cores }}"
+                    max_mem: "{{ job_max_mem }}"
