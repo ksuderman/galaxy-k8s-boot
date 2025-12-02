@@ -29,7 +29,7 @@ configs:
 
         # Container settings
         use_container: true
-        container_image: ksuderman/galaxy-min:25.1-batch-2  # fallback if tool doesn't specify
+        container_image: quay.io/galaxyproject/galaxy-min:25.0.2  # fallback if tool doesn't specify
         galaxy_user_id: 10001
         galaxy_group_id: 10001
 
