@@ -26,10 +26,10 @@ ingress:
     - path: /
   path: /
 
-# Use standard Galaxy image (includes Pulsar GCP support in 25.1+)
+# Use custom Galaxy image with GCP Batch runner (not yet in standard image)
 image:
-  repository: quay.io/galaxyproject/galaxy-min
-  tag: "25.1"
+  repository: ksuderman/galaxy-min
+  tag: "25.1-batch-2"
 
 resources:
   limits:
