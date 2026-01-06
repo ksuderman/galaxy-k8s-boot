@@ -1,17 +1,14 @@
 #!/usr/bin/env bash
 
-#BRANCH=41-fix-nfs
-BRANCH=${BRANCH:-persistent-data-merged}
-SERVER=${SERVER:-ks-dev-batch}
+BRANCH=${BRANCH:-pulsar-gcp}
+SERVER=${SERVER:-ks-hybrid-test}
 REPO=${REPO:-https://github.com/ksuderman/galaxy-k8s-boot}
 
-echo "Launching ${SERVER}"
+echo "Launching ${SERVER} with hybrid GCP Batch configuration"
 
 bin/launch_vm.sh $SERVER \
   --git-repo $REPO \
   --git-branch $BRANCH \
-  --disk-size 256
-
-
-#--enable-gcp-batch \
-#-f values/values.yml -f values/batch.yml -f values/v25.1-auto.yml -f values/rules.yml -f values/resource-params.yml -f values/probes.yml
+  --disk-size 256 \
+  -f values/hybrid-gcp-batch.yml \
+  -f values/test-gcp-batch-comparison.yml
