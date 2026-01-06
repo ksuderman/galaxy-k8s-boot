@@ -1,0 +1,172 @@
+# Performance Test Configuration for GCP Batch Runner Comparison
+#
+# This configuration routes specific tools to each runner for A/B testing:
+#   - Cut1, Grep1, Sort1 -> Direct GCP Batch (NFS-based)
+#   - FastQC, BWA, Samtools -> Pulsar GCP Batch (SSD-based)
+#
+# Usage:
+#   bin/launch_vm.sh test-galaxy-vm \
+#     --git-branch persistent-data-merged \
+#     -f values/hybrid-gcp-batch.yml \
+#     -f values/test-gcp-batch-comparison.yml
+#
+# Or add to existing cluster:
+#   helm upgrade galaxy ksuderman/galaxy -n galaxy \
+#     --reuse-values \
+#     -f values/test-gcp-batch-comparison.yml
+
+configs:
+  job_conf.yml:
+    execution:
+      # Use TPV dispatcher for flexible tool routing
+      default: tpv_dispatcher
+      environments:
+        local:
+          runner: local
+        gcp_batch:
+          runner: gcp_batch
+          container_image: ubuntu:22.04
+          machine_type: e2-standard-4
+        pulsar_gcp:
+          runner: pulsar_gcp
+          machine_type: e2-standard-4
+
+    # =========================================================================
+    # Test Tool Routing Configuration
+    # =========================================================================
+    # Tools are categorized by their I/O patterns to test each runner's strengths:
+    #
+    # Group A (Direct GCP Batch / NFS):
+    #   - Text processing tools with streaming I/O
+    #   - Benefits from direct NFS access without transfer overhead
+    #
+    # Group B (Pulsar GCP Batch / SSD):
+    #   - Tools with heavy random I/O
+    #   - Benefits from local SSD speed
+    # =========================================================================
+    tools:
+      # System tools - always local
+      - environment: local
+        id: upload1
+      - environment: local
+        id: __DATA_FETCH__
+      - environment: local
+        id: __EXPORT_HISTORY__
+      - environment: local
+        id: __IMPORT_HISTORY__
+      - environment: local
+        id: __SET_METADATA__
+      - environment: local
+        id: __EXTRACT_DATASET__
+      - environment: local
+        id: interactive_tool.*
+      - environment: local
+        id: .*data_source.*
+      - environment: local
+        id: __EXPORT_WORKFLOW__
+      - environment: local
+        id: __IMPORT_WORKFLOW__
+
+      # =========================================================================
+      # GROUP A: Direct GCP Batch (NFS-based)
+      # Test streaming/sequential I/O performance
+      # =========================================================================
+      - environment: gcp_batch
+        id: Cut1
+      - environment: gcp_batch
+        id: Grep1
+      - environment: gcp_batch
+        id: Sort1
+      - environment: gcp_batch
+        id: Paste1
+      - environment: gcp_batch
+        id: join1
+      - environment: gcp_batch
+        id: cat1
+      - environment: gcp_batch
+        id: toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/.*
+
+      # =========================================================================
+      # GROUP B: Pulsar GCP Batch (SSD-based)
+      # Test random I/O intensive tools
+      # =========================================================================
+      - environment: pulsar_gcp
+        id: toolshed.g2.bx.psu.edu/repos/devteam/fastqc/fastqc/.*
+      - environment: pulsar_gcp
+        id: toolshed.g2.bx.psu.edu/repos/devteam/bwa/bwa/.*
+      - environment: pulsar_gcp
+        id: toolshed.g2.bx.psu.edu/repos/devteam/bwa/bwa_mem/.*
+      - environment: pulsar_gcp
+        id: toolshed.g2.bx.psu.edu/repos/iuc/samtools_.*
+      - environment: pulsar_gcp
+        id: toolshed.g2.bx.psu.edu/repos/iuc/hisat2/hisat2/.*
+      - environment: pulsar_gcp
+        id: toolshed.g2.bx.psu.edu/repos/iuc/featurecounts/featurecounts/.*
+
+# TPV Rules for resource-based routing
+jobs:
+  rules:
+    tpv_rules_local.yml:
+      # =========================================================================
+      # Performance Test Destinations
+      # =========================================================================
+      destinations:
+        # Direct GCP Batch destination
+        gcp_batch:
+          runner: gcp_batch
+          params:
+            docker_enabled: "true"
+          scheduling:
+            prefer:
+              - gcp-batch-nfs
+
+        # Pulsar GCP Batch destination
+        pulsar_gcp:
+          runner: pulsar_gcp
+          params:
+            docker_enabled: "true"
+          scheduling:
+            prefer:
+              - gcp-batch-ssd
+
+      # =========================================================================
+      # Tool-specific resource requirements for testing
+      # =========================================================================
+      tools:
+        # Text processing - lightweight, test NFS streaming
+        Cut1:
+          cores: 1
+          mem: 2
+          env:
+            TEST_RUNNER: "direct_gcp_batch"
+
+        Grep1:
+          cores: 1
+          mem: 2
+          env:
+            TEST_RUNNER: "direct_gcp_batch"
+
+        Sort1:
+          cores: 2
+          mem: 4
+          env:
+            TEST_RUNNER: "direct_gcp_batch"
+
+        # Bioinformatics - heavier, test SSD performance
+        toolshed.g2.bx.psu.edu/repos/devteam/fastqc/fastqc/.*:
+          cores: 2
+          mem: 4
+          env:
+            TEST_RUNNER: "pulsar_gcp_batch"
+
+        toolshed.g2.bx.psu.edu/repos/devteam/bwa/bwa_mem/.*:
+          cores: 4
+          mem: 8
+          env:
+            TEST_RUNNER: "pulsar_gcp_batch"
+
+        toolshed.g2.bx.psu.edu/repos/iuc/samtools_.*/.*:
+          cores: 2
+          mem: 4
+          env:
+            TEST_RUNNER: "pulsar_gcp_batch"

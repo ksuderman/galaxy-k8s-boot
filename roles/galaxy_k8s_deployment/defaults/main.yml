@@ -128,6 +128,27 @@ enable_gcp_batch: false
 gcp_batch_service_account_email: ""
 gcp_batch_region: "us-east4"
 
+# Pulsar GCP Batch Configuration
+# Set enable_pulsar_gcp_batch=true to configure Galaxy for Pulsar-based GCP Batch job runner
+# This uses the upstream Pulsar library for GCP Batch integration instead of the custom runner.
+# Key differences from direct GCP Batch:
+#   - Uses RabbitMQ message queue for job communication (not NFS)
+#   - File staging via Pulsar sidecar container to local SSD (not NFS mount)
+#   - Requires RabbitMQ to be accessible from GCP Batch VMs
+# This will:
+#   - Expose RabbitMQ service to GCP Batch VMs via node internal IP
+#   - Configure job_conf.yml with Pulsar GCP Batch runner
+#   - Restart Galaxy deployments to apply changes
+enable_pulsar_gcp_batch: false
+pulsar_gcp_project_id: ""
+pulsar_gcp_region: "us-east4"
+pulsar_gcp_machine_type: "n2-standard-4"
+pulsar_gcp_walltime_limit: 86400
+pulsar_gcp_retry_count: 3
+pulsar_gcp_disk_size: 375
+pulsar_gcp_ssd_name: "pulsar_staging"
+pulsar_container_image: "galaxy/pulsar-pod-staging:0.15.0.2"
+
 # Pulsar Application Configuration
 pulsar_chart: cloudve/pulsar
 pulsar_chart_version: "0.2.0"

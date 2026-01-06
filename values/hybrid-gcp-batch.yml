@@ -1,0 +1,257 @@
+# Hybrid GCP Batch Configuration
+# This values file configures Galaxy with BOTH job runners:
+#   1. Direct GCP Batch Runner (gcp_batch) - uses NFS for file access
+#   2. Pulsar GCP Batch Runner (pulsar_gcp) - uses message queue + local SSD
+#
+# Usage:
+#   ansible-playbook playbook.yml \
+#     --extra-vars "enable_gcp_batch=true" \
+#     --extra-vars "enable_pulsar_gcp_batch=true" \
+#     --extra-vars "galaxy_values_files=['values/hybrid-gcp-batch.yml']"
+#
+# Testing:
+#   - Route specific tools to each runner to compare performance
+#   - See tools section at bottom for routing configuration
+
+ingress:
+  enabled: true
+  ingressClassName: ""
+  canary:
+    enabled: false
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+  - host: ~
+    paths:
+    - path: /
+  path: /
+
+# Use standard Galaxy image (includes Pulsar GCP support in 25.1+)
+image:
+  repository: quay.io/galaxyproject/galaxy-min
+  tag: "25.1"
+
+resources:
+  limits:
+    memory: 64G
+
+persistence:
+  storageClass: nfs
+  size: 20Gi
+
+cvmfs:
+  deployPostInstallFix: true
+  cvmfscsi:
+    cache:
+      local:
+        enabled: true
+        pvc:
+          storageClass: nfs
+          name: cvmfs-local-cache
+      alien:
+        enabled: false
+        pvc:
+          name: cvmfs-alien-cache
+    logVerbosityLevel: 5
+
+postgresql:
+  persistence:
+    storageClass: blockstorage
+
+rabbitmq:
+  persistence:
+    storageClassName: blockstorage
+
+# Mount GCP service account credentials for both runners
+extraVolumes:
+  - name: gcp-batch-key
+    secret:
+      secretName: gcp-batch-key
+      defaultMode: 0400
+
+extraVolumeMounts:
+  - name: gcp-batch-key
+    mountPath: /etc/secrets/galaxy
+    readOnly: true
+
+configs:
+  galaxy.yml:
+    galaxy:
+      require_login: false
+      show_welcome_with_login: true
+      allow_user_creation: true
+      cleanup_job: never
+      admin_users: admin@example.com,admin@galaxyproject.org,suderman@jhu.edu
+      job_metrics:
+        - type: core
+        - type: cgroup
+        - type: cpuinfo
+        - type: meminfo
+        - type: uname
+      logging_levels:
+        uvicorn.access: WARNING
+        main: INFO
+        galaxy.*: INFO
+        galaxy.datatypes.*: WARNING
+        galaxy.jobs.*: DEBUG
+        galaxy.jobs.runners.*: DEBUG
+        galaxy.jobs.runners.gcp_batch: DEBUG
+        galaxy.jobs.runners.pulsar: DEBUG
+
+  job_conf.yml:
+    runners:
+      # =======================================================================
+      # Direct GCP Batch Runner (Custom Implementation)
+      # - Files accessed via NFS mount
+      # - Lower job startup overhead
+      # - Better for large input files
+      # =======================================================================
+      gcp_batch:
+        load: galaxy.jobs.runners.gcp_batch:GoogleCloudBatchJobRunner
+        workers: 4
+        # GCP settings (project_id set by playbook)
+        project_id: "PLACEHOLDER_PROJECT_ID"
+        region: us-east4
+        service_account_file: /etc/secrets/galaxy/key.json
+        service_account_email: "PLACEHOLDER_SERVICE_ACCOUNT"
+        # NFS configuration (nfs_server and nfs_path set dynamically by playbook)
+        nfs_server: "PLACEHOLDER_NFS_SERVER"
+        nfs_path: /
+        nfs_mount_path: /galaxy/server/database
+        # Network configuration
+        network: default
+        subnet: default
+        # Compute resources
+        machine_type: n2-standard-4
+        vcpu: 1.0
+        memory_mib: 2048
+        boot_disk_size_gb: 100
+        boot_disk_type: pd-standard
+        # Container settings
+        use_container: true
+        container_image: quay.io/galaxyproject/galaxy-min:25.1
+        galaxy_user_id: 10001
+        galaxy_group_id: 10001
+        # Job settings
+        max_retry_count: 3
+        max_run_duration: 3600s
+        polling_interval: 30
+
+      # =======================================================================
+      # Pulsar GCP Batch Runner (Upstream Implementation)
+      # - Files staged via Pulsar sidecar to local SSD
+      # - Better for I/O intensive tools
+      # - Uses RabbitMQ for communication
+      # =======================================================================
+      pulsar_gcp:
+        load: galaxy.jobs.runners.pulsar:PulsarGcpBatchJobRunner
+        workers: 4
+        # AMQP connection (set dynamically by playbook)
+        amqp_url: "PLACEHOLDER_AMQP_URL"
+        # GCP settings (project_id set by playbook)
+        project_id: "PLACEHOLDER_PROJECT_ID"
+        credentials_file: /etc/secrets/galaxy/key.json
+        region: us-east4
+        # Compute resources
+        machine_type: n2-standard-4
+        walltime_limit: 86400
+        retry_count: 3
+        # Storage
+        ssd_name: pulsar_staging
+        disk_size: 375
+        # Pulsar configuration
+        pulsar_container_image: galaxy/pulsar-pod-staging:0.15.0.2
+        default_file_action: remote_transfer
+        rewrite_parameters: "true"
+        # Embedded Pulsar app config (message_queue_url set dynamically)
+        pulsar_app_config:
+          message_queue_url: "PLACEHOLDER_AMQP_URL"
+
+    execution:
+      default: tpv_dispatcher
+      environments:
+        local:
+          runner: local
+        # Direct GCP Batch environment
+        gcp_batch:
+          runner: gcp_batch
+          container_image: ubuntu:22.04
+          machine_type: e2-standard-4
+        # Pulsar GCP Batch environment
+        pulsar_gcp:
+          runner: pulsar_gcp
+          machine_type: e2-standard-4
+
+    destinations:
+      - id: gcp_batch_default
+        runner: gcp_batch
+      - id: pulsar_gcp_default
+        runner: pulsar_gcp
+      - id: k8s_default
+        runner: k8s
+      - id: local_default
+        runner: local
+
+    # =======================================================================
+    # Tool Routing for Performance Testing
+    # Route specific tools to each runner to compare performance
+    # =======================================================================
+    tools:
+      # System tools - always local
+      - environment: local
+        id: upload1
+      - environment: local
+        id: __DATA_FETCH__
+      - environment: local
+        id: __EXPORT_HISTORY__
+      - environment: local
+        id: __IMPORT_HISTORY__
+      - environment: local
+        id: __SET_METADATA__
+      - environment: local
+        id: __EXTRACT_DATASET__
+      - environment: local
+        id: interactive_tool.*
+      - environment: local
+        id: .*data_source.*
+      - environment: local
+        id: __EXPORT_WORKFLOW__
+      - environment: local
+        id: __IMPORT_WORKFLOW__
+
+      # =======================================================================
+      # PERFORMANCE TEST ROUTING
+      # Uncomment one of the following blocks to route test tools
+      # =======================================================================
+
+      # Option 1: Route Cut1 to Direct GCP Batch (baseline)
+      - environment: gcp_batch
+        id: Cut1
+
+      # Option 2: Route a different tool to Pulsar GCP Batch for comparison
+      # - environment: pulsar_gcp
+      #   id: toolshed.g2.bx.psu.edu/repos/devteam/fastqc/fastqc/.*
+
+      # Option 3: Route all unspecified tools to Pulsar for broader testing
+      # (comment out the TPV dispatcher default and uncomment this)
+      # - environment: pulsar_gcp
+      #   id: .*
+
+# TPV Rules for more sophisticated routing (optional)
+jobs:
+  rules:
+    tpv_rules_local.yml:
+      tools:
+        # Example: Route compute-heavy tools to specific runner
+        toolshed.g2.bx.psu.edu/repos/iuc/metaphlan/metaphlan/.*:
+          cores: 16
+          mem: 96
+      destinations:
+        gcp_batch:
+          runner: gcp_batch
+          params:
+            docker_enabled: "true"
+        pulsar_gcp:
+          runner: pulsar_gcp
+          params:
+            docker_enabled: "true"
