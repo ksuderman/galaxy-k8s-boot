@@ -162,6 +162,10 @@ gcloud compute firewall-rules create allow-rabbitmq-for-batch \
   --source-ranges=10.128.0.0/9 --target-tags=k8s
 ```
 
+## Claude Instructions
+
+- **Use single-line commit messages.** Do not use multi-line commit messages with body text, bullet points, or the generated-by footer.
+
 ## Development Notes
 
 - The project targets Ubuntu 24.04+ exclusively
