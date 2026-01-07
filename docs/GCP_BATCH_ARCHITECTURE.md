@@ -206,9 +206,10 @@ runners:
   gcp_batch:
     load: galaxy.jobs.runners.gcp_batch:GoogleCloudBatchJobRunner
     workers: 4
+    # Authentication uses ADC from VM's attached service account
+    # No service_account_file needed - uses metadata service automatically
     project_id: my-gcp-project
     region: us-east4
-    service_account_file: /etc/secrets/galaxy/key.json
     service_account_email: batch-runner@my-project.iam.gserviceaccount.com
     # NFS configuration
     nfs_server: "10.150.0.X"        # Set by playbook
@@ -233,9 +234,8 @@ runners:
     workers: 4
     # AMQP connection
     amqp_url: "pyamqp://user:pass@10.150.0.X:5672//"  # Set by playbook
-    # GCP settings
+    # GCP settings - Authentication uses ADC from VM's attached service account
     project_id: my-gcp-project
-    credentials_file: /etc/secrets/galaxy/key.json
     region: us-east4
     machine_type: n2-standard-4
     # Storage

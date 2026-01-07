@@ -12,4 +12,6 @@ bin/launch_vm.sh $SERVER \
   --disk-size 256 \
   --reuse-existing-data \
   -f values/hybrid-gcp-batch.yml \
-  -f values/test-gcp-batch-comparison.yml
+  -f values/test-gcp-batch-comparison.yml \
+  -f values/test-toolshed.yml
+  

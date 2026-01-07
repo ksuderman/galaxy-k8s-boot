@@ -1499,3 +1499,117 @@ gcloud batch jobs list --location=us-east4 --project=anvil-and-terra-development
 5. Create production configuration
 
 ---
+
+# GCP Batch Authentication: Switch to Application Default Credentials
+
+**Date**: 2026-01-06
+**Focus**: Removing JSON key secret requirement, using ADC from VM's attached service account
+
+## Summary
+
+Updated all GCP Batch values files to use Application Default Credentials (ADC) instead of requiring a mounted JSON key secret. This simplifies deployment and leverages the VM's attached service account.
+
+## Background
+
+The user questioned why a `gcp-batch-key` secret was needed when Workload Identity had been previously discussed.
+
+### Investigation Findings
+
+1. **This is an RKE2 cluster**, not GKE - Workload Identity is a GKE-specific feature
+2. **The custom GCP Batch runner already supports ADC** - see `gcp_batch.py:99-111`:
+   ```python
+   def _init_batch_client(self):
+       service_account_file = self.runner_params.get("service_account_file")
+       if service_account_file:
+           os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_file
+
+       credentials, project = default()  # Uses ADC
+       self.batch_client = batch_v1.BatchServiceClient(credentials=credentials)
+   ```
+3. **The `service_account_file` parameter is optional** - when not provided, the runner uses `google.auth.default()` which on a GCP VM uses the metadata service
+4. **The VM has a service account attached** with `cloud-platform` scope, providing full API access
+
+## Changes Made
+
+### Values Files Updated
+
+| File | Changes |
+|------|---------|
+| `values/hybrid-gcp-batch.yml` | Removed `extraVolumes`, `extraVolumeMounts`, `service_account_file`, `credentials_file` |
+| `values/gcp-batch.yml` | Removed `extraVolumes`, `extraVolumeMounts`, `service_account_file` |
+| `values/gcp-batch2.yml` | Removed `extraVolumes`, `extraVolumeMounts`, `service_account_file` |
+| `values/hybrid_job_conf.yml` | Removed `service_account_file` |
+
+### Before (Required JSON Key Secret)
+
+```yaml
+extraVolumes:
+  - name: gcp-batch-key
+    secret:
+      secretName: gcp-batch-key
+      defaultMode: 0400
+
+extraVolumeMounts:
+  - name: gcp-batch-key
+    mountPath: /etc/secrets/galaxy
+    readOnly: true
+
+configs:
+  job_conf.yml:
+    runners:
+      gcp_batch:
+        service_account_file: /etc/secrets/galaxy/key.json
+```
+
+### After (Uses ADC)
+
+```yaml
+# Authentication: Uses Application Default Credentials (ADC) from VM's attached service account
+# No secret mounting required - the GCP Batch runner automatically uses the metadata service
+
+configs:
+  job_conf.yml:
+    runners:
+      gcp_batch:
+        # Authentication uses ADC from VM's attached service account
+        project_id: "PLACEHOLDER_PROJECT_ID"
+        region: us-east4
+        service_account_email: "PLACEHOLDER_SERVICE_ACCOUNT"
+```
+
+## How ADC Works on GCP VMs
+
+According to [Google Cloud documentation](https://cloud.google.com/docs/authentication/application-default-credentials):
+
+1. ADC checks `GOOGLE_APPLICATION_CREDENTIALS` environment variable (not set)
+2. ADC checks well-known credential locations (not present)
+3. **ADC uses the VM's metadata service** to get credentials from the attached service account
+
+The RKE2 VM has service account `526897014808-compute@developer.gserviceaccount.com` attached with `cloud-platform` scope, which provides access to all GCP APIs including Batch.
+
+## Benefits
+
+1. **No secret management** - No JSON key file to create, rotate, or secure
+2. **Simpler deployment** - Fewer configuration steps
+3. **Automatic credential refresh** - Metadata service handles token refresh
+4. **Security best practice** - No long-lived credentials stored in cluster
+
+## Prerequisites
+
+The VM must have:
+- A service account attached with required permissions (see `PERMISSIONS.md`)
+- `cloud-platform` scope (or more specific Batch API scopes)
+
+## Verification
+
+```bash
+# Check VM service account
+gcloud compute instances describe <vm-name> --zone=<zone> \
+  --format='get(serviceAccounts[].email)'
+
+# Check scopes
+gcloud compute instances describe <vm-name> --zone=<zone> \
+  --format='get(serviceAccounts[].scopes)'
+```
+
+---
