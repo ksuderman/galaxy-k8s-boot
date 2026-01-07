@@ -62,17 +62,8 @@ rabbitmq:
   persistence:
     storageClassName: blockstorage
 
-# Mount GCP service account credentials for both runners
-extraVolumes:
-  - name: gcp-batch-key
-    secret:
-      secretName: gcp-batch-key
-      defaultMode: 0400
-
-extraVolumeMounts:
-  - name: gcp-batch-key
-    mountPath: /etc/secrets/galaxy
-    readOnly: true
+# Authentication: Uses Application Default Credentials (ADC) from VM's attached service account
+# No secret mounting required - the GCP Batch runner automatically uses the metadata service
 
 configs:
   galaxy.yml:
@@ -110,9 +101,9 @@ configs:
         load: galaxy.jobs.runners.gcp_batch:GoogleCloudBatchJobRunner
         workers: 4
         # GCP settings (project_id set by playbook)
+        # Authentication uses ADC from VM's attached service account
         project_id: "PLACEHOLDER_PROJECT_ID"
         region: us-east4
-        service_account_file: /etc/secrets/galaxy/key.json
         service_account_email: "PLACEHOLDER_SERVICE_ACCOUNT"
         # NFS configuration (nfs_server and nfs_path set dynamically by playbook)
         nfs_server: "PLACEHOLDER_NFS_SERVER"
@@ -149,8 +140,8 @@ configs:
         # AMQP connection (set dynamically by playbook)
         amqp_url: "PLACEHOLDER_AMQP_URL"
         # GCP settings (project_id set by playbook)
+        # Authentication uses ADC from VM's attached service account
         project_id: "PLACEHOLDER_PROJECT_ID"
-        credentials_file: /etc/secrets/galaxy/key.json
         region: us-east4
         # Compute resources
         machine_type: n2-standard-4
