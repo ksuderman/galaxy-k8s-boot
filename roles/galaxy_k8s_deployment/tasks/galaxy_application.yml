@@ -280,24 +280,27 @@
       configs:
         job_conf.yml:
           runners:
+            # Only include valid runner parameters - GCP-specific params go in execution.environments
             pulsar_gcp:
               load: galaxy.jobs.runners.pulsar:PulsarGcpBatchJobRunner
               workers: 4
-              project_id: "{{ pulsar_gcp_project_id }}"
-              credentials_file: /etc/secrets/galaxy/key.json
-              region: "{{ pulsar_gcp_region }}"
-              machine_type: "{{ pulsar_gcp_machine_type }}"
-              walltime_limit: "{{ pulsar_gcp_walltime_limit }}"
-              retry_count: "{{ pulsar_gcp_retry_count }}"
-              ssd_name: "{{ pulsar_gcp_ssd_name }}"
-              disk_size: "{{ pulsar_gcp_disk_size }}"
-              pulsar_container_image: "{{ pulsar_container_image }}"
-              default_file_action: remote_transfer
-              rewrite_parameters: "true"
               # AMQP URL will be set after Galaxy install when RabbitMQ credentials are available
               amqp_url: "PLACEHOLDER_AMQP_URL"
-              pulsar_app_config:
-                message_queue_url: "PLACEHOLDER_AMQP_URL"
+          execution:
+            environments:
+              # GCP Batch destination parameters (uses ADC from VM's service account)
+              pulsar_gcp:
+                runner: pulsar_gcp
+                project_id: "{{ pulsar_gcp_project_id }}"
+                region: "{{ pulsar_gcp_region }}"
+                machine_type: "{{ pulsar_gcp_machine_type }}"
+                walltime_limit: "{{ pulsar_gcp_walltime_limit }}"
+                retry_count: "{{ pulsar_gcp_retry_count }}"
+                ssd_name: "{{ pulsar_gcp_ssd_name }}"
+                disk_size: "{{ pulsar_gcp_disk_size }}"
+                pulsar_container_image: "{{ pulsar_container_image }}"
+                default_file_action: remote_transfer
+                rewrite_parameters: "true"
     _helm_values_cnpg_plugin:
       postgresql:
         cluster:
