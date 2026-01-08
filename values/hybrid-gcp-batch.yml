@@ -133,28 +133,13 @@ configs:
       # - Files staged via Pulsar sidecar to local SSD
       # - Better for I/O intensive tools
       # - Uses RabbitMQ for communication
+      # NOTE: Most GCP-specific params go in execution.environments.pulsar_gcp
       # =======================================================================
       pulsar_gcp:
         load: galaxy.jobs.runners.pulsar:PulsarGcpBatchJobRunner
         workers: 4
         # AMQP connection (set dynamically by playbook)
         amqp_url: "PLACEHOLDER_AMQP_URL"
-        # GCP settings (project_id set by playbook)
-        # Authentication uses ADC from VM's attached service account
-        project_id: "PLACEHOLDER_PROJECT_ID"
-        region: us-east4
-        # Compute resources
-        machine_type: n2-standard-4
-        walltime_limit: 86400
-        retry_count: 3
-        # Storage
-        ssd_name: pulsar_staging
-        disk_size: 375
-        # Pulsar configuration
-        pulsar_container_image: galaxy/pulsar-pod-staging:0.15.0.2
-        # Embedded Pulsar app config (message_queue_url set dynamically)
-        pulsar_app_config:
-          message_queue_url: "PLACEHOLDER_AMQP_URL"
 
     execution:
       default: tpv_dispatcher
@@ -167,9 +152,21 @@ configs:
           container_image: ubuntu:22.04
           machine_type: e2-standard-4
         # Pulsar GCP Batch environment
+        # All GCP Batch specific parameters go here as destination params
         pulsar_gcp:
           runner: pulsar_gcp
-          machine_type: e2-standard-4
+          # GCP settings
+          project_id: "PLACEHOLDER_PROJECT_ID"
+          region: us-east4
+          # Compute resources
+          machine_type: n2-standard-4
+          walltime_limit: 86400
+          retry_count: 3
+          # Storage
+          ssd_name: pulsar_staging
+          disk_size: 375
+          # Pulsar configuration
+          pulsar_container_image: galaxy/pulsar-pod-staging:0.15.0.2
           default_file_action: remote_transfer
           rewrite_parameters: "true"
 
