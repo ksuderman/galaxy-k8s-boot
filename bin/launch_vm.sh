@@ -418,7 +418,8 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
 
     EXTRA_VARS_ARG=""
     if [ -n "${ANSIBLE_EXTRA_VARS}" ]; then
-        EXTRA_VARS_ARG="--extra-vars '${ANSIBLE_EXTRA_VARS}'"
+        echo "${ANSIBLE_EXTRA_VARS}" > /tmp/ansible_extra_vars.json
+        EXTRA_VARS_ARG="--extra-vars @/tmp/ansible_extra_vars.json"
     fi
     ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/ubuntu/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "{\"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}}" ${EXTRA_VARS_ARG} playbook.yml
 
