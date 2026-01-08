@@ -298,8 +298,11 @@ else
     PV_SIZE_VALUE="20Gi"
 fi
 
-# Convert values files list to JSON array
-GALAXY_VALUES_FILES_JSON=$(echo "$GALAXY_VALUES_FILES_LIST" | sed -e 's/;/","/g' -e 's/^/["/' -e 's/$/"]/')
+# Convert values files list to JSON array (escape quotes for shell embedding)
+GALAXY_VALUES_FILES_JSON=$(echo "$GALAXY_VALUES_FILES_LIST" | sed -e 's/;/","/g' -e 's/^/["/' -e 's/$/"]/' -e 's/"/\\"/g')
+
+# Escape quotes in ANSIBLE_EXTRA_VARS for shell embedding
+ANSIBLE_EXTRA_VARS_ESCAPED=$(echo "$ANSIBLE_EXTRA_VARS" | sed 's/"/\\"/g')
 
 cat > "$TEMP_USER_DATA" << 'EOF'
 #cloud-config
@@ -382,7 +385,7 @@ cat >> "$TEMP_USER_DATA" << EOF
     GALAXY_VALUES_FILES_JSON="${GALAXY_VALUES_FILES_JSON}"
     RESTORE_GALAXY_PVC_UUID="${RESTORE_GALAXY_PVC_UUID}"
     REUSE_EXISTING_DATA="${REUSE_EXISTING_DATA}"
-    ANSIBLE_EXTRA_VARS="${ANSIBLE_EXTRA_VARS}"
+    ANSIBLE_EXTRA_VARS="${ANSIBLE_EXTRA_VARS_ESCAPED}"
 EOF
 
 cat >> "$TEMP_USER_DATA" << 'EOF'
