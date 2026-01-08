@@ -20,6 +20,7 @@ PROJECT="anvil-and-terra-development"
 ZONE="us-east4-c"
 RESTORE_GALAXY_PVC_UUID=""
 REUSE_EXISTING_DATA="false"
+ANSIBLE_EXTRA_VARS=""
 
 # Parse command line arguments
 DISK_NAME=""
@@ -56,6 +57,7 @@ Options:
   --postgres-disk DISK_NAME         Name of PostgreSQL disk (default: galaxy-postgres-INSTANCE_NAME)
   --postgres-disk-size SIZE         Size of PostgreSQL disk (default: $POSTGRES_DISK_SIZE)
   --restore-galaxy-pvc-uuid UUID    Restore Galaxy PVC from existing NFS data (e.g., "57681430-eb8f-460f-9eae-294e061c579e")
+  --ansible-extra-vars VARS         Additional Ansible extra vars as JSON (e.g., '{"enable_gcp_batch": true}')
   -h, --help, help                  Show this help message
 
 Examples:
@@ -156,6 +158,10 @@ while [[ $# -gt 0 ]]; do
         --reuse-existing-data)
             REUSE_EXISTING_DATA="true"
             shift
+            ;;
+        --ansible-extra-vars)
+            ANSIBLE_EXTRA_VARS="$2"
+            shift 2
             ;;
         -h|--help|help)
             usage
@@ -376,6 +382,7 @@ cat >> "$TEMP_USER_DATA" << EOF
     GALAXY_VALUES_FILES_JSON='${GALAXY_VALUES_FILES_JSON}'
     RESTORE_GALAXY_PVC_UUID="${RESTORE_GALAXY_PVC_UUID}"
     REUSE_EXISTING_DATA="${REUSE_EXISTING_DATA}"
+    ANSIBLE_EXTRA_VARS='${ANSIBLE_EXTRA_VARS}'
 EOF
 
 cat >> "$TEMP_USER_DATA" << 'EOF'
@@ -406,7 +413,11 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     echo "[`date`] - Galaxy Values Files: ${GALAXY_VALUES_FILES_JSON}"
     echo "[`date`] - Inventory file created at /tmp/ansible-inventory/localhost; running ansible-pull..."
 
-    ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/ubuntu/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "{\"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}}" playbook.yml
+    EXTRA_VARS_ARG=""
+    if [ -n "${ANSIBLE_EXTRA_VARS}" ]; then
+        EXTRA_VARS_ARG="--extra-vars '${ANSIBLE_EXTRA_VARS}'"
+    fi
+    ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/ubuntu/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "{\"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}}" ${EXTRA_VARS_ARG} playbook.yml
 
     echo "[`date`] - User data script completed."
     '
