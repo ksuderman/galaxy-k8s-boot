@@ -152,8 +152,6 @@ configs:
         disk_size: 375
         # Pulsar configuration
         pulsar_container_image: galaxy/pulsar-pod-staging:0.15.0.2
-        default_file_action: remote_transfer
-        rewrite_parameters: "true"
         # Embedded Pulsar app config (message_queue_url set dynamically)
         pulsar_app_config:
           message_queue_url: "PLACEHOLDER_AMQP_URL"
@@ -172,6 +170,8 @@ configs:
         pulsar_gcp:
           runner: pulsar_gcp
           machine_type: e2-standard-4
+          default_file_action: remote_transfer
+          rewrite_parameters: "true"
 
     destinations:
       - id: gcp_batch_default
