@@ -134,39 +134,59 @@ jobs:
       # =========================================================================
       tools:
         # Text processing - lightweight, test NFS streaming
+        # Must include scheduling.prefer to match destination tags
         Cut1:
           cores: 1
           mem: 2
           env:
             TEST_RUNNER: "direct_gcp_batch"
+          scheduling:
+            prefer:
+              - gcp-batch-nfs
 
         Grep1:
           cores: 1
           mem: 2
           env:
             TEST_RUNNER: "direct_gcp_batch"
+          scheduling:
+            prefer:
+              - gcp-batch-nfs
 
         Sort1:
           cores: 2
           mem: 4
           env:
             TEST_RUNNER: "direct_gcp_batch"
+          scheduling:
+            prefer:
+              - gcp-batch-nfs
 
         # Bioinformatics - heavier, test SSD performance
+        # Must include scheduling.prefer to match destination tags
         toolshed.g2.bx.psu.edu/repos/devteam/fastqc/fastqc/.*:
           cores: 2
           mem: 4
           env:
             TEST_RUNNER: "pulsar_gcp_batch"
+          scheduling:
+            prefer:
+              - gcp-batch-ssd
 
         toolshed.g2.bx.psu.edu/repos/devteam/bwa/bwa_mem/.*:
           cores: 4
           mem: 8
           env:
             TEST_RUNNER: "pulsar_gcp_batch"
+          scheduling:
+            prefer:
+              - gcp-batch-ssd
 
         toolshed.g2.bx.psu.edu/repos/iuc/samtools_.*/.*:
           cores: 2
           mem: 4
           env:
             TEST_RUNNER: "pulsar_gcp_batch"
+          scheduling:
+            prefer:
+              - gcp-batch-ssd
