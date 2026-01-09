@@ -158,7 +158,6 @@
 - name: Get node internal IP for NFS access
   set_fact:
     nfs_server: "{{ ansible_default_ipv4.address }}"
-  when: enable_gcp_batch | default(false) | bool
 
 - name: Verify NFS service exists
   kubernetes.core.k8s_info:
@@ -168,14 +167,11 @@
     namespace: nfs-provisioner
     kubeconfig: "{{ kubeconfig_path }}"
   register: nfs_service_info
-  when: enable_gcp_batch | default(false) | bool
 
 - name: Fail if NFS service not found
   fail:
     msg: "NFS service not found. Make sure NFS setup completed successfully."
-  when:
-    - enable_gcp_batch | default(false) | bool
-    - nfs_service_info.resources | length == 0
+  when: nfs_service_info.resources | length == 0
 
 - name: Patch NFS service with node internal IP as externalIP
   kubernetes.core.k8s:
@@ -189,12 +185,10 @@
       spec:
         externalIPs:
           - "{{ nfs_server }}"
-  when: enable_gcp_batch | default(false) | bool
 
 - name: Display NFS server access method
   debug:
     msg: "Using node internal IP for NFS: {{ nfs_server }} (accessible from GCP Batch VMs in same VPC)"
-  when: enable_gcp_batch | default(false) | bool
 
 # ============================================================================
 # Pulsar GCP Batch: RabbitMQ External Access Configuration
@@ -206,14 +200,12 @@
 - name: Set RabbitMQ external IP (node internal IP)
   set_fact:
     rabbitmq_external_ip: "{{ ansible_default_ipv4.address }}"
-  when: enable_pulsar_gcp_batch | default(false) | bool
 
 # Note: RabbitMQ service is created by Galaxy Helm chart, so we patch it after Galaxy install.
 # The _rabbitmq_needs_patching flag signals that post-install patching is required.
 - name: Flag RabbitMQ for post-install patching
   set_fact:
     _rabbitmq_needs_patching: true
-  when: enable_pulsar_gcp_batch | default(false) | bool
 
 # Prepare values files list with backward compatibility
 - name: Prepare Galaxy values files list
@@ -249,7 +241,7 @@
     kubeconfig: "{{ kubeconfig_path }}"
     update_repo_cache: true
     values_files: "{{ lookup('sequence', 'start=0 end=' ~ (_galaxy_values_files|length - 1) ~ ' format=/tmp/galaxy_values_%d.yml', wantlist=True) }}"
-    values: "{{ _helm_values_base | combine(_helm_values_gcp_batch if (enable_gcp_batch | default(false) | bool) else {}, recursive=True) | combine(_helm_values_pulsar_gcp if (enable_pulsar_gcp_batch | default(false) | bool) else {}, recursive=True) | combine(_helm_values_cnpg_plugin if (cnpg_skip_initdb_enabled | default(false) | bool) else {}, recursive=True) | combine(_helm_values_skip_initdb if (reuse_existing_data | default(false) | bool) else {}, recursive=True) }}"
+    values: "{{ _helm_values_base | combine(_helm_values_gcp_batch, recursive=True) | combine(_helm_values_pulsar_gcp, recursive=True) | combine(_helm_values_cnpg_plugin if (cnpg_skip_initdb_enabled | default(false) | bool) else {}, recursive=True) | combine(_helm_values_skip_initdb if (reuse_existing_data | default(false) | bool) else {}, recursive=True) }}"
     set_values: "{{ galaxy_helm_extra_sets | default([]) }}"
   vars:
     _helm_values_base:
@@ -327,7 +319,6 @@
       type: Bound
       status: "True"
     wait_timeout: 300
-  when: enable_gcp_batch | default(false) | bool
 
 - name: Detect NFS export path for Galaxy PVC
   shell: |
@@ -340,29 +331,23 @@
   retries: 10
   delay: 5
   until: nfs_export_detection.stdout != ""
-  when: enable_gcp_batch | default(false) | bool
 
 - name: Set NFS export path for Galaxy database
   set_fact:
     nfs_export_path: "{{ nfs_export_detection.stdout }}"
   when:
-    - enable_gcp_batch | default(false) | bool
     - nfs_export_detection.stdout is defined
     - nfs_export_detection.stdout != ""
 
 - name: Display detected NFS export path
   debug:
     msg: "Detected NFS export path for Galaxy PVC: {{ nfs_export_path }}"
-  when:
-    - enable_gcp_batch | default(false) | bool
-    - nfs_export_path is defined
+  when: nfs_export_path is defined
 
 - name: Fail if NFS export path not detected
   fail:
     msg: "Could not detect NFS export path for Galaxy PVC. Available exports: {{ nfs_export_detection.stdout_lines | default('none') }}"
-  when:
-    - enable_gcp_batch | default(false) | bool
-    - nfs_export_path is not defined or nfs_export_path == ""
+  when: nfs_export_path is not defined or nfs_export_path == ""
 
 # ============================================================================
 # GCP Batch: Update Configuration and Restart
@@ -375,7 +360,6 @@
     namespace: galaxy
     kubeconfig: "{{ kubeconfig_path }}"
   register: galaxy_configs
-  when: enable_gcp_batch | default(false) | bool
 
 - name: Update job_conf.yml with NFS export path
   kubernetes.core.k8s:
@@ -388,9 +372,7 @@
         name: galaxy-configs
         namespace: galaxy
       data: "{{ galaxy_configs.resources[0].data | combine({'job_conf.yml': (galaxy_configs.resources[0].data['job_conf.yml'] | from_yaml | combine({'runners': {'gcp_batch': {'nfs_path': nfs_export_path}}}, recursive=True) | to_nice_yaml) }) }}"
-  when:
-    - enable_gcp_batch | default(false) | bool
-    - nfs_export_path is defined
+  when: nfs_export_path is defined
 
 - name: Restart Galaxy deployments to pick up configuration changes
   shell: kubectl rollout restart deployment {{ item }} -n galaxy
@@ -400,9 +382,7 @@
     - galaxy-web
     - galaxy-workflow
     - galaxy-job-0
-  when:
-    - enable_gcp_batch | default(false) | bool
-    - nfs_export_path is defined
+  when: nfs_export_path is defined
 
 # ============================================================================
 # Persistent Data Reuse: RabbitMQ Credential Synchronization
@@ -531,30 +511,24 @@
     namespace: galaxy
     kubeconfig: "{{ kubeconfig_path }}"
   register: pulsar_rabbitmq_secret
-  when: enable_pulsar_gcp_batch | default(false) | bool
 
 - name: Set RabbitMQ AMQP URL for Pulsar GCP Batch
   set_fact:
     pulsar_rabbitmq_user: "{{ pulsar_rabbitmq_secret.resources[0].data.username | b64decode }}"
     pulsar_rabbitmq_pass: "{{ pulsar_rabbitmq_secret.resources[0].data.password | b64decode }}"
-  when:
-    - enable_pulsar_gcp_batch | default(false) | bool
-    - pulsar_rabbitmq_secret.resources | length > 0
+  when: pulsar_rabbitmq_secret.resources | length > 0
 
 - name: Construct Pulsar AMQP URL with external IP
   set_fact:
     pulsar_amqp_url: "pyamqp://{{ pulsar_rabbitmq_user }}:{{ pulsar_rabbitmq_pass }}@{{ rabbitmq_external_ip }}:5672//"
   when:
-    - enable_pulsar_gcp_batch | default(false) | bool
     - pulsar_rabbitmq_user is defined
     - rabbitmq_external_ip is defined
 
 - name: Display Pulsar AMQP configuration
   debug:
     msg: "Pulsar GCP Batch AMQP URL: pyamqp://{{ pulsar_rabbitmq_user }}:****@{{ rabbitmq_external_ip }}:5672//"
-  when:
-    - enable_pulsar_gcp_batch | default(false) | bool
-    - pulsar_amqp_url is defined
+  when: pulsar_amqp_url is defined
 
 - name: Get RabbitMQ service for external IP patching
   kubernetes.core.k8s_info:
@@ -565,14 +539,11 @@
     label_selectors:
       - "app.kubernetes.io/component=rabbitmq"
   register: rabbitmq_services
-  when: enable_pulsar_gcp_batch | default(false) | bool
 
 - name: Set RabbitMQ service name for patching
   set_fact:
     rabbitmq_service_name: "{{ (rabbitmq_services.resources | selectattr('spec.type', 'equalto', 'ClusterIP') | first).metadata.name }}"
-  when:
-    - enable_pulsar_gcp_batch | default(false) | bool
-    - rabbitmq_services.resources | length > 0
+  when: rabbitmq_services.resources | length > 0
 
 - name: Patch RabbitMQ service with external IP
   kubernetes.core.k8s:
@@ -587,16 +558,13 @@
         externalIPs:
           - "{{ rabbitmq_external_ip }}"
   when:
-    - enable_pulsar_gcp_batch | default(false) | bool
     - rabbitmq_service_name is defined
     - rabbitmq_external_ip is defined
 
 - name: Display RabbitMQ external access info
   debug:
     msg: "RabbitMQ service '{{ rabbitmq_service_name }}' patched with external IP {{ rabbitmq_external_ip }}:5672"
-  when:
-    - enable_pulsar_gcp_batch | default(false) | bool
-    - rabbitmq_service_name is defined
+  when: rabbitmq_service_name is defined
 
 # Update Galaxy ConfigMap with the real AMQP URL
 - name: Get current job_conf.yml from ConfigMap for Pulsar update
@@ -607,7 +575,6 @@
     namespace: galaxy
     kubeconfig: "{{ kubeconfig_path }}"
   register: galaxy_configs_pulsar
-  when: enable_pulsar_gcp_batch | default(false) | bool
 
 - name: Update job_conf.yml with Pulsar AMQP URL
   kubernetes.core.k8s:
@@ -621,7 +588,6 @@
         namespace: galaxy
       data: "{{ galaxy_configs_pulsar.resources[0].data | combine({'job_conf.yml': (galaxy_configs_pulsar.resources[0].data['job_conf.yml'] | from_yaml | combine({'runners': {'pulsar_gcp': {'amqp_url': pulsar_amqp_url, 'pulsar_app_config': {'message_queue_url': pulsar_amqp_url}}}}, recursive=True) | to_nice_yaml) }) }}"
   when:
-    - enable_pulsar_gcp_batch | default(false) | bool
     - pulsar_amqp_url is defined
     - galaxy_configs_pulsar.resources | length > 0
 
@@ -633,9 +599,7 @@
     - galaxy-web
     - galaxy-workflow
     - galaxy-job-0
-  when:
-    - enable_pulsar_gcp_batch | default(false) | bool
-    - pulsar_amqp_url is defined
+  when: pulsar_amqp_url is defined
 
 - name: Display Pulsar GCP Batch configuration complete
   debug:
@@ -652,6 +616,4 @@
           --direction=INGRESS --priority=1000 --network=default \
           --action=ALLOW --rules=tcp:5672 \
           --source-ranges=10.128.0.0/9 --target-tags=k8s
-  when:
-    - enable_pulsar_gcp_batch | default(false) | bool
-    - pulsar_amqp_url is defined
+  when: pulsar_amqp_url is defined

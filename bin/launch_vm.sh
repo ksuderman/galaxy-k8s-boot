@@ -20,7 +20,6 @@ PROJECT="anvil-and-terra-development"
 ZONE="us-east4-c"
 RESTORE_GALAXY_PVC_UUID=""
 REUSE_EXISTING_DATA="false"
-ANSIBLE_EXTRA_VARS=""
 
 # Parse command line arguments
 DISK_NAME=""
@@ -57,7 +56,6 @@ Options:
   --postgres-disk DISK_NAME         Name of PostgreSQL disk (default: galaxy-postgres-INSTANCE_NAME)
   --postgres-disk-size SIZE         Size of PostgreSQL disk (default: $POSTGRES_DISK_SIZE)
   --restore-galaxy-pvc-uuid UUID    Restore Galaxy PVC from existing NFS data (e.g., "57681430-eb8f-460f-9eae-294e061c579e")
-  --ansible-extra-vars VARS         Additional Ansible extra vars as JSON (e.g., '{"enable_gcp_batch": true}')
   -h, --help, help                  Show this help message
 
 Examples:
@@ -158,10 +156,6 @@ while [[ $# -gt 0 ]]; do
         --reuse-existing-data)
             REUSE_EXISTING_DATA="true"
             shift
-            ;;
-        --ansible-extra-vars)
-            ANSIBLE_EXTRA_VARS="$2"
-            shift 2
             ;;
         -h|--help|help)
             usage
@@ -298,8 +292,8 @@ else
     PV_SIZE_VALUE="20Gi"
 fi
 
-# Convert values files list to JSON array
-GALAXY_VALUES_FILES_JSON=$(echo "$GALAXY_VALUES_FILES_LIST" | sed -e 's/;/","/g' -e 's/^/["/' -e 's/$/"]/')
+# Convert values files list to JSON array (escape quotes for shell embedding)
+GALAXY_VALUES_FILES_JSON=$(echo "$GALAXY_VALUES_FILES_LIST" | sed -e 's/;/","/g' -e 's/^/["/' -e 's/$/"]/' -e 's/"/\\"/g')
 
 cat > "$TEMP_USER_DATA" << 'EOF'
 #cloud-config
@@ -379,10 +373,9 @@ cat >> "$TEMP_USER_DATA" << EOF
     GIT_BRANCH="${GIT_BRANCH}"
     GALAXY_CHART_VERSION="${GALAXY_CHART_VERSION}"
     GALAXY_DEPS_VERSION="${GALAXY_DEPS_VERSION}"
-    GALAXY_VALUES_FILES_JSON='${GALAXY_VALUES_FILES_JSON}'
+    GALAXY_VALUES_FILES_JSON="${GALAXY_VALUES_FILES_JSON}"
     RESTORE_GALAXY_PVC_UUID="${RESTORE_GALAXY_PVC_UUID}"
     REUSE_EXISTING_DATA="${REUSE_EXISTING_DATA}"
-    ANSIBLE_EXTRA_VARS='${ANSIBLE_EXTRA_VARS}'
 EOF
 
 cat >> "$TEMP_USER_DATA" << 'EOF'
@@ -411,39 +404,9 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     echo "[`date`] - Galaxy Chart Version: ${GALAXY_CHART_VERSION}"
     echo "[`date`] - Galaxy Deps Version: ${GALAXY_DEPS_VERSION}"
     echo "[`date`] - Galaxy Values Files: ${GALAXY_VALUES_FILES_JSON}"
-    echo "[`date`] - Inventory Extra Vars: ${ANSIBLE_EXTRA_VARS}"
     echo "[`date`] - Inventory file created at /tmp/ansible-inventory/localhost; running ansible-pull..."
 
-    # Build consolidated extra vars JSON file to avoid shell quoting issues
-    # Start with base vars, then merge any additional vars
-    python3 << PYEOF
-import json
-import sys
-
-# Base extra vars
-extra_vars = {
-    "galaxy_chart_version": "${GALAXY_CHART_VERSION}",
-    "galaxy_deps_version": "${GALAXY_DEPS_VERSION}",
-    "galaxy_values_files": json.loads('${GALAXY_VALUES_FILES_JSON}')
-}
-
-# Merge additional extra vars if provided
-additional_vars = '''${ANSIBLE_EXTRA_VARS}'''.strip()
-if additional_vars:
-    try:
-        additional = json.loads(additional_vars)
-        extra_vars.update(additional)
-    except json.JSONDecodeError as e:
-        print(f"Warning: Failed to parse additional extra vars: {e}", file=sys.stderr)
-
-# Write consolidated extra vars to file
-with open("/tmp/ansible_extra_vars.json", "w") as f:
-    json.dump(extra_vars, f)
-
-print(f"[INFO] Consolidated extra vars: {json.dumps(extra_vars)}")
-PYEOF
-
-    ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/ubuntu/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars @/tmp/ansible_extra_vars.json playbook.yml
+    ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/ubuntu/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "{\"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}}" playbook.yml
 
     echo "[`date`] - User data script completed."
     '

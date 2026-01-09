@@ -11,5 +11,4 @@ bin/launch_vm.sh $SERVER \
   --git-branch $BRANCH \
   --disk-size 256 \
   -f values/hybrid-gcp-batch.yml \
-  -f values/test-gcp-batch-comparison.yml \
-  --ansible-extra-vars '{"enable_gcp_batch": true, "enable_pulsar_gcp_batch": true}'
+  -f values/test-gcp-batch-comparison.yml
