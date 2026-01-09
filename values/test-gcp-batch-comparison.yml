@@ -111,82 +111,67 @@ jobs:
       # Performance Test Destinations
       # =========================================================================
       destinations:
-        # Direct GCP Batch destination
+        # Direct GCP Batch destination (no scheduling tags - rely on job_conf routing)
         gcp_batch:
           runner: gcp_batch
           params:
             docker_enabled: "true"
-          scheduling:
-            prefer:
-              - gcp-batch-nfs
 
-        # Pulsar GCP Batch destination
+        # Pulsar GCP Batch destination (no scheduling tags - rely on job_conf routing)
         pulsar_gcp:
           runner: pulsar_gcp
           params:
             docker_enabled: "true"
-          scheduling:
-            prefer:
-              - gcp-batch-ssd
+
+        # Kubernetes destination (remove accept tag for equal scoring)
+        k8s:
+          runner: k8s
+          max_cores: 1
+          max_mem: 4
+          params:
+            docker_enabled: "true"
+            limits_memory: '{mem}Gi'
+            requests_cpu: '{cores}'
+            requests_memory: '{mem}Gi'
 
       # =========================================================================
       # Tool-specific resource requirements for testing
       # =========================================================================
       tools:
-        # Text processing - lightweight, test NFS streaming
-        # Must include scheduling.prefer to match destination tags
+        # Text processing - lightweight, routed to gcp_batch via job_conf
         Cut1:
           cores: 1
           mem: 2
           env:
             TEST_RUNNER: "direct_gcp_batch"
-          scheduling:
-            prefer:
-              - gcp-batch-nfs
 
         Grep1:
           cores: 1
           mem: 2
           env:
             TEST_RUNNER: "direct_gcp_batch"
-          scheduling:
-            prefer:
-              - gcp-batch-nfs
 
         Sort1:
           cores: 2
           mem: 4
           env:
             TEST_RUNNER: "direct_gcp_batch"
-          scheduling:
-            prefer:
-              - gcp-batch-nfs
 
-        # Bioinformatics - heavier, test SSD performance
-        # Must include scheduling.prefer to match destination tags
+        # Bioinformatics - routed to pulsar_gcp via job_conf
         toolshed.g2.bx.psu.edu/repos/devteam/fastqc/fastqc/.*:
           cores: 2
           mem: 4
           env:
             TEST_RUNNER: "pulsar_gcp_batch"
-          scheduling:
-            prefer:
-              - gcp-batch-ssd
 
         toolshed.g2.bx.psu.edu/repos/devteam/bwa/bwa_mem/.*:
           cores: 4
           mem: 8
           env:
             TEST_RUNNER: "pulsar_gcp_batch"
-          scheduling:
-            prefer:
-              - gcp-batch-ssd
 
         toolshed.g2.bx.psu.edu/repos/iuc/samtools_.*/.*:
           cores: 2
           mem: 4
           env:
             TEST_RUNNER: "pulsar_gcp_batch"
-          scheduling:
-            prefer:
-              - gcp-batch-ssd
