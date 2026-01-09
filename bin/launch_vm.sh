@@ -298,11 +298,8 @@ else
     PV_SIZE_VALUE="20Gi"
 fi
 
-# Convert values files list to JSON array (escape quotes for shell embedding)
-GALAXY_VALUES_FILES_JSON=$(echo "$GALAXY_VALUES_FILES_LIST" | sed -e 's/;/","/g' -e 's/^/["/' -e 's/$/"]/' -e 's/"/\\"/g')
-
-# Escape quotes in ANSIBLE_EXTRA_VARS for shell embedding
-ANSIBLE_EXTRA_VARS_ESCAPED=$(echo "$ANSIBLE_EXTRA_VARS" | sed 's/"/\\"/g')
+# Convert values files list to JSON array
+GALAXY_VALUES_FILES_JSON=$(echo "$GALAXY_VALUES_FILES_LIST" | sed -e 's/;/","/g' -e 's/^/["/' -e 's/$/"]/')
 
 cat > "$TEMP_USER_DATA" << 'EOF'
 #cloud-config
@@ -382,10 +379,10 @@ cat >> "$TEMP_USER_DATA" << EOF
     GIT_BRANCH="${GIT_BRANCH}"
     GALAXY_CHART_VERSION="${GALAXY_CHART_VERSION}"
     GALAXY_DEPS_VERSION="${GALAXY_DEPS_VERSION}"
-    GALAXY_VALUES_FILES_JSON="${GALAXY_VALUES_FILES_JSON}"
+    GALAXY_VALUES_FILES_JSON='${GALAXY_VALUES_FILES_JSON}'
     RESTORE_GALAXY_PVC_UUID="${RESTORE_GALAXY_PVC_UUID}"
     REUSE_EXISTING_DATA="${REUSE_EXISTING_DATA}"
-    ANSIBLE_EXTRA_VARS="${ANSIBLE_EXTRA_VARS_ESCAPED}"
+    ANSIBLE_EXTRA_VARS='${ANSIBLE_EXTRA_VARS}'
 EOF
 
 cat >> "$TEMP_USER_DATA" << 'EOF'
@@ -414,14 +411,39 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     echo "[`date`] - Galaxy Chart Version: ${GALAXY_CHART_VERSION}"
     echo "[`date`] - Galaxy Deps Version: ${GALAXY_DEPS_VERSION}"
     echo "[`date`] - Galaxy Values Files: ${GALAXY_VALUES_FILES_JSON}"
+    echo "[`date`] - Inventory Extra Vars: ${ANSIBLE_EXTRA_VARS}"
     echo "[`date`] - Inventory file created at /tmp/ansible-inventory/localhost; running ansible-pull..."
 
-    EXTRA_VARS_ARG=""
-    if [ -n "${ANSIBLE_EXTRA_VARS}" ]; then
-        echo "${ANSIBLE_EXTRA_VARS}" > /tmp/ansible_extra_vars.json
-        EXTRA_VARS_ARG="--extra-vars @/tmp/ansible_extra_vars.json"
-    fi
-    ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/ubuntu/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "{\"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}}" ${EXTRA_VARS_ARG} playbook.yml
+    # Build consolidated extra vars JSON file to avoid shell quoting issues
+    # Start with base vars, then merge any additional vars
+    python3 << PYEOF
+import json
+import sys
+
+# Base extra vars
+extra_vars = {
+    "galaxy_chart_version": "${GALAXY_CHART_VERSION}",
+    "galaxy_deps_version": "${GALAXY_DEPS_VERSION}",
+    "galaxy_values_files": json.loads('${GALAXY_VALUES_FILES_JSON}')
+}
+
+# Merge additional extra vars if provided
+additional_vars = '''${ANSIBLE_EXTRA_VARS}'''.strip()
+if additional_vars:
+    try:
+        additional = json.loads(additional_vars)
+        extra_vars.update(additional)
+    except json.JSONDecodeError as e:
+        print(f"Warning: Failed to parse additional extra vars: {e}", file=sys.stderr)
+
+# Write consolidated extra vars to file
+with open("/tmp/ansible_extra_vars.json", "w") as f:
+    json.dump(extra_vars, f)
+
+print(f"[INFO] Consolidated extra vars: {json.dumps(extra_vars)}")
+PYEOF
+
+    ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/ubuntu/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars @/tmp/ansible_extra_vars.json playbook.yml
 
     echo "[`date`] - User data script completed."
     '
