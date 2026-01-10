@@ -102,7 +102,7 @@ configs:
         workers: 4
         # GCP settings (project_id set by playbook)
         # Authentication uses ADC from VM's attached service account
-        project_id: "PLACEHOLDER_PROJECT_ID"
+        project_id: "anvil-and-terra-development"
         region: us-east4
         service_account_email: "PLACEHOLDER_SERVICE_ACCOUNT"
         # NFS configuration (nfs_server and nfs_path set dynamically by playbook)
@@ -156,7 +156,7 @@ configs:
         pulsar_gcp:
           runner: pulsar_gcp
           # GCP settings
-          project_id: "PLACEHOLDER_PROJECT_ID"
+          project_id: "anvil-and-terra-development"
           region: us-east4
           # Compute resources
           machine_type: n2-standard-4
