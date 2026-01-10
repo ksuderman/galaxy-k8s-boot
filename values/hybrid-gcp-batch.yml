@@ -104,7 +104,7 @@ configs:
         # Authentication uses ADC from VM's attached service account
         project_id: "anvil-and-terra-development"
         region: us-east4
-        service_account_email: "PLACEHOLDER_SERVICE_ACCOUNT"
+        service_account_email: galaxy-batch-runner@anvil-and-terra-development.iam.gserviceaccount.com
         # NFS configuration (nfs_server and nfs_path set dynamically by playbook)
         nfs_server: "PLACEHOLDER_NFS_SERVER"
         nfs_path: /
