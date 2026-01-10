@@ -126,8 +126,60 @@ destinations:
     machine_type: n2-standard-16
 ```
 
+## Authentication Considerations
+
+### Architecture Difference from Direct GCP Batch Runner
+
+The Pulsar GCP Batch runner has a different authentication model than the direct GCP Batch runner:
+
+| Aspect | Direct GCP Batch (`gcp_batch`) | Pulsar GCP Batch (`pulsar_gcp`) |
+|--------|-------------------------------|--------------------------------|
+| **Job Submission** | Galaxy submits directly to GCP Batch API | Galaxy submits to GCP Batch API (not Pulsar sidecar) |
+| **Pulsar Role** | N/A | Sidecar on GCP Batch VM for file staging only |
+| **Communication** | Direct API calls | RabbitMQ for status/file coordination |
+| **Constraint** | Galaxy MUST run on GCP VM (for ADC) | Galaxy can run anywhere with proper credentials |
+
+### When Galaxy is NOT on a GCP VM
+
+If Galaxy runs outside of GCP (e.g., on-premises, AWS, Azure):
+
+1. **ADC will not work** - No GCP metadata service available
+2. **Must use explicit credentials** - Service account JSON key file required
+3. **Configuration required**:
+   ```yaml
+   execution:
+     environments:
+       pulsar_gcp:
+         runner: pulsar_gcp
+         credentials_file: /path/to/service-account-key.json
+         project_id: my-gcp-project
+         # ... other params
+   ```
+
+4. **Security considerations**:
+   - Service account key must be securely mounted into Galaxy pods
+   - Key rotation becomes a manual process
+   - Consider using Workload Identity Federation for cross-cloud scenarios
+
+### Pulsar's Credential Handling
+
+The Pulsar library supports both authentication methods (`pulsar/managers/util/gcp_util.py`):
+
+```python
+def gcp_client(credentials_file: Optional[str]) -> "batch_v1.BatchServiceClient":
+    if credentials_file:
+        # Explicit credentials for non-GCP environments
+        credentials = service_account.Credentials.from_service_account_file(credentials_file)
+        client = batch_v1.BatchServiceClient(credentials=credentials)
+    else:
+        # ADC for GCP VM environments
+        client = batch_v1.BatchServiceClient()
+    return client
+```
+
 ## References
 
 - GCP Batch ComputeResource documentation: https://cloud.google.com/batch/docs/reference/rest/v1/projects.locations.jobs#ComputeResource
 - Galaxy GCP Batch runner (dynamic sizing implementation): `galaxy/jobs/runners/gcp_batch.py`
 - Pulsar GCP Batch code: `pulsar/client/container_job_config.py`
+- GCP Workload Identity Federation: https://cloud.google.com/iam/docs/workload-identity-federation
