@@ -243,46 +243,33 @@
     wait: true
     wait_timeout: "600s"
     values_files: "{{ lookup('sequence', 'start=0 end=' ~ (_galaxy_values_files|length - 1) ~ ' format=/tmp/galaxy_values_%d.yml', wantlist=True) }}"
-    values: "{{ _helm_values_base | combine(_helm_values_gcp_batch, recursive=True) | combine(_helm_values_pulsar_gcp, recursive=True) | combine(_helm_values_cnpg_plugin if (cnpg_skip_initdb_enabled | default(false) | bool) else {}, recursive=True) | combine(_helm_values_skip_initdb if (reuse_existing_data | default(false) | bool) else {}, recursive=True) }}"
+    values: "{{ _helm_values | combine(_helm_values_skip_initdb if (reuse_existing_data | default(false) | bool) else {}, recursive=True) }}"
     set_values: "{{ galaxy_helm_extra_sets | default([]) }}"
   vars:
-    _helm_values_base:
+    _helm_values:
       persistence:
         size: "{{ galaxy_persistence_size }}"
       postgresql:
         galaxyDatabasePassword: "{{ galaxy_db_password }}"
+        cluster:
+          plugins:
+            - name: "{{ cnpg_skip_initdb_plugin_name | default('cnpg-i-skip-initdb.leonardoce.github.com') }}"
       configs:
         galaxy.yml:
           galaxy:
             single_user: "{{ galaxy_user }}"
             admin_users: "{{ galaxy_user }}"
             master_api_key: "{{ galaxy_api_key | default(omit) }}"
-      jobs:
-        rules:
-          tpv_rules_local.yml:
-            destinations:
-              k8s:
-                max_cores: "{{ galaxy_job_max_cores }}"
-                max_mem: "{{ galaxy_job_max_mem }}"
-    _helm_values_gcp_batch:
-      configs:
         job_conf.yml:
           runners:
             gcp_batch:
               nfs_server: "{{ nfs_server }}"
-    _helm_values_pulsar_gcp:
-      configs:
-        job_conf.yml:
-          runners:
-            # Only include valid runner parameters - GCP-specific params go in execution.environments
             pulsar_gcp:
               load: galaxy.jobs.runners.pulsar:PulsarGcpBatchJobRunner
               workers: 4
-              # AMQP URL will be set after Galaxy install when RabbitMQ credentials are available
               amqp_url: "PLACEHOLDER_AMQP_URL"
           execution:
             environments:
-              # GCP Batch destination parameters (uses ADC from VM's service account)
               pulsar_gcp:
                 runner: pulsar_gcp
                 project_id: "{{ pulsar_gcp_project_id }}"
@@ -295,11 +282,13 @@
                 pulsar_container_image: "{{ pulsar_container_image }}"
                 default_file_action: remote_transfer
                 rewrite_parameters: "true"
-    _helm_values_cnpg_plugin:
-      postgresql:
-        cluster:
-          plugins:
-            - name: "{{ cnpg_skip_initdb_plugin_name | default('cnpg-i-skip-initdb.leonardoce.github.com') }}"
+      jobs:
+        rules:
+          tpv_rules_local.yml:
+            destinations:
+              k8s:
+                max_cores: "{{ galaxy_job_max_cores }}"
+                max_mem: "{{ galaxy_job_max_mem }}"
     _helm_values_skip_initdb:
       postgresql:
         cluster:
