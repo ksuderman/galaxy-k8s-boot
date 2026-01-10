@@ -1,0 +1,35 @@
+digraph pulsar_gcp_batch {
+    rankdir=LR;
+    node [shape=box, style=filled];
+
+    subgraph cluster_galaxy {
+        label="Galaxy Host (GCP VM or External)";
+        style=filled;
+        color=lightblue;
+
+        galaxy [label="Galaxy\nJob Handler", fillcolor=lightyellow];
+        rabbitmq [label="RabbitMQ", fillcolor=orange];
+    }
+
+    subgraph cluster_gcp_batch {
+        label="GCP Batch VM";
+        style=filled;
+        color=lightgray;
+
+        pulsar [label="Pulsar\nSidecar", fillcolor=lightgreen];
+        tool [label="Tool Container", fillcolor=lightyellow];
+        ssd [label="Local SSD", shape=cylinder, fillcolor=lightgray];
+    }
+
+    gcp_api [label="GCP Batch API", shape=ellipse, fillcolor=white];
+
+    galaxy -> gcp_api [label="1. Submit job\n(ADC or credentials_file)"];
+    gcp_api -> pulsar [label="2. Create VM"];
+    gcp_api -> tool [label="2. Create VM"];
+    pulsar -> rabbitmq [label="3. Get job details", style=dashed, dir=both];
+    pulsar -> ssd [label="4. Stage files"];
+    tool -> ssd [label="5. Read/write"];
+    pulsar -> ssd [label="6. Upload results"];
+    pulsar -> rabbitmq [label="7. Job complete", style=dashed];
+    rabbitmq -> galaxy [label="8. Status update", style=dashed];
+}
