@@ -139,6 +139,123 @@ The Pulsar GCP Batch runner has a different authentication model than the direct
 | **Communication** | Direct API calls | RabbitMQ for status/file coordination |
 | **Constraint** | Galaxy MUST run on GCP VM (for ADC) | Galaxy can run anywhere with proper credentials |
 
+### Architecture Diagrams (Graphviz DOT)
+
+#### Direct GCP Batch Runner (NFS-based)
+
+```dot
+digraph direct_gcp_batch {
+    rankdir=LR;
+    node [shape=box, style=filled];
+
+    subgraph cluster_k8s {
+        label="Kubernetes Cluster (GCP VM)";
+        style=filled;
+        color=lightblue;
+
+        galaxy [label="Galaxy\nJob Handler", fillcolor=lightyellow];
+        nfs [label="NFS Server", fillcolor=lightgreen];
+    }
+
+    subgraph cluster_gcp_batch {
+        label="GCP Batch VM";
+        style=filled;
+        color=lightgray;
+
+        tool [label="Tool Container", fillcolor=lightyellow];
+    }
+
+    gcp_api [label="GCP Batch API", shape=ellipse, fillcolor=white];
+
+    galaxy -> gcp_api [label="1. Submit job\n(ADC auth)"];
+    gcp_api -> tool [label="2. Create VM\n& run container"];
+    tool -> nfs [label="3. NFS mount\n(file access)", style=dashed];
+    tool -> gcp_api [label="4. Job complete"];
+    gcp_api -> galaxy [label="5. Poll status"];
+}
+```
+
+#### Pulsar GCP Batch Runner (SSD-based)
+
+```dot
+digraph pulsar_gcp_batch {
+    rankdir=LR;
+    node [shape=box, style=filled];
+
+    subgraph cluster_galaxy {
+        label="Galaxy Host (GCP VM or External)";
+        style=filled;
+        color=lightblue;
+
+        galaxy [label="Galaxy\nJob Handler", fillcolor=lightyellow];
+        rabbitmq [label="RabbitMQ", fillcolor=orange];
+    }
+
+    subgraph cluster_gcp_batch {
+        label="GCP Batch VM";
+        style=filled;
+        color=lightgray;
+
+        pulsar [label="Pulsar\nSidecar", fillcolor=lightgreen];
+        tool [label="Tool Container", fillcolor=lightyellow];
+        ssd [label="Local SSD", shape=cylinder, fillcolor=lightgray];
+    }
+
+    gcp_api [label="GCP Batch API", shape=ellipse, fillcolor=white];
+
+    galaxy -> gcp_api [label="1. Submit job\n(ADC or credentials_file)"];
+    gcp_api -> pulsar [label="2. Create VM"];
+    gcp_api -> tool [label="2. Create VM"];
+    pulsar -> rabbitmq [label="3. Get job details", style=dashed, dir=both];
+    pulsar -> ssd [label="4. Stage files"];
+    tool -> ssd [label="5. Read/write"];
+    pulsar -> ssd [label="6. Upload results"];
+    pulsar -> rabbitmq [label="7. Job complete", style=dashed];
+    rabbitmq -> galaxy [label="8. Status update", style=dashed];
+}
+```
+
+#### Authentication Flow: Galaxy on GCP VM (ADC)
+
+```dot
+digraph auth_adc {
+    rankdir=TB;
+    node [shape=box, style=filled];
+
+    galaxy [label="Galaxy Pod", fillcolor=lightyellow];
+    metadata [label="GCP Metadata\nService\n(169.254.169.254)", shape=ellipse, fillcolor=lightgreen];
+    gcp_api [label="GCP Batch API", shape=ellipse, fillcolor=white];
+
+    galaxy -> metadata [label="1. Request token\n(automatic)"];
+    metadata -> galaxy [label="2. Access token"];
+    galaxy -> gcp_api [label="3. API call\nwith token"];
+}
+```
+
+#### Authentication Flow: Galaxy External (Credentials File)
+
+```dot
+digraph auth_credentials {
+    rankdir=TB;
+    node [shape=box, style=filled];
+
+    galaxy [label="Galaxy Pod", fillcolor=lightyellow];
+    secret [label="K8s Secret\n(service account key)", shape=note, fillcolor=orange];
+    gcp_api [label="GCP Batch API", shape=ellipse, fillcolor=white];
+
+    secret -> galaxy [label="1. Mount key file"];
+    galaxy -> gcp_api [label="2. API call\nwith key-based auth"];
+}
+```
+
+To generate PNG images from these diagrams:
+```bash
+dot -Tpng direct_gcp_batch.dot -o direct_gcp_batch.png
+dot -Tpng pulsar_gcp_batch.dot -o pulsar_gcp_batch.png
+dot -Tpng auth_adc.dot -o auth_adc.png
+dot -Tpng auth_credentials.dot -o auth_credentials.png
+```
+
 ### When Galaxy is NOT on a GCP VM
 
 If Galaxy runs outside of GCP (e.g., on-premises, AWS, Azure):
