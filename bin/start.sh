@@ -11,4 +11,6 @@ bin/launch_vm.sh $SERVER \
   --git-branch $BRANCH \
   --disk-size 256 \
   -f values/hybrid-gcp-batch.yml \
-  -f values/test-gcp-batch-comparison.yml
+  -f values/test-gcp-batch-comparison.yml \
+  -f values/resource-params.yml
+
