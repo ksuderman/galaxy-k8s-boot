@@ -1613,3 +1613,249 @@ gcloud compute instances describe <vm-name> --zone=<zone> \
 ```
 
 ---
+
+# TPV Job Routing Fix and Helm Install Timeout Resolution
+
+**Date**: 2026-01-09
+**Focus**: Fixing TPV job routing so FastQC runs on Pulsar GCP Batch instead of Kubernetes
+
+## Summary of Issues Identified and Resolved
+
+### 19. TPV Job Routing - FastQC Going to k8s Instead of pulsar_gcp
+
+**Problem**: FastQC jobs were being routed to the Kubernetes runner instead of the Pulsar GCP Batch runner, despite having explicit tool routing in `job_conf.yml`.
+
+**Root Cause Analysis**:
+TPV (Total Perspective Vortex) scoring was causing the issue:
+- `gcp_batch` destination had `scheduling.prefer: [gcp-batch-nfs]` → tools without matching tag get score -1
+- `pulsar_gcp` destination had `scheduling.prefer: [gcp-batch-ssd]` → tools without matching tag get score -1
+- `k8s` destination had `scheduling.accept: [docker]` → tools without tag get score 0 (neutral)
+
+Since tool definitions in TPV rules were missing their `scheduling.prefer` tags (Galaxy Helm chart template dropped them), all tools scored:
+- `gcp_batch`: -1
+- `k8s`: 0 (winner!)
+- `pulsar_gcp`: -1
+
+**Solution Implemented**:
+Removed `scheduling.prefer` tags from destinations so all destinations score 0 equally, allowing `job_conf.yml` tool routing to control execution:
+
+```yaml
+# Before: Destinations with prefer tags (caused score imbalance)
+destinations:
+  gcp_batch:
+    runner: gcp_batch
+    scheduling:
+      prefer: [gcp-batch-nfs]  # REMOVED
+  pulsar_gcp:
+    runner: pulsar_gcp
+    scheduling:
+      prefer: [gcp-batch-ssd]  # REMOVED
+  k8s:
+    runner: k8s
+    scheduling:
+      accept: [docker]  # REMOVED
+
+# After: All destinations score equally
+destinations:
+  gcp_batch:
+    runner: gcp_batch
+    params:
+      docker_enabled: "true"
+  pulsar_gcp:
+    runner: pulsar_gcp
+    params:
+      docker_enabled: "true"
+  k8s:
+    runner: k8s
+    # No scheduling tags - scores 0
+```
+
+### 20. Ansible Playbook Timeout During Galaxy Helm Install
+
+**Problem**: Ansible playbook was timing out waiting for Galaxy PVC to be bound (300 second timeout), causing downstream tasks (like Pulsar configuration) to be skipped.
+
+**Root Cause Analysis**:
+The Galaxy Helm install task didn't have `wait: true`, so it returned immediately. The subsequent PVC wait task then started before the Helm deployment was stable.
+
+**Solution Implemented**:
+Added `wait: true` and `wait_timeout: 600` to the Galaxy Helm install task:
+
+```yaml
+# roles/galaxy_k8s_deployment/tasks/galaxy_application.yml
+- name: Helm install Galaxy
+  kubernetes.core.helm:
+    name: galaxy
+    namespace: galaxy
+    chart_ref: "{{ galaxy_chart }}"
+    chart_version: "{{ galaxy_chart_version }}"
+    kubeconfig: "{{ kubeconfig_path }}"
+    update_repo_cache: true
+    wait: true           # NEW: Wait for deployment to stabilize
+    wait_timeout: 600    # NEW: 10 minute timeout
+    values_files: ...
+    values: ...
+```
+
+## Files Modified This Session
+
+| File | Changes |
+|------|---------|
+| `values/test-gcp-batch-comparison.yml` | Removed `scheduling.prefer` tags from `gcp_batch` and `pulsar_gcp` destinations; added `k8s` override without `scheduling.accept`; removed scheduling tags from tool definitions |
+| `roles/galaxy_k8s_deployment/tasks/galaxy_application.yml` | Added `wait: true` and `wait_timeout: 600` to Galaxy Helm install task |
+
+## Configuration Architecture
+
+**Tool Routing** (`job_conf.yml`):
+- FastQC, BWA, Samtools → `pulsar_gcp` environment
+- Cut1, Grep1, Sort1 → `gcp_batch` environment
+- System tools → `local` environment
+
+**TPV Rules** (`tpv_rules_local.yml`):
+- Resource allocation (cores, memory) per tool
+- No scheduling preferences on destinations
+- All destinations score equally (0)
+
+## Commit Details
+
+```
+Fix Helm install timeout and TPV scheduling tag conflicts
+
+- Add wait: true and wait_timeout: 600 to Galaxy Helm install task
+  to ensure deployment is stable before checking PVC status
+- Remove scheduling.prefer tags from TPV destinations (gcp_batch, pulsar_gcp)
+  to avoid scoring conflicts with tools that lack matching tags
+- Override k8s destination without scheduling.accept tag for equal scoring
+- Tool routing now relies on job_conf.yml environment mappings instead of
+  TPV scheduling tag matching
+```
+
+## Next Steps
+
+1. Delete existing VM (user will do manually)
+2. Deploy fresh cluster with `bin/start.sh`
+3. Verify FastQC routes to `pulsar_gcp`
+4. Confirm GCP Batch job is created
+
+## Key Debugging Commands
+
+```bash
+# Check current TPV rules in pod
+KUBECONFIG=~/.kube/configs/gcp kubectl exec -n galaxy deployment/galaxy-web -- \
+  cat /galaxy/server/lib/galaxy/jobs/rules/tpv_rules_local.yml
+
+# Check job_conf.yml tool routing
+KUBECONFIG=~/.kube/configs/gcp kubectl get configmap galaxy-configs -n galaxy -o yaml | \
+  grep -A50 "job_conf.yml"
+
+# Monitor GCP Batch jobs
+gcloud batch jobs list --location=us-east4 --project=anvil-and-terra-development
+```
+
+---
+
+# Deployment Fixes and Pulsar GCP Batch Investigation - Session Notes
+
+**Date**: 2026-01-11
+**Focus**: Fixing deployment issues and investigating Pulsar GCP Batch resource sizing
+
+## Summary of Issues Identified and Resolved
+
+### 20. Helm wait_timeout Missing Time Unit
+**Problem**: Ansible playbook failed with error `invalid argument "600" for "--timeout" flag: time: missing unit in duration "600"`
+
+**Root Cause**: The `wait_timeout` parameter in the Helm install task was set to `600` but Helm requires a time unit suffix (e.g., `600s`).
+
+**Solution**: Changed `wait_timeout: 600` to `wait_timeout: "600s"` in `galaxy_application.yml:244`.
+
+**Commit**: `e14f5e6`
+
+### 21. Galaxy PVC Wait Using Wrong Condition Type
+**Problem**: Playbook timed out waiting for Galaxy PVC even though the PVC was bound. Error: `Failed to gather information about PersistentVolumeClaim(s) even after waiting for 300 seconds`
+
+**Root Cause**: The PVC wait task used `wait_condition` with `type: Bound`, but PVCs don't have condition types - they have `status.phase`.
+
+**Solution**: Changed from `wait_condition` approach to checking `status.phase == "Bound"` with retries:
+```yaml
+- name: Wait for Galaxy PVC to be bound
+  kubernetes.core.k8s_info:
+    # ...
+  register: galaxy_pvc
+  until: galaxy_pvc.resources | length > 0 and galaxy_pvc.resources[0].status.phase == "Bound"
+  retries: 30
+  delay: 10
+```
+
+### 22. Consolidated Helm Values
+**Problem**: Multiple `_helm_values_*` sections made the playbook harder to maintain.
+
+**Solution**: Consolidated `_helm_values_base`, `_helm_values_gcp_batch`, `_helm_values_pulsar_gcp`, and `_helm_values_cnpg_plugin` into a single `_helm_values` section. Only `_helm_values_skip_initdb` remains conditional.
+
+**Commit**: `3fe2c29`
+
+### 23. Default Galaxy API Key
+**Problem**: The `galaxy_api_key` default was empty string, which didn't trigger `default(omit)` in the template.
+
+**Solution**: Set `galaxy_api_key: "galaxypassword"` in `defaults/main.yml`. Note: This is actually passed via inventory file in `launch_vm.sh`, so the default is redundant but provides a fallback.
+
+**Commit**: `e54d826`
+
+### 24. GCP Batch Placeholder Values Not Replaced
+**Problem**: `PLACEHOLDER_PROJECT_ID` and `PLACEHOLDER_SERVICE_ACCOUNT` in `values/hybrid-gcp-batch.yml` were not being replaced, causing GCP Batch job submission failures.
+
+**Solution**: Hardcoded the actual values:
+- `project_id: "anvil-and-terra-development"`
+- `service_account_email: galaxy-batch-runner@anvil-and-terra-development.iam.gserviceaccount.com`
+
+**Commits**: `62f108e`, `778c645`
+
+## Pulsar GCP Batch Resource Sizing Investigation
+
+### Issue Identified
+When launching a FastQC job requesting 8 cores, the GCP Batch VM was created with `n2-standard-2` (1 vCPU per task) instead of being sized appropriately.
+
+### Root Cause
+The Pulsar GCP Batch runner (`PulsarGcpBatchJobRunner`) does NOT support dynamic resource sizing. The `GcpJobParams` class in `pulsar/client/container_job_config.py` only supports a fixed `machine_type` parameter - it doesn't read job resource requirements and size VMs accordingly.
+
+This is different from Galaxy's direct `gcp_batch` runner which has dynamic resource allocation implemented.
+
+### Documentation Created
+Created comprehensive documentation at `docs/PULSAR_GCP_BATCH_RESOURCE_SIZING_ISSUE.md` including:
+- Technical analysis of the limitation
+- Comparison with direct GCP Batch runner
+- Proposed solutions (machine type mapping, ComputeResource usage, hybrid approach)
+- Authentication considerations for non-GCP Galaxy deployments
+- Graphviz DOT diagrams for architecture visualization
+
+### Diagrams Generated
+Created `docs/diagrams/` with DOT source files and PNG images:
+- `direct_gcp_batch.dot/.png` - Direct GCP Batch runner architecture
+- `pulsar_gcp_batch.dot/.png` - Pulsar GCP Batch runner architecture
+- `auth_adc.dot/.png` - ADC authentication flow
+- `auth_credentials.dot/.png` - Credentials file authentication flow
+
+**Commit**: `ff392d1`, `7de4ed3`, `1eddf78`, `e07ec46`
+
+## Files Modified This Session
+
+| File | Changes |
+|------|---------|
+| `roles/galaxy_k8s_deployment/tasks/galaxy_application.yml` | Fixed wait_timeout, consolidated helm values, fixed PVC wait condition |
+| `roles/galaxy_k8s_deployment/defaults/main.yml` | Set default galaxy_api_key |
+| `values/hybrid-gcp-batch.yml` | Replaced placeholder values with actual project_id and service_account_email |
+| `docs/PULSAR_GCP_BATCH_RESOURCE_SIZING_ISSUE.md` | **NEW** - Documented resource sizing limitation |
+| `docs/diagrams/*.dot` | **NEW** - Graphviz source files |
+| `docs/diagrams/*.png` | **NEW** - Generated architecture diagrams |
+
+## Current Deployment Status
+
+Galaxy is successfully deployed and running on `ks-psql-test`:
+- All pods running
+- PVCs bound
+- GCP Batch jobs dispatching (but Pulsar runner uses fixed machine types)
+
+## Next Steps
+
+1. **For Pulsar maintainers**: Review `docs/PULSAR_GCP_BATCH_RESOURCE_SIZING_ISSUE.md` and consider implementing dynamic resource sizing
+2. **Workaround**: Use multiple destinations with different `machine_type` values and TPV routing until Pulsar is updated
+
+---
