@@ -237,9 +237,21 @@ jobs:
       destinations:
         gcp_batch:
           runner: gcp_batch
+          scheduling:
+            accept:
+              - gcp-batch
           params:
             docker_enabled: "true"
+            # Pass TPV-computed cores/mem to the runner for dynamic VM sizing
+            cores: '{cores}'
+            mem: '{mem}'
         pulsar_gcp:
           runner: pulsar_gcp
+          scheduling:
+            accept:
+              - pulsar-gcp
           params:
             docker_enabled: "true"
+            # Pass TPV-computed cores/mem to the runner for dynamic VM sizing
+            cores: '{cores}'
+            mem: '{mem}'

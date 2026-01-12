@@ -111,23 +111,38 @@ jobs:
       # Performance Test Destinations
       # =========================================================================
       destinations:
-        # Direct GCP Batch destination (no scheduling tags - rely on job_conf routing)
+        # Direct GCP Batch destination
         gcp_batch:
           runner: gcp_batch
+          scheduling:
+            accept:
+              - gcp-batch
           params:
             docker_enabled: "true"
+            # Pass TPV-computed cores/mem to the runner for dynamic VM sizing
+            cores: '{cores}'
+            mem: '{mem}'
 
-        # Pulsar GCP Batch destination (no scheduling tags - rely on job_conf routing)
+        # Pulsar GCP Batch destination
         pulsar_gcp:
           runner: pulsar_gcp
+          scheduling:
+            accept:
+              - pulsar-gcp
           params:
             docker_enabled: "true"
+            # Pass TPV-computed cores/mem to the runner for dynamic VM sizing
+            cores: '{cores}'
+            mem: '{mem}'
 
-        # Kubernetes destination (remove accept tag for equal scoring)
+        # Kubernetes destination
         k8s:
           runner: k8s
           max_cores: 1
           max_mem: 4
+          scheduling:
+            accept:
+              - k8s
           params:
             docker_enabled: "true"
             limits_memory: '{mem}Gi'
@@ -138,40 +153,57 @@ jobs:
       # Tool-specific resource requirements for testing
       # =========================================================================
       tools:
-        # Text processing - lightweight, routed to gcp_batch via job_conf
+        # Text processing - lightweight, routed to gcp_batch
         Cut1:
           cores: 1
           mem: 2
+          scheduling:
+            prefer:
+              - gcp-batch
           env:
             TEST_RUNNER: "direct_gcp_batch"
 
         Grep1:
           cores: 1
           mem: 2
+          scheduling:
+            prefer:
+              - gcp-batch
           env:
             TEST_RUNNER: "direct_gcp_batch"
 
         Sort1:
           cores: 2
           mem: 4
+          scheduling:
+            prefer:
+              - gcp-batch
           env:
             TEST_RUNNER: "direct_gcp_batch"
 
-        # Bioinformatics - routed to pulsar_gcp via job_conf
+        # Bioinformatics - routed to pulsar_gcp
+        # No hardcoded cores/mem - allows user resource_parameters to control VM sizing
         toolshed.g2.bx.psu.edu/repos/devteam/fastqc/fastqc/.*:
-          cores: 2
-          mem: 4
+          scheduling:
+            prefer:
+              - pulsar-gcp
           env:
             TEST_RUNNER: "pulsar_gcp_batch"
 
         toolshed.g2.bx.psu.edu/repos/devteam/bwa/bwa_mem/.*:
           cores: 4
           mem: 8
+          scheduling:
+            prefer:
+              - pulsar-gcp
           env:
             TEST_RUNNER: "pulsar_gcp_batch"
 
         toolshed.g2.bx.psu.edu/repos/iuc/samtools_.*/.*:
           cores: 2
           mem: 4
+          scheduling:
+            prefer:
+              - pulsar-gcp
           env:
             TEST_RUNNER: "pulsar_gcp_batch"
