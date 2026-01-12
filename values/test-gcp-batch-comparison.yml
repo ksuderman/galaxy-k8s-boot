@@ -182,10 +182,13 @@ jobs:
             TEST_RUNNER: "direct_gcp_batch"
 
         # Bioinformatics - routed to pulsar_gcp
-        # No hardcoded cores/mem - allows user resource_parameters to control VM sizing
+        # Use 'require' to force routing (prefer wasn't working)
+        # Explicit cores/mem override remote TPV database formulas
         toolshed.g2.bx.psu.edu/repos/devteam/fastqc/fastqc/.*:
+          cores: 8
+          mem: 32
           scheduling:
-            prefer:
+            require:
               - pulsar-gcp
           env:
             TEST_RUNNER: "pulsar_gcp_batch"
