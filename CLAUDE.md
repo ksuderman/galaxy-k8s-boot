@@ -165,6 +165,7 @@ gcloud compute firewall-rules create allow-rabbitmq-for-batch \
 ## Claude Instructions
 
 - **Use single-line commit messages.** Do not use multi-line commit messages with body text, bullet points, or the generated-by footer.
+- Unless otherwise specified the Google VM name will be `ks-psql-test`, the kubeconfig file can be found at ~/.kube/configs/gcp and the Galaxy API key can be obtained using the command `abm config show gcp | jq -r .key`.
 
 ## Development Notes
 

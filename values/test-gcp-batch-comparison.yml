@@ -29,7 +29,20 @@ configs:
           machine_type: e2-standard-4
         pulsar_gcp:
           runner: pulsar_gcp
-          machine_type: e2-standard-4
+          # GCP settings - required for Pulsar GCP Batch runner
+          project_id: "anvil-and-terra-development"
+          region: us-east4
+          # Compute resources
+          machine_type: n2-standard-4
+          walltime_limit: 86400
+          retry_count: 3
+          # Storage
+          ssd_name: pulsar_staging
+          disk_size: 375
+          # Pulsar configuration
+          pulsar_container_image: galaxy/pulsar-pod-staging:0.15.0.2
+          default_file_action: remote_transfer
+          rewrite_parameters: "true"
 
     # =========================================================================
     # Test Tool Routing Configuration
@@ -131,6 +144,9 @@ jobs:
               - pulsar-gcp
           params:
             docker_enabled: "true"
+            # GCP settings - required for Pulsar GCP Batch runner
+            project_id: "anvil-and-terra-development"
+            region: us-east4
             # Pass TPV-computed cores/mem to the runner for dynamic VM sizing
             cores: '{cores}'
             mem: '{mem}'
