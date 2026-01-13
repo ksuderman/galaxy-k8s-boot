@@ -203,6 +203,8 @@ jobs:
         toolshed.g2.bx.psu.edu/repos/devteam/fastqc/fastqc/.*:
           cores: 8
           mem: 32
+          params:
+            machine_type: n2-standard-8
           scheduling:
             require:
               - pulsar-gcp
