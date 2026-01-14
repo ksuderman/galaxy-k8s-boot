@@ -201,6 +201,31 @@
   set_fact:
     rabbitmq_external_ip: "{{ ansible_default_ipv4.address }}"
 
+# Get the public IP from GCP metadata service for Galaxy URL
+# This is needed for Pulsar GCP Batch VMs to reach Galaxy's API
+- name: Get Galaxy public IP from GCP metadata
+  ansible.builtin.uri:
+    url: http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip
+    headers:
+      Metadata-Flavor: Google
+    return_content: yes
+  register: galaxy_public_ip_result
+  ignore_errors: yes
+
+- name: Set Galaxy public URL for Pulsar
+  set_fact:
+    galaxy_public_url: "http://{{ galaxy_public_ip_result.content }}"
+  when: galaxy_public_ip_result is succeeded
+
+- name: Fallback to internal IP if public IP not available
+  set_fact:
+    galaxy_public_url: "http://{{ ansible_default_ipv4.address }}"
+  when: galaxy_public_ip_result is failed
+
+- name: Display Galaxy URL for Pulsar
+  debug:
+    msg: "Galaxy URL for Pulsar GCP Batch: {{ galaxy_public_url }}"
+
 # Note: RabbitMQ service is created by Galaxy Helm chart, so we patch it after Galaxy install.
 # The _rabbitmq_needs_patching flag signals that post-install patching is required.
 - name: Flag RabbitMQ for post-install patching
@@ -268,6 +293,7 @@
               load: galaxy.jobs.runners.pulsar:PulsarGcpBatchJobRunner
               workers: 4
               amqp_url: "PLACEHOLDER_AMQP_URL"
+              galaxy_url: "{{ galaxy_public_url }}"
           execution:
             environments:
               pulsar_gcp:
