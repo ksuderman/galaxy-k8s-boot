@@ -1,0 +1,138 @@
+ingress:
+  enabled: true
+  ingressClassName: ""
+  canary:
+    enabled: false
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+  - host: ~
+    paths:
+    - path: /
+  path: /
+
+image:
+  repository: ksuderman/galaxy-min
+  tag: "pr-21590-gcsfs"
+
+resources:
+  limits:
+    memory: 64G
+
+persistence:
+  storageClass: nfs
+  size: 20Gi
+
+cvmfs:
+  deployPostInstallFix: true
+  cvmfscsi:
+    cache:
+      local:
+        enabled: true
+        pvc:
+          storageClass: nfs
+          name: cvmfs-local-cache
+      alien:
+        enabled: false
+        pvc:
+          name: cvmfs-alien-cache
+    logVerbosityLevel: 5
+
+postgresql:
+  persistence:
+    storageClass: blockstorage
+
+rabbitmq:
+  persistence:
+    storageClassName: blockstorage
+
+extraFileMappings:
+  /galaxy/server/static/welcome.html:
+    applyToWeb: true
+    applyToNginx: true
+    content: |
+      <!DOCTYPE html>
+      <html lang="en">
+          <head>
+              <meta charset="utf-8" />
+              <link rel="stylesheet" href="dist/base.css" type="text/css" />
+          </head>
+          <body class="m-0">
+              <div class="py-4">
+                  <div class="container">
+                      <div class="row mb-4">
+                          <div class="col-md-12">
+                              <h2>Welcome to Galaxy - PR #21590 Test</h2>
+                              <p>
+                                  This is a test Galaxy instance for testing
+                                  <strong>PR #21590: Switch Google Cloud Storage file source from fs-gcsfs to gcsfs (fsspec)</strong>.
+                              </p>
+                              <p>
+                                  Changes in this PR:
+                                  <ul>
+                                      <li>Replaces deprecated fs-gcsfs library with gcsfs (fsspec-based)</li>
+                                      <li>Simplifies GCS file source implementation</li>
+                                      <li>Fixes anonymous access credential refresh issues</li>
+                                      <li>Restores root_path support for bucket scoping</li>
+                                  </ul>
+                              </p>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </body>
+      </html>
+
+configs:
+  galaxy.yml:
+    galaxy:
+      require_login: false
+      show_welcome_with_login: true
+      allow_user_creation: true
+      cleanup_job: never
+      admin_users: admin@example.com,admin@galaxyproject.org,suderman@jhu.edu
+      # Enable file sources for GCS testing
+      file_sources_config_file: "/galaxy/server/config/file_sources_conf.yml"
+      logging_levels:
+        uvicorn.access: WARNING
+        main: INFO
+        galaxy.*: INFO
+        galaxy.datatypes.*: WARNING
+        galaxy.files.*: DEBUG
+        galaxy.files.sources.*: DEBUG
+        galaxy.files.sources.gcsfs: TRACE
+
+  # GCS file sources configuration for testing the PR
+  # NOTE: Use type "googlecloudstorage" (not "gcsfs") and "bucket_name" (not "bucket")
+  file_sources_conf.yml:
+    - type: googlecloudstorage
+      id: gcs_test_public
+      label: "GCS Public Test - Landsat"
+      doc: "Test GCS file source with anonymous access to Landsat data"
+      bucket_name: "gcp-public-data-landsat"
+      anonymous: true
+    # Uncomment and configure for authenticated access testing:
+    # - type: googlecloudstorage
+    #   id: gcs_test_private
+    #   label: "GCS Private Test"
+    #   doc: "Test GCS file source with service account"
+    #   bucket_name: "your-private-bucket"
+    #   service_account_json: "/path/to/service-account.json"
+
+  job_conf.yml:
+    runners:
+      local:
+        load: galaxy.jobs.runners.local:LocalJobRunner
+        workers: 4
+    execution:
+      default: local
+      environments:
+        local:
+          runner: local
+    tools:
+      - environment: local
+        id: upload1
+      - environment: local
+        id: __DATA_FETCH__
+      - environment: local
+        id: __SET_METADATA__
