@@ -12,7 +12,7 @@ bin/launch_vm.sh $SERVER \
   --disk-size 256 \
   -f values/values.yml \
   -f values/batch.yml \
-  -f values/v0.1.yml 
+  -f values/v25.1-batch.yml
 #  -f values/resource-params.yml
 
 
