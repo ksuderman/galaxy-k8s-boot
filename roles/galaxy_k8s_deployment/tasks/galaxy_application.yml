@@ -287,8 +287,7 @@
             master_api_key: "{{ galaxy_api_key | default(omit) }}"
         job_conf.yml:
           runners:
-            gcp_batch:
-              nfs_server: "{{ nfs_server }}"
+            # gcp_batch runner config is set after PVC detection via ConfigMap update
             pulsar_gcp:
               load: galaxy.jobs.runners.pulsar:PulsarGcpBatchJobRunner
               workers: 4
@@ -377,7 +376,7 @@
     kubeconfig: "{{ kubeconfig_path }}"
   register: galaxy_configs
 
-- name: Update job_conf.yml with NFS export path
+- name: Update job_conf.yml with gcp_batch_volumes for NFS access
   kubernetes.core.k8s:
     state: present
     kubeconfig: "{{ kubeconfig_path }}"
@@ -387,7 +386,8 @@
       metadata:
         name: galaxy-configs
         namespace: galaxy
-      data: "{{ galaxy_configs.resources[0].data | combine({'job_conf.yml': (galaxy_configs.resources[0].data['job_conf.yml'] | from_yaml | combine({'runners': {'gcp_batch': {'nfs_path': nfs_export_path}}}, recursive=True) | to_nice_yaml) }) }}"
+      # gcp_batch_volumes format: "server:/remote_path:/mount_path"
+      data: "{{ galaxy_configs.resources[0].data | combine({'job_conf.yml': (galaxy_configs.resources[0].data['job_conf.yml'] | from_yaml | combine({'runners': {'gcp_batch': {'gcp_batch_volumes': nfs_server ~ ':' ~ nfs_export_path ~ ':/galaxy/server/database'}}}, recursive=True) | to_nice_yaml) }) }}"
   when: nfs_export_path is defined
 
 - name: Restart Galaxy deployments to pick up configuration changes
