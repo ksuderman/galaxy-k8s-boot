@@ -38,6 +38,7 @@ configs:
         # Note: container_image comes from tool requirements via Galaxy's container finder
         galaxy_user_id: 10001
         galaxy_group_id: 10001
+        docker_extra_volumes: "/cvmfs/data.galaxyproject.org:/cvmfs/data.galaxyproject.org:ro,/cvmfs/cloud.galaxyproject.org:/cvmfs/cloud.galaxyproject.org:ro"
 
         # Custom VM image with CVMFS pre-configured (update date as needed)
 #        custom_vm_image: projects/anvil-and-terra-development/global/images/galaxy-k8s-boot-v2025-09-26
