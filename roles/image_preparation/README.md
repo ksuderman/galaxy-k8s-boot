@@ -33,6 +33,7 @@ The process will set up the following components on the image:
 ### CVMFS Client
 - Configured for the following Galaxy's CVMFS data repositories:
   - data.galaxyproject.org
+  - cloud.galaxyproject.org
 
 ## Repo Files Structure
 
@@ -41,6 +42,7 @@ roles/image_preparation/
 ├── defaults/main.yml        # Simplified variables
 ├── tasks/
 │   ├── main.yml             # Orchestrates all tasks
+│   ├── base_packages.yml    # Ubuntu package installation
 │   ├── base_packages.yml    # Ubuntu package installation
 │   ├── system_config.yml    # Kernel and system settings
 │   ├── rke2_prerequisites.yml # RKE2 prerequisites installation

@@ -1859,3 +1859,122 @@ Galaxy is successfully deployed and running on `ks-psql-test`:
 2. **Workaround**: Use multiple destinations with different `machine_type` values and TPV routing until Pulsar is updated
 
 ---
+
+# GCP Batch Runner Configuration Fixes - Session Notes
+
+**Date**: 2026-01-24
+**Focus**: Fixing GCP Batch runner parameter validation errors and playbook configuration
+
+## Summary of Issues Identified and Resolved
+
+### 25. Invalid GCP Batch Runner Parameters
+**Problem**: Galaxy job handler crashing with `Exception: Invalid job runner parameter for this plugin: container_image`
+
+**Root Cause Analysis**:
+The `values/batch.yml` file contained parameters that are not valid for the GCP Batch runner:
+- `container_image` - Not in `runner_param_specs` (runner uses Galaxy's container finder)
+- `nfs_server` - Not a valid parameter
+- `nfs_path` - Not a valid parameter
+- `nfs_mount_path` - Not a valid parameter
+
+The GCP Batch runner expects NFS configuration via `gcp_batch_volumes` in format: `"server:/remote_path:/mount_path"`
+
+**Solution Implemented**:
+
+1. **Updated `values/batch.yml`**:
+   - Removed invalid `container_image`, `nfs_server`, `nfs_path`, `nfs_mount_path` parameters
+   - Added comment about `gcp_batch_volumes` format
+   - Added startup probe timeout configuration for CVMFS tool loading
+
+2. **Updated `roles/galaxy_k8s_deployment/tasks/galaxy_application.yml`**:
+   - Removed `nfs_server` from initial Helm values
+   - Changed ConfigMap update to set `gcp_batch_volumes` with format `"nfs_server:nfs_export_path:/galaxy/server/database"`
+
+### 26. Pulsar GCP Batch Configuration Breaking Deployment
+**Problem**: VM launch failing due to Pulsar GCP Batch configuration being applied unconditionally, even when `enable_pulsar_gcp_batch` was false.
+
+**Root Cause Analysis**:
+The Helm values and Ansible tasks for Pulsar GCP Batch were being included unconditionally in `galaxy_application.yml`, causing errors when variables like `galaxy_public_url` weren't defined.
+
+**Solution Implemented**:
+Made all Pulsar-related configuration conditional on `enable_pulsar_gcp_batch`:
+
+1. **Helm install task**: Pulsar GCP values are now conditionally combined only when `enable_pulsar_gcp_batch` is true
+2. **Pulsar-specific tasks**: Added `when: enable_pulsar_gcp_batch | default(false) | bool` to all tasks including:
+   - RabbitMQ external IP setup
+   - Galaxy public URL detection
+   - RabbitMQ patching flag
+   - RabbitMQ credentials retrieval
+   - AMQP URL construction
+   - RabbitMQ service patching
+   - ConfigMap update with AMQP URL
+   - Galaxy deployment restart for Pulsar
+
+### 27. Missing GCP Batch Helper Module
+**Problem**: Job handler crashing with `ModuleNotFoundError: No module named 'galaxy.jobs.runners.util.gcp_batch'`
+
+**Root Cause Analysis**:
+The Docker image was built from `galaxy-upstream` which had the `gcp_batch.py` runner file but was missing the `util/gcp_batch/` helper module directory that the runner imports.
+
+**Solution Implemented**:
+Copied the `util/gcp_batch/` module from `galaxy-batch-dev` to `galaxy-upstream`:
+```
+lib/galaxy/jobs/runners/util/gcp_batch/
+├── __init__.py
+├── container_script.sh
+├── direct_script.sh
+└── helpers.py
+```
+
+### 28. Slow Startup Due to Tool Loading
+**Problem**: Galaxy web pod being killed by startup probe before tool loading completed from CVMFS.
+
+**Root Cause Analysis**:
+Investigated whether this was the slow startup bug from issue #21262. Found that:
+- Commit `2e4a50a38c75` introduced the bug on **2025-10-29** on the `dev` branch
+- The `release_25.1` branch was created earlier and does NOT contain this bug
+- The slow startup is normal CVMFS tool loading time, not the validation bug
+
+**Solution Implemented**:
+Added startup probe timeout configuration to `values/batch.yml`:
+```yaml
+web:
+  startupProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    failureThreshold: 120  # Allow up to ~20 minutes
+```
+
+### 29. Wrong Docker Image Tag Being Used
+**Problem**: Pods using old image tag (0.2) instead of new tag (0.3) after rebuilding.
+
+**Root Cause Analysis**:
+The `start.sh` script pulls values files from the remote GitHub repository (`pulsar-gcp` branch), not the local files. Local changes to `values/v25.1-batch.yml` weren't being applied.
+
+**Solution**: User pushed local changes to GitHub and relaunched.
+
+## Files Modified This Session
+
+| File | Changes |
+|------|---------|
+| `values/batch.yml` | Removed invalid runner params (`container_image`, `nfs_*`), added startup probe timeout, added `gcp_batch_volumes` comment |
+| `values/v0.1.yml` | Updated image tag to 0.3 |
+| `roles/galaxy_k8s_deployment/tasks/galaxy_application.yml` | Made Pulsar config conditional, changed NFS config to use `gcp_batch_volumes` |
+
+## Key Learnings
+
+1. **GCP Batch runner parameter validation**: The runner validates all parameters against `runner_param_specs` - invalid parameters cause immediate failure
+2. **`gcp_batch_volumes` format**: Must be `"server:/remote_path:/mount_path"` - separate NFS parameters are not supported
+3. **Conditional Ansible configuration**: Use `when: variable | default(false) | bool` pattern to guard optional features
+4. **GitHub vs local files**: The `launch_vm.sh` script pulls from GitHub, so local changes must be pushed before they take effect
+5. **Release branch bug status**: The slow startup bug (issue #21262) only affects the `dev` branch, not `release_25.1`
+
+## Current Status: WORKING ✅
+
+**✅ GCP Batch runner parameters fixed**: Invalid parameters removed
+**✅ Pulsar GCP Batch conditionally configured**: No longer breaks when disabled
+**✅ Helper module included**: `util/gcp_batch/` copied to galaxy-upstream
+**✅ Startup probe timeout extended**: 20 minutes for CVMFS tool loading
+**✅ Docker image rebuilt**: `ksuderman/galaxy-batch:0.3` with all fixes
+
+---

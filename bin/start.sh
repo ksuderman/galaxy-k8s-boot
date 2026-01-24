@@ -4,9 +4,10 @@ BRANCH=${BRANCH:-pulsar-gcp}
 SERVER=${SERVER:-ks-gcp-test}
 REPO=${REPO:-https://github.com/ksuderman/galaxy-k8s-boot}
 
+cd $(dirname $(realpath $0))
 echo "Launching ${SERVER} with hybrid GCP Batch configuration"
 
-bin/launch_vm.sh $SERVER \
+./launch_vm.sh $SERVER \
   --git-repo $REPO \
   --git-branch $BRANCH \
   --disk-size 256 \

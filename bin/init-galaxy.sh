@@ -36,11 +36,14 @@ while [[ $# -gt 0 ]] ; do
   shift
 done
 
+IP=$(gcp ip get $SERVER)
 if [[ -n $GET_URL ]] ; then
-	abm config url $CLOUD "http://$(gcp ip get $SERVER)"	
+	abm config url $CLOUD "http://$IP"	
 fi
 
 if [[ -n $GET_KEY ]] ; then
+	# Ensure the default Galaxy user has been created.
+	curl http://$IP > /dev/null
 	echo "Getting user API key for $CLOUD"
 	abm config key $CLOUD galaxypassword
 	key=$(abm $CLOUD user key dev)
