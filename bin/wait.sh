@@ -27,6 +27,7 @@ echo "Waiting for the VM at $ip to come up"
 while ! nc -z $ip 22 ; do
 	sleep 1
 done
+sleep 5
 echo "Waiting for cloud init to complete"
 while [[ ! "$(gcloud compute ssh "$SERVER" \
   --project=anvil-and-terra-development \
