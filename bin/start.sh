@@ -13,5 +13,6 @@ echo "Launching ${SERVER} with hybrid GCP Batch configuration"
   --disk-size 256 \
   -f values/values.yml \
   -f values/batch.yml \
+  -f values/rules.yml \
   -f values/v25.1-batch.yml \
   -f values/resource-params.yml
