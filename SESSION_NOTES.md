@@ -1978,3 +1978,59 @@ The `start.sh` script pulls values files from the remote GitHub repository (`pul
 **✅ Docker image rebuilt**: `ksuderman/galaxy-batch:0.3` with all fixes
 
 ---
+
+## Session 2026-01-26: GCP Batch CVMFS and Resource Fixes
+
+### 30. CVMFS cloud.galaxyproject.org Not Mounted
+**Problem**: Tool Shed tools (like snpEff) failed with error:
+```
+python3: can't open file '/cvmfs/cloud.galaxyproject.org/tools/toolshed.g2.bx.psu.edu/repos/iuc/snpeff/74aebe30fb52/snpeff/gbk2fa.py': [Errno 2] No such file or directory
+```
+
+**Root Cause**: The default CVMFS docker volume mount in the GCP Batch runner only included `data.galaxyproject.org`, not `cloud.galaxyproject.org` which hosts Tool Shed tools.
+
+**Solution**:
+1. Updated `docker_extra_volumes` in `values/batch.yml` to include both repositories
+2. Updated `DEFAULT_CVMFS_DOCKER_VOLUME` in Galaxy runner code
+3. Updated `container_script.sh` to verify both CVMFS repos
+4. Updated `image_prep.yml` to verify `cloud.galaxyproject.org` in `cvmfs_verify_repos`
+5. Created new VM image `galaxy-k8s-boot-v2026-01-24`
+
+### 31. Job Resource Parameters Not Respected
+**Problem**: Jobs requested 4 CPUs and 16GB memory via Galaxy's job resource selector, but VMs were created with default 1 CPU and 2GB memory.
+
+**Root Cause**: GCP Batch runner only checked `job_destination.params` for Kubernetes-style parameters (`requests_cpu`, `limits_cpu`) but didn't check Galaxy's job resource parameters (`processors`, `mem`).
+
+**Solution**: Updated `_get_job_resources()` in `gcp_batch.py` to call `job_wrapper.get_resource_parameters()` and check for `processors` and `mem` parameters from the tool form.
+
+### 32. Static Machine Type Causing Job Failures
+**Problem**: Jobs with large resource requirements failed:
+```
+machine_type "n2-standard-4" cannot satisfy compute_resource cpu_milli:16000 memory_mib:32768
+```
+
+**Root Cause**: Machine type was hardcoded to `n2-standard-4` regardless of resource requirements.
+
+**Solution**: Added `compute_machine_type()` function that:
+- Selects variant (highcpu/standard/highmem) based on memory-per-vCPU ratio
+- Finds smallest valid size (2, 4, 8, 16, 32, 48, 64, 80, 96, 128) meeting requirements
+- Returns appropriate machine type like `n2-standard-16` or `n2-highmem-8`
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `values/batch.yml` | Updated `docker_extra_volumes` and `custom_vm_image` |
+| `bin/launch_vm.sh` | Updated default `MACHINE_IMAGE` to `galaxy-k8s-boot-v2026-01-24` |
+| `image_prep.yml` | Added `cloud.galaxyproject.org` to `cvmfs_verify_repos` |
+
+### Galaxy Code Modified (galaxy-batch-dev and galaxy-upstream)
+
+| File | Changes |
+|------|---------|
+| `lib/galaxy/jobs/runners/gcp_batch.py` | Resource parameter handling, dynamic machine type selection |
+| `lib/galaxy/jobs/runners/util/gcp_batch/helpers.py` | `compute_machine_type()`, updated `DEFAULT_CVMFS_DOCKER_VOLUME` |
+| `lib/galaxy/jobs/runners/util/gcp_batch/__init__.py` | Export `compute_machine_type` |
+| `lib/galaxy/jobs/runners/util/gcp_batch/container_script.sh` | CVMFS verification for both repos |
+
+---
