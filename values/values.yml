@@ -54,6 +54,7 @@ configs:
       # The custom brand image source
       logo_src_secondary: /static/images/anvilwhite.png
       enable_quotas: true
+      parallel_tool_loading: true
   job_conf.yml:
     limits:
       - type: total_walltime
