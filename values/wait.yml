@@ -1,4 +1,4 @@
-web:
+webHandlers:
   startupProbe:
     initialDelaySeconds: 60
     periodSeconds: 10
