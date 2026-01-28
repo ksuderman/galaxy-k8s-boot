@@ -1,0 +1,143 @@
+ingress:
+  enabled: true
+  ingressClassName: ""
+  canary:
+    enabled: false
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+  - host: ~
+    paths:
+    - path: /
+  path: /
+
+#image:
+#  repository: quay.io/galaxyproject/galaxy-min
+#  tag: "25.0.2"
+
+resources:
+  limits:
+    memory: 64G
+
+persistence:
+  storageClass: nfs
+  size: 20Gi
+
+cvmfs:
+  deployPostInstallFix: true
+  cvmfscsi:
+    cache:
+      local:
+        enabled: true
+        pvc:
+          storageClass: nfs
+          name: cvmfs-local-cache
+      alien:
+        enabled: false
+        pvc:
+          name: cvmfs-alien-cache
+    logVerbosityLevel: 5
+
+postgresql:
+  persistence:
+    storageClass: blockstorage
+
+rabbitmq:
+  persistence:
+    storageClassName: blockstorage
+
+extraFileMappings:
+  /galaxy/server/static/welcome.html:
+    applyToWeb: true
+    applyToNginx: true
+    content: |
+      <!DOCTYPE html>
+      <html lang="en">
+          <head>
+              <meta charset="utf-8" />
+              <link rel="stylesheet" href="dist/base.css" type="text/css" />
+          </head>
+          <body class="m-0">
+              <div class="py-4">
+                  <div class="container">
+                      <div class="row mb-4">
+                          <div class="col-md-12">
+                              <h2>Welcome to Galaxy</h2>
+                              <p>
+                                  Galaxy is an interactive and workflow analysis
+                                  platform providing a graphical user interface
+                                  for computational tools. This is a test Galaxy 
+                                  instance running on the Google Cloud Platform 
+                                  for testing dispatching jobs to Google Batch.
+                              </p>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </body>
+      </html>
+
+configs:
+  galaxy.yml:
+    galaxy:
+      require_login: false
+      show_welcome_with_login: true
+      allow_user_creation: true
+      cleanup_job: never
+      admin_users: admin@example.com
+      job_metrics:
+        - type: core
+        - type: cgroup
+        - type: cpuinfo
+        - type: meminfo
+        - type: uname
+      logging_levels:
+        uvicorn.access: WARNING
+        main: INFO
+        galaxy.*: INFO
+        galaxy.datatypes.*: WARNING
+        galaxy.jobs.*: DEBUG
+        galaxy.jobs.runners.*: DEBUG
+        galaxy.jobs.runners.gcp_batch: TRACE
+        galaxy.tool_util.deps.*: TRACE
+  job_conf.yml:
+    runners:
+      k8s:
+        load: galaxy.jobs.runners.kubernetes:KubernetesJobRunner
+      local:
+        load: galaxy.jobs.runners.local:LocalJobRunner
+        workers: 4
+    execution:
+      default: tpv_dispatcher
+      environments:
+        local:
+          runner: local
+    destinations:
+      - id: k8s_default
+        runner: k8s
+      - id: local_default
+        runner: local
+    tools:
+      - environment: local
+        id: upload1
+      - environment: local
+        id: __DATA_FETCH__
+      - environment: local
+        id: __EXPORT_HISTORY__
+      - environment: local
+        id: __IMPORT_HISTORY__
+      - environment: local
+        id: __SET_METADATA__
+      - environment: local
+        id: __EXTRACT_DATASET__
+      # Route interactive tools to Kubernetes
+      - environment: local
+        id: interactive_tool.*
+      # Route data source tools to Kubernetes
+      - environment: local
+        id: .*data_source.*
+      # Keep workflows internal to cluster
+      - environment: local
+        id: __EXPORT_WORKFLOW__
+      - environment: local
+        id: __IMPORT_WORKFLOW__

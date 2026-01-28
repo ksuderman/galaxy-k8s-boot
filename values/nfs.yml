@@ -1,0 +1,6 @@
+configs:
+  job_conf.yml:
+    runners:
+      gcp_batch:
+        nfs_server: 10.150.15.228
+        nfs_path: /export/pvc-6405d7be-c191-4697-9d55-22331e7f88ad

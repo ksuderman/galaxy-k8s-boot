@@ -1,0 +1,221 @@
+ingress:
+  enabled: true
+  ingressClassName: ""
+  canary:
+    enabled: false
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+  - host: ~
+    paths:
+    - path: /
+  path: /
+
+image:
+  repository: ksuderman/galaxy-min
+  tag: "25.1-batch-2"
+
+resources:
+  limits:
+    memory: 64G
+
+persistence:
+  storageClass: nfs
+  size: 20Gi
+
+cvmfs:
+  deployPostInstallFix: true
+  cvmfscsi:
+    cache:
+      local:
+        enabled: true
+        pvc:
+          storageClass: nfs
+          name: cvmfs-local-cache
+      alien:
+        enabled: false
+        pvc:
+          name: cvmfs-alien-cache
+    logVerbosityLevel: 5
+
+postgresql:
+  persistence:
+    storageClass: blockstorage
+
+rabbitmq:
+  persistence:
+    storageClassName: blockstorage
+
+extraFileMappings:
+  /galaxy/server/config/job_resource_params_conf.xml:
+    applyToWeb: true
+    applyToJob: true
+    applyToWorkflow: true
+    content: |
+      <parameters>
+        <param label="Processors" name="processors" type="integer" min="1" max="{{ .Values.galaxy.jobs.user_limits.cores }}" value="" help="Number of processing cores, 'ppn' value (1-{{ .Values.galaxy.jobs.user_limits.cores }}). Leave blank to use default value." />
+        <param label="Memory" name="mem" type="integer" min="1" max="{{ .Values.galaxy.jobs.user_limits.mem }}" value="" help="Memory size in gigabytes, 'pmem' value (1-{{ .Values.galaxy.jobs.user_limits.mem }}). Leave blank to use default value." />
+        <param label="Wall Time" name="time" type="integer" min="1" max="{{ .Values.galaxy.jobs.user_limits.walltime }}" value="" help="Maximum job time in hours, 'walltime' value (1-{{ .Values.galaxy.jobs.user_limits.walltime }}). Leave blank to use default value." />
+      </parameters>
+
+  /galaxy/server/static/welcome.html:
+    applyToWeb: true
+    applyToNginx: true
+    content: |
+      <!DOCTYPE html>
+      <html lang="en">
+          <head>
+              <meta charset="utf-8" />
+              <link rel="stylesheet" href="dist/base.css" type="text/css" />
+          </head>
+          <body class="m-0">
+              <div class="py-4">
+                  <div class="container">
+                      <div class="row mb-4">
+                          <div class="col-md-12">
+                              <h2>Welcome to Galaxy</h2>
+                              <p>
+                                  Galaxy is an interactive and workflow analysis
+                                  platform providing a graphical user interface
+                                  for computational tools. This is a test Galaxy 
+                                  instance running on the Google Cloud Platform 
+                                  for testing dispatching jobs to Google Batch.
+                              </p>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </body>
+      </html>
+# Authentication: Uses Application Default Credentials (ADC) from VM's attached service account
+# No secret mounting required - the GCP Batch runner automatically uses the metadata service
+
+#extraVolumes:
+#  - name: job-resource-params-conf
+#    configMap:
+#      name: "{{ .Release.Name }}-resource-params-conf"
+#extraVolumeMounts:
+#  - name: job-resource-params-conf
+#    mountPath: /galaxy/server/config/job_resource_params_conf.xml
+#    subPath: job_resource_params_conf.xml
+
+configs:
+  galaxy.yml:
+    galaxy:
+      require_login: false
+      show_welcome_with_login: true
+      allow_user_creation: true
+      cleanup_job: never
+      admin_users: admin@example.com,admin@galaxyproject.org,suderman@jhu.edu
+      job_resource_params_file: "/galaxy/server/config/job_resource_params_conf.xml"
+      job_metrics:
+        - type: core
+        - type: cgroup
+        - type: cpuinfo
+        - type: meminfo
+        - type: uname
+      logging_levels:
+        uvicorn.access: WARNING
+        main: INFO
+        galaxy.*: INFO
+        galaxy.datatypes.*: WARNING
+        galaxy.jobs.*: DEBUG
+        galaxy.jobs.runners.*: DEBUG
+        galaxy.jobs.runners.gcp_batch: TRACE
+        galaxy.tool_util.deps.*: TRACE
+
+  job_conf.yml:
+    runners:
+      gcp_batch:
+        load: galaxy.jobs.runners.gcp_batch:GoogleCloudBatchJobRunner
+        workers: 4
+        # Basic GCP settings
+        # Authentication uses ADC from VM's attached service account
+        project_id: anvil-and-terra-development
+        region: us-east4
+        service_account_email: galaxy-batch-runner@anvil-and-terra-development.iam.gserviceaccount.com
+
+        # NFS configuration (required)
+        # nfs_server is set dynamically by the playbook via helm_values_gcp_batch
+        nfs_path: /             # Root path on NFS server. This will be updated by the playbook.
+        nfs_mount_path: /galaxy/server/database # Mount point in Batch VMs
+
+        # Network configuration (required for NFS access)
+        network: default
+        subnet: default
+
+        # Compute resources (defaults shown)
+        machine_type: n2-standard-4
+        vcpu: 1.0
+        memory_mib: 2048
+        boot_disk_size_gb: 100
+        boot_disk_type: pd-standard
+
+        # Container settings
+        use_container: true
+        container_image: ksuderman/galaxy-min:25.1-batch-2  # fallback if tool doesn't specify
+        galaxy_user_id: 10001
+        galaxy_group_id: 10001
+
+        # Custom VM image with CVMFS pre-configured (update date as needed)
+        #custom_vm_image: projects/anvil-and-terra-development/global/images/galaxy-batch-cvmfs-2025-09-27
+        custom_vm_image: projects/anvil-and-terra-development/global/images/galaxy-k8s-boot-v2025-09-26
+
+        # Job execution settings
+        max_retry_count: 3
+        max_run_duration: 3600s
+        polling_interval: 30
+    execution:
+      default: tpv_dispatcher
+      environments:
+        local:
+          runner: local
+        gcp_batch:
+          runner: gcp_batch
+          # Override runner parameters if needed
+          container_image: ubuntu:20.04
+          machine_type: e2-standard-4
+    destinations:
+      - id: gcp_batch_default
+        runner: gcp_batch
+      - id: k8s_default
+        runner: k8s
+      - id: local_default
+        runner: local
+    tools:
+      - environment: local
+        id: upload1
+      - environment: local
+        id: __DATA_FETCH__
+      - environment: local
+        id: __EXPORT_HISTORY__
+      - environment: local
+        id: __IMPORT_HISTORY__
+      - environment: local
+        id: __SET_METADATA__
+      - environment: local
+        id: __EXTRACT_DATASET__
+      # Route interactive tools to Kubernetes
+      - environment: local
+        id: interactive_tool.*
+      # Route data source tools to Kubernetes
+      - environment: local
+        id: .*data_source.*
+      # Keep workflows internal to cluster
+      - environment: local
+        id: __EXPORT_WORKFLOW__
+      - environment: local
+        id: __IMPORT_WORKFLOW__
+
+jobs:
+  rules:
+    tpv_rules_local.yml:
+      tools:
+        toolshed.g2.bx.psu.edu/repos/iuc/metaphlan/metaphlan/.*:
+          cores: 16
+          mem: 96
+      destinations:
+        gcp_batch:
+          runner: gcp_batch
+          params:
+            docker_enabled: "true"

@@ -1,0 +1,107 @@
+destinations:
+- id: gcp_batch_default
+  runner: gcp_batch
+- id: k8s_default  
+  runner: k8s
+- id: local_default
+  runner: local
+
+execution:
+  default: gcp_batch_default  # Default to GCP Batch for compute tools
+  
+  environments:
+    gcp_batch:
+      container_image: ubuntu:20.04
+      machine_type: e2-standard-4
+      runner: gcp_batch
+    k8s_data_management:
+      runner: k8s  # For data management tools
+    tpv_dispatcher:
+      container_monitor: false
+      docker_default_container_id: 'ksuderman/galaxy-min:25.1-batch'
+      function: map_tool_to_destination
+      rules_module: tpv.rules
+      runner: dynamic
+      tpv_config_files:
+      - https://gxy.io/tpv/db.yml
+      - lib/galaxy/jobs/rules/tpv_rules_local.yml
+      type: python
+
+handling:
+  assign:
+  - db-skip-locked
+
+runners:
+  gcp_batch:
+    boot_disk_size_gb: 100
+    boot_disk_type: pd-standard
+    container_image: ubuntu:20.04
+    galaxy_group_id: 10001
+    galaxy_user_id: 10001
+    load: galaxy.jobs.runners.gcp_batch:GoogleCloudBatchJobRunner
+    machine_type: e2-standard-4
+    max_retry_count: 3
+    max_run_duration: 3600s
+    memory_mib: 2048
+    network: default
+    nfs_mount_path: /galaxy/server/database
+    polling_interval: 30
+    project_id: anvil-and-terra-development
+    region: us-east4
+    service_account_email: galaxy-batch-runner@anvil-and-terra-development.iam.gserviceaccount.com
+    # Authentication uses ADC from VM's attached service account (no service_account_file needed)
+    subnet: default
+    use_container: true
+    vcpu: 1
+    workers: 4
+  k8s:
+    k8s_cleanup_job: onsuccess
+    k8s_data_volume_claim: 'galaxy-galaxy-pvc:/galaxy/server/database'
+    k8s_fs_group_id: '10001'
+    k8s_galaxy_instance_id: 'galaxy'
+    k8s_interactivetools_ingress_annotations: |
+      
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/proxy-body-size: 10G
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    k8s_interactivetools_use_ssl: true
+    k8s_job_ttl_secs_after_finished: 90
+    k8s_namespace: 'galaxy'
+    k8s_persistent_volume_claims: |
+      galaxy-galaxy-pvc/config:/galaxy/server/database/config:r,galaxy-galaxy-pvc/tmp:/galaxy/server/database/tmp:rw,galaxy-galaxy-pvc/tool-data:/galaxy/server/database/tool-data:rw,galaxy-galaxy-pvc/tools:/galaxy/server/database/tools:r,galaxy-galaxy-pvc/shed_tools:/galaxy/server/database/shed_tools:r,galaxy-refdata-gxy-pvc/data.galaxyproject.org:/cvmfs/data.galaxyproject.org:r,galaxy-galaxy-pvc/cvmfsclone:/cvmfs/cloud.galaxyproject.org:r
+    k8s_pod_priority_class: |
+      galaxy-job-priority
+    k8s_pull_policy: IfNotPresent
+    k8s_supplemental_group_id: '10001'
+    k8s_use_service_account: true
+    k8s_working_volume_claim: 'galaxy-galaxy-pvc:/galaxy/server/database'
+    load: galaxy.jobs.runners.kubernetes:KubernetesJobRunner
+  local:
+    load: galaxy.jobs.runners.local:LocalJobRunner
+    workers: 4
+
+# Route specific tools to Kubernetes for data management operations
+tools:
+- environment: k8s_data_management
+  id: upload1
+- environment: k8s_data_management  
+  id: __DATA_FETCH__
+- environment: k8s_data_management
+  id: __EXPORT_HISTORY__
+- environment: k8s_data_management
+  id: __IMPORT_HISTORY__
+- environment: k8s_data_management
+  id: __SET_METADATA__
+- environment: k8s_data_management
+  id: __EXTRACT_DATASET__
+# Route interactive tools to Kubernetes  
+- environment: k8s_data_management
+  id: interactive_tool.*
+# Route data source tools to Kubernetes
+- environment: k8s_data_management
+  id: .*data_source.*
+# Keep workflows internal to cluster
+- environment: k8s_data_management
+  id: __EXPORT_WORKFLOW__
+- environment: k8s_data_management
+  id: __IMPORT_WORKFLOW__

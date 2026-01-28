@@ -1,0 +1,33 @@
+extraFileMappings:
+  /galaxy/server/lib/galaxy/jobs/runners/gcp_batch.py:
+    useSecret: false
+    applyToJob: true
+    applyToWeb: true
+    applyToWorkflow: true
+    tpl: true
+    content: |-
+      {{ .Files.Get "files/source/lib/galaxy/jobs/runners/gcp_batch.py" }}
+  /galaxy/server/lib/galaxy/tool_util/deps/containers.py:
+    useSecret: false
+    applyToJob: true
+    applyToWeb: true
+    applyToWorkflow: true
+    tpl: true
+    content: |-
+      {{ .Files.Get "files/source/lib/galaxy/tool_util/deps/containers.py" }}
+  /galaxy/server/lib/galaxy/util/logging/__init__.py:
+    useSecret: false
+    applyToJob: true
+    applyToWeb: true
+    applyToWorkflow: true
+    tpl: true
+    content: |-
+      {{ .Files.Get "files/source/lib/galaxy/util/logging/__init__.py" }}
+  /galaxy/server/lib/galaxy/config/__init__.py:
+    useSecret: false
+    applyToJob: true
+    applyToWeb: true
+    applyToWorkflow: true
+    tpl: true
+    content: |-
+      {{ .Files.Get "files/source/lib/galaxy/config/__init__.py" }}
