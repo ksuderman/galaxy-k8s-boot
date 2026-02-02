@@ -2034,3 +2034,78 @@ machine_type "n2-standard-4" cannot satisfy compute_resource cpu_milli:16000 mem
 | `lib/galaxy/jobs/runners/util/gcp_batch/container_script.sh` | CVMFS verification for both repos |
 
 ---
+
+## Session 2026-01-27: Startup Probe Fix and Tool Loading Analysis
+
+### 33. Startup Probe Settings Not Being Applied
+**Problem**: The `wait.yml` values file was being passed to Helm but startup probe settings weren't being applied. Web handler pod kept restarting.
+
+**Root Cause Analysis**:
+The Galaxy Helm chart uses `webHandlers:` as the top-level key for web handler configuration, but `wait.yml` was using `web:` which doesn't match.
+
+**Solution**:
+Updated `values/wait.yml` to use the correct Helm chart key:
+
+**Before**:
+```yaml
+web:
+  startupProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    failureThreshold: 120
+```
+
+**After**:
+```yaml
+webHandlers:
+  startupProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    failureThreshold: 120
+```
+
+### 34. Tool Loading Time Analysis
+**Context**: After fixing the startup probe, analyzed web handler logs to understand startup timing.
+
+**Findings**:
+| Phase | Timestamp | Duration |
+|-------|-----------|----------|
+| Galaxy startup began | 20:52:19 | - |
+| Parsing tool_conf.xml | 20:52:43 | ~24s |
+| Started parsing CVMFS shed_tool_conf.xml | 20:52:47 | ~4s |
+| Finished CVMFS tools | 21:10:20 | **~17m 33s** |
+| First successful /api/version response | 21:11:04 | ~44s |
+
+**Summary**:
+- **Total startup time**: ~18 minutes 45 seconds
+- **CVMFS tool loading**: ~17 minutes 33 seconds (94% of startup time)
+
+The CVMFS tool loading from `/cvmfs/cloud.galaxyproject.org/config/shed_tool_conf.xml` is the primary bottleneck, justifying the extended 20-minute startup probe timeout.
+
+### Files Modified This Session
+
+| File | Changes |
+|------|---------|
+| `values/wait.yml` | Changed `web:` to `webHandlers:` to match Galaxy Helm chart structure |
+
+### Verification
+
+```bash
+# Verify startup probe settings
+KUBECONFIG=~/.kube/configs/gcp kubectl get pod -n galaxy <web-pod> -o jsonpath='{.spec.containers[0].startupProbe}' | jq .
+
+# Expected output:
+{
+  "failureThreshold": 120,
+  "httpGet": { "path": "/api/version", "port": 8080 },
+  "initialDelaySeconds": 60,
+  "periodSeconds": 10,
+  "successThreshold": 1,
+  "timeoutSeconds": 5
+}
+```
+
+### Key Lesson
+Always verify Helm chart structure when creating values files. Use `helm show values <chart>` to find the correct key paths for configuration options.
+
+---
