@@ -1,0 +1,9 @@
+image:
+  repository: ksuderman/galaxy-guerler
+  tag: "26.0.dev0"
+configs:
+  galaxy.yml:
+    galaxy:
+      parallel_tool_loading: false
+      parallel_tool_loading_workers: 8
+
