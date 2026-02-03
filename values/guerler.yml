@@ -5,5 +5,5 @@ configs:
   galaxy.yml:
     galaxy:
       parallel_tool_loading: true
-      parallel_tool_loading_workers: 16
+      parallel_tool_loading_workers: 4
 
