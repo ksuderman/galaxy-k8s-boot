@@ -4,6 +4,6 @@ image:
 configs:
   galaxy.yml:
     galaxy:
-      parallel_tool_loading: false
+      parallel_tool_loading: true
       parallel_tool_loading_workers: 8
 
