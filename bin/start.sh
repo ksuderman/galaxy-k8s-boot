@@ -14,7 +14,7 @@ echo "Launching ${SERVER} with hybrid GCP Batch configuration"
   -f values/values.yml \
   -f values/wait.yml \
   -f values/batch.yml \
-  -f values/rules.yml \
   -f values/resource-params.yml \
-  -f values/v25.1-batch.yml
+  -f values/v26.0.yml
+#  -f values/rules.yml \
 
