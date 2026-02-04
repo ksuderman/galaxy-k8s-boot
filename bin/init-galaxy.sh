@@ -7,9 +7,9 @@ set -eu
 # 	exit 1
 # fi
 
-SERVER=${SERVER:-ks-dev-batch}
+SERVER=${SERVER:-ks-gcp-test}
 CLOUD=${CLOUD:-gcp}
-ADMIN_EMAIL=admin@example.com
+ADMIN_EMAIL=admin@galaxyproject.org
 
 CREATE_USER=""
 GET_KEY=""
