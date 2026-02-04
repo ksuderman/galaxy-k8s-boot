@@ -43,7 +43,7 @@ configs:
   galaxy.yml:
     galaxy:
       enable_beta_gdpr: true
-      require_login: true
+      require_login: false
       show_welcome_with_login: true
       allow_user_creation: true
       allow_local_account_creation: true
