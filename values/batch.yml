@@ -46,6 +46,7 @@ configs:
         max_retry_count: 3
         max_run_duration: 3600s
         polling_interval: 30
+        delete_completed_jobs: false
     execution:
       default: tpv_dispatcher
       environments:
