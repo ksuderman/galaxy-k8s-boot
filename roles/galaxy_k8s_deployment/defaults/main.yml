@@ -69,9 +69,8 @@ setup_cert_manager: false
 cert_manager_version: "v1.14.0"
 
 # CNPG Skip-Initdb Plugin Configuration
-# Enable this to allow PostgreSQL to reuse existing data directories
+# Deployed when restore_galaxy is true to allow PostgreSQL to reuse existing data directories
 # Requires: cert-manager installed in the cluster
-cnpg_skip_initdb_enabled: true
 cnpg_skip_initdb_image: "quay.io/galaxyproject/cnpg-i-skip-initdb:0.1"
 # IMPORTANT: Plugin must be deployed in same namespace as CNPG operator (galaxy-deps)
 cnpg_skip_initdb_namespace: "galaxy-deps"

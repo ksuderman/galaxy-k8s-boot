@@ -29,7 +29,7 @@
 
 - name: Display restoration mode
   debug:
-    msg: "Galaxy restoration mode: {{ 'Auto-detect and restore' if restore_galaxy else 'Fresh installation' }}"
+    msg: "Galaxy restoration mode: {{ 'Auto-detect and restore' if restore_galaxy | bool else 'Fresh installation' }}"
 
 # ============================================================================
 # CNPG Skip-Initdb Plugin Deployment
@@ -44,7 +44,7 @@
     state: present
     kubeconfig: "{{ kubeconfig_path }}"
     definition: "{{ lookup('template', 'templates/cnpg_skip_initdb_plugin.yaml.j2') }}"
-  when: restore_galaxy
+  when: restore_galaxy | bool
 
 - name: Wait for CNPG plugin pod to be ready
   kubernetes.core.k8s_info:
@@ -60,12 +60,12 @@
     - plugin_pod.resources[0].status.phase == "Running"
   retries: 10
   delay: 3
-  when: restore_galaxy
+  when: restore_galaxy | bool
 
 - name: Display CNPG plugin status
   debug:
     msg: "CNPG skip-initdb plugin deployed. Plugin will skip initdb."
-  when: restore_galaxy
+  when: restore_galaxy | bool
 - name: Ensure CNPG plugin is NOT deployed in fresh install mode
   kubernetes.core.k8s:
     state: absent
@@ -74,7 +74,7 @@
     name: skip-initdb
     namespace: "{{ cnpg_skip_initdb_namespace }}"
     kubeconfig: "{{ kubeconfig_path }}"
-  when: not restore_galaxy
+  when: not restore_galaxy | bool
 
 - name: Helm install galaxy-deps
   kubernetes.core.helm:
@@ -106,13 +106,13 @@
     KUBECONFIG: "{{ kubeconfig_path }}"
   register: auto_detected_uuid
   ignore_errors: true
-  when: restore_galaxy
+  when: restore_galaxy | bool
 
 - name: Set auto-detected PVC UUID
   set_fact:
     detected_galaxy_pvc_uuid: "{{ auto_detected_uuid.stdout | trim }}"
   when:
-    - restore_galaxy
+    - restore_galaxy | bool
     - auto_detected_uuid.stdout is defined
     - auto_detected_uuid.stdout | trim != ''
 
@@ -120,7 +120,7 @@
   debug:
     msg: "Using Galaxy PVC UUID: {{ detected_galaxy_pvc_uuid }}"
   when:
-    - restore_galaxy
+    - restore_galaxy | bool
     - detected_galaxy_pvc_uuid is defined
     - detected_galaxy_pvc_uuid != ''
 
@@ -128,7 +128,7 @@
   debug:
     msg: "WARNING: restore_galaxy=true but no existing PVC found in NFS exports. Falling back to fresh installation."
   when:
-    - restore_galaxy
+    - restore_galaxy | bool
     - detected_galaxy_pvc_uuid is not defined or detected_galaxy_pvc_uuid == ''
 
 # Step 2: Restore Galaxy PVC if UUID determined
@@ -162,14 +162,14 @@
         galaxy_helm_extra_sets: []
 
   when:
-    - restore_galaxy
+    - restore_galaxy | bool
     - detected_galaxy_pvc_uuid is defined
     - detected_galaxy_pvc_uuid != ''
 
 - name: Set Galaxy Helm values for fresh deployment
   set_fact:
     galaxy_helm_extra_sets: []
-  when: not restore_galaxy or detected_galaxy_pvc_uuid | default('') == ''
+  when: not restore_galaxy | bool or detected_galaxy_pvc_uuid | default('') == ''
 
 # ============================================================================
 # GCP Batch: NFS Server Configuration
@@ -268,7 +268,7 @@
     kubeconfig: "{{ kubeconfig_path }}"
     update_repo_cache: true
     values_files: "{{ lookup('sequence', 'start=0 end=' ~ (_galaxy_values_files|length - 1) ~ ' format=/tmp/galaxy_values_%d.yml', wantlist=True) }}"
-    values: "{{ _helm_values_base | combine(_helm_values_gcp_batch if (enable_gcp_batch | default(false) | bool) else {}, recursive=True) | combine(_helm_values_cnpg_plugin if (restore_galaxy and detected_galaxy_pvc_uuid | default('') != '') else {}, recursive=True) }}"
+    values: "{{ _helm_values_base | combine(_helm_values_gcp_batch if (enable_gcp_batch | default(false) | bool) else {}, recursive=True) | combine(_helm_values_cnpg_plugin if (restore_galaxy | bool and detected_galaxy_pvc_uuid | default('') != '') else {}, recursive=True) }}"
     set_values: "{{ galaxy_helm_extra_sets | default([]) }}"
   vars:
     _helm_values_base:
@@ -405,7 +405,7 @@
       type: Ready
       status: "True"
     wait_timeout: 300
-  when: restore_galaxy and detected_galaxy_pvc_uuid | default('') != ''
+  when: restore_galaxy | bool and detected_galaxy_pvc_uuid | default('') != ''
 
 - name: Get expected RabbitMQ credentials from secret
   kubernetes.core.k8s_info:
@@ -415,7 +415,7 @@
     namespace: galaxy
     kubeconfig: "{{ kubeconfig_path }}"
   register: rabbitmq_secret
-  when: restore_galaxy and detected_galaxy_pvc_uuid | default('') != ''
+  when: restore_galaxy | bool and detected_galaxy_pvc_uuid | default('') != ''
 
 - name: Decode expected RabbitMQ username
   set_fact:
