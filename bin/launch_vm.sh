@@ -107,6 +107,7 @@ while [[ $# -gt 0 ]]; do
         	;;
         --enable-pulsar-gcp)
         	ENABLE_PULSAR_GCP="true"
+        	shift
         	;;
         -e|--ephemeral-only)
             EPHEMERAL_ONLY=true
@@ -303,7 +304,7 @@ if [[ $DRY_RUN = "yes" ]] ; then
 	TEMP_USER_DATA="./cloud-config.txt"
 else
 	TEMP_USER_DATA=$(mktemp /tmp/user_data.XXXXXX)
-	trap "rm -f $TEMP_USER_DATA" EXIT
+	# trap "rm -f $TEMP_USER_DATA" EXIT
 fi
 
 # Add the configuration values directly into the script
@@ -377,7 +378,7 @@ runcmd:
     else
       echo "[`date`] - No PostgreSQL disk found. PostgreSQL will use ephemeral storage."
     fi
-  - |
+  
     # Set disk ownership
     VM_USER="PLACEHOLDER_VM_USER"
     if [ -d /mnt/block_storage ]; then
