@@ -15,12 +15,9 @@
 # - Deadlock: Pulsar sidecar runnable missing background=True
 # - Missing kill(): GcpMessageCoexecutionJobClient lacks kill() method
 
-# Increase startup probe timeout to allow for Pulsar + AMQP initialization
-web:
-  startupProbe:
-    initialDelaySeconds: 60
-    periodSeconds: 10
-    failureThreshold: 120
+image:
+  repository: ksuderman/galaxy-pulsar-fix
+  tag: 26.1.dev0
 
 configs:
   job_conf.yml:

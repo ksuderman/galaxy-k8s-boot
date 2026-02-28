@@ -10,7 +10,7 @@ BOOT_DISK_SIZE="100GB"
 DISK_SIZE="150GB"
 POSTGRES_DISK_SIZE="10GB"
 DISK_TYPE="pd-balanced"
-GALAXY_CHART_VERSION="6.7.0"
+GALAXY_CHART_VERSION="6.7.2"
 GALAXY_DEPS_VERSION="1.1.1"
 GIT_BRANCH="master"
 GIT_REPO="https://github.com/galaxyproject/galaxy-k8s-boot.git"
@@ -24,10 +24,11 @@ RESTORE_GALAXY=false
 # Parse command line arguments
 DISK_NAME=""
 DRY_RUN=""
-POSTGRES_DISK_NAME=""
+ENABLE_PULSAR_GCP=""
 EPHEMERAL_ONLY=false
 GALAXY_VALUES_FILES=()  # Array to hold multiple values files
 INSTANCE_NAME=""
+POSTGRES_DISK_NAME=""
 SSH_KEY=""
 
 usage() {
@@ -53,6 +54,7 @@ Options:
   -r, --git-repo REPO               Git repository URL (default: $GIT_REPO)
   -s, --disk-size SIZE              Size of NFS persistent disk (default: $DISK_SIZE)
   -z, --zone ZONE                   GCP zone (default: $ZONE)
+  --enable-pulsar-batch             Use the Pulsar Batch runner instead of the direct GCP Batch runner
   --galaxy-chart-version VERSION    Galaxy Helm chart version (default: $GALAXY_CHART_VERSION)
   --galaxy-deps-version VERSION     Galaxy dependencies chart version (default: $GALAXY_DEPS_VERSION)
   --postgres-disk DISK_NAME         Name of PostgreSQL disk (default: galaxy-postgres-INSTANCE_NAME)
@@ -102,6 +104,9 @@ while [[ $# -gt 0 ]]; do
         --dry-run)
         	DRY_RUN="yes"
         	shift
+        	;;
+        --enable-pulsar-gcp)
+        	ENABLE_PULSAR_GCP="true"
         	;;
         -e|--ephemeral-only)
             EPHEMERAL_ONLY=true
@@ -233,6 +238,11 @@ echo "Galaxy Deps Version: $GALAXY_DEPS_VERSION"
 echo "Galaxy Values Files: ${GALAXY_VALUES_FILES[@]}"
 echo "Git Repository: $GIT_REPO"
 echo "Git Branch: $GIT_BRANCH"
+if [[ $ENABLE_PULSAR_GCP = "true" ]] ; then
+	echo "GCP Batch runner: pulsar"
+else
+	echo "GCP Batch runner: direct"
+fi
 
 if [ "$RESTORE_GALAXY" = true ]; then
     echo "Galaxy Restore Mode: Auto-detect and restore"
@@ -422,13 +432,19 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     echo "[`date`] - Galaxy Deps Version: ${GALAXY_DEPS_VERSION}"
     echo "[`date`] - Galaxy Values Files: ${GALAXY_VALUES_FILES_JSON}"
     echo "[`date`] - Inventory file created at /tmp/ansible-inventory/localhost; running ansible-pull..."
-
-    ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/PLACEHOLDER_VM_USER/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "{\"enable_gcp_batch\": true, \"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}}" playbook.yml
-
-    echo "[`date`] - User data script completed."
-    '
-
 EOF
+
+if [[ $ENABLE_PULSAR_GCP = "yes" ]] ; then
+    cat >> $TEMP_USER_DATA << 'EOF'
+    	ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/PLACEHOLDER_VM_USER/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "{\"enable_gcp_batch\": false, \"enable_pulsar_gcp_batch\": true, \"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}}" playbook.yml
+	    echo "[`date`] - User data script completed."
+EOF
+else
+    cat >> $TEMP_USER_DATA << 'EOF'
+    	ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/PLACEHOLDER_VM_USER/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "{\"enable_gcp_batch\": true, \"enable_pulsar_gcp_batch\": false, \"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}}" playbook.yml
+	    echo "[`date`] - User data script completed."
+EOF
+fi
 
 # Replace VM_USER placeholder in the generated user-data
 if [[ "$OSTYPE" == "darwin"* ]]; then
