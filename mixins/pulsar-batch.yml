@@ -42,8 +42,10 @@ jobs:
   rules:
     tpv_rules_local.yml:
       destinations:
-        # Disable direct GCP Batch routing so all tools go through Pulsar
+        # Disable direct GCP Batch and K8s routing so all tools go through Pulsar
         gcp_batch:
+          abstract: true
+        k8s:
           abstract: true
         # Route non-local tools through Pulsar GCP Batch coexecution
         pulsar_gcp:
