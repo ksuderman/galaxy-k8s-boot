@@ -22,7 +22,7 @@ image:
 configs:
   galaxy.yml:
     galaxy:
-      branch: Pulsar 
+      brand: Pulsar
   job_conf.yml:
     runners:
       pulsar_gcp:
