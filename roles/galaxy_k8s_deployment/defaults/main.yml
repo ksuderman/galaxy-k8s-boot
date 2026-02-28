@@ -114,6 +114,16 @@ enable_gcp_batch: true
 gcp_batch_service_account_email: ""
 gcp_batch_region: "us-east4"
 
+# Pulsar GCP Batch Configuration
+# Set enable_pulsar_gcp_batch=true to configure Galaxy for Pulsar GCP Batch runner
+# This will:
+#   - Detect Galaxy public URL for Pulsar file transfer
+#   - Extract RabbitMQ credentials and construct AMQP URL
+#   - Patch RabbitMQ service with external IP for Batch VM access
+#   - Update job_conf.yml ConfigMap with real amqp_url and galaxy_url
+#   - Restart Galaxy deployments to apply changes
+enable_pulsar_gcp_batch: false
+
 # Pulsar Application Configuration
 pulsar_chart: cloudve/pulsar
 pulsar_chart_version: "0.2.0"
