@@ -57,3 +57,9 @@ jobs:
             docker_enabled: "true"
             cores: "{cores}"
             mem: "{mem}"
+            project_id: anvil-and-terra-development
+            region: us-east4
+            service_account_email: galaxy-batch-runner@anvil-and-terra-development.iam.gserviceaccount.com
+            machine_type: n2-standard-4
+            docker_extra_volumes: "/cvmfs/data.galaxyproject.org:/cvmfs/data.galaxyproject.org:ro,/cvmfs/cloud.galaxyproject.org:/cvmfs/cloud.galaxyproject.org:ro"
+            custom_vm_image: projects/anvil-and-terra-development/global/images/galaxy-k8s-boot-debian12-v2026-02-24
