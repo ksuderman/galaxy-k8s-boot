@@ -5,7 +5,7 @@
 .prettierignore
 .gemini/
 .claude/
-.ignored
+.ignored/
 k3s/outputs/
 ansible.cfg
 sa-key.json
@@ -13,3 +13,5 @@ kubeconfig.yaml
 image_prep.ini
 vm.ini
 ea-no-commit/
+bin/start.sh
+bin/stop.sh
