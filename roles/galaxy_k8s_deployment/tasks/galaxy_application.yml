@@ -643,6 +643,31 @@
     - pulsar_amqp_url is defined
     - galaxy_configs_pulsar.resources | length > 0
 
+- name: Get galaxy-job-rules ConfigMap for TPV rules patching
+  kubernetes.core.k8s_info:
+    kind: ConfigMap
+    name: galaxy-job-rules
+    namespace: galaxy
+    kubeconfig: "{{ kubeconfig_path }}"
+  register: galaxy_job_rules_cm
+  when: enable_pulsar_gcp_batch | default(false) | bool
+
+- name: Update TPV rules with Pulsar AMQP URL for remote sidecar callbacks
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: galaxy-job-rules
+        namespace: galaxy
+      data: "{{ galaxy_job_rules_cm.resources[0].data | combine({'tpv_rules_local.yml': (galaxy_job_rules_cm.resources[0].data['tpv_rules_local.yml'] | from_yaml | combine({'destinations': {'pulsar_gcp': {'params': {'pulsar_app_config': {'message_queue_url': pulsar_amqp_url}}}}}, recursive=True) | to_nice_yaml) }) }}"
+  when:
+    - enable_pulsar_gcp_batch | default(false) | bool
+    - pulsar_amqp_url is defined
+    - galaxy_job_rules_cm.resources | length > 0
+
 - name: Restart Galaxy deployments to pick up Pulsar configuration
   shell: kubectl rollout restart deployment {{ item }} -n galaxy
   environment:

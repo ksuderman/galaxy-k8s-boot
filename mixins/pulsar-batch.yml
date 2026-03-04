@@ -63,3 +63,8 @@ jobs:
             machine_type: n2-standard-4
             docker_extra_volumes: "/cvmfs/data.galaxyproject.org:/cvmfs/data.galaxyproject.org:ro,/cvmfs/cloud.galaxyproject.org:/cvmfs/cloud.galaxyproject.org:ro"
             custom_vm_image: projects/anvil-and-terra-development/global/images/galaxy-k8s-boot-debian12-v2026-02-24
+            # Placeholder: patched by playbook with real AMQP URL after RabbitMQ is running.
+            # This config is passed to the remote Pulsar sidecar container on GCP Batch VMs
+            # so it can send job completion callbacks back to Galaxy via AMQP.
+            pulsar_app_config:
+              message_queue_url: "amqp://placeholder:placeholder@localhost:5672//"
