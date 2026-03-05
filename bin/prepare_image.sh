@@ -22,6 +22,7 @@ PLAYBOOK="image_prep.yml"
 KEEP_VM=false
 DRY_RUN=false
 VERBOSE=""
+ANSIBLE_EXTRA_VARS=()       # Extra vars to pass to ansible-playbook (-e key=value)
 
 # Temp files to clean up
 INVENTORY_FILE=""
@@ -74,8 +75,10 @@ $(hi OPTIONS)
     $(hi --zone) ZONE          GCP zone. Default $(hi $ZONE)
     $(hi --project) PROJECT    GCP project. Default $(hi $PROJECT)
     $(hi --machine-type) TYPE  VM machine type. Default $(hi $MACHINE_TYPE)
+    $(hi --boot-disk-size) SIZE Boot disk size. Default $(hi $BOOT_DISK_SIZE)
     $(hi --vm-name) NAME       Override temporary VM name. Default $(hi $VM_NAME)
     $(hi --keep-vm)            Don't delete VM after image creation (for debugging)
+    $(hi -e) KEY=VALUE         Pass extra variable to Ansible (repeatable)
     $(hi -v)|$(hi --verbose)          Verbose Ansible output
     $(hi -n)|$(hi --dry-run)          Show what would be done without executing
     $(hi -h)|$(hi --help)             Show this help message
@@ -96,6 +99,7 @@ $(hi EXAMPLES)
     \$> $NAME --os ubuntu2404
     \$> $NAME --name galaxy-k8s-boot-custom-v1
     \$> $NAME --keep-vm --verbose
+    \$> $NAME --boot-disk-size 20GB -e install_rke2_prerequisites=false
 
 EOF
 }
@@ -108,8 +112,10 @@ while [[ $# -gt 0 ]]; do
         --zone) ZONE="$2"; shift 2 ;;
         --project) PROJECT="$2"; shift 2 ;;
         --machine-type) MACHINE_TYPE="$2"; shift 2 ;;
+        --boot-disk-size) BOOT_DISK_SIZE="$2"; shift 2 ;;
         --vm-name) VM_NAME="$2"; shift 2 ;;
         --keep-vm) KEEP_VM=true; shift ;;
+        -e|--extra-vars) ANSIBLE_EXTRA_VARS+=("-e" "$2"); shift 2 ;;
         -v|--verbose) VERBOSE="-v"; shift ;;
         -n|--dry-run) DRY_RUN=true; shift ;;
         -h|--help|help) help; exit 0 ;;
@@ -165,7 +171,7 @@ if [[ "$DRY_RUN" == "true" ]]; then
     echo "  2. Wait for SSH readiness"
     echo ""
     echo "  3. Run Ansible playbook:"
-    echo "     ansible-playbook -i <inventory> $PROJECT_ROOT/$PLAYBOOK${VERBOSE:+ $VERBOSE}"
+    echo "     ansible-playbook -i <inventory> $PROJECT_ROOT/$PLAYBOOK${ANSIBLE_EXTRA_VARS:+ ${ANSIBLE_EXTRA_VARS[*]}}${VERBOSE:+ $VERBOSE}"
     echo "     (inventory: $SSH_USER@<external-ip>, key: ~/.ssh/google_compute_engine)"
     echo ""
     echo "  4. Stop VM:"
@@ -273,6 +279,7 @@ echo "==> Running image preparation playbook..."
 ansible-playbook \
     -i "$INVENTORY_FILE" \
     "$PROJECT_ROOT/$PLAYBOOK" \
+    "${ANSIBLE_EXTRA_VARS[@]}" \
     $VERBOSE
 
 # --- Step 4: Stop VM ---
