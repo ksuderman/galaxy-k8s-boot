@@ -62,6 +62,7 @@ jobs:
             region: us-east4
             service_account_email: galaxy-batch-runner@anvil-and-terra-development.iam.gserviceaccount.com
             machine_type: n2-standard-4
+            pulsar_container_image: ksuderman/pulsar-pod-staging:0.15.15.dev0
             docker_extra_volumes: "/cvmfs/data.galaxyproject.org:/cvmfs/data.galaxyproject.org:ro,/cvmfs/cloud.galaxyproject.org:/cvmfs/cloud.galaxyproject.org:ro"
             # Placeholder: patched by playbook with real AMQP URL after RabbitMQ is running.
             # This config is passed to the remote Pulsar sidecar container on GCP Batch VMs
