@@ -31,7 +31,7 @@ configs:
         amqp_url: "amqp://placeholder:placeholder@localhost:5672//"
         galaxy_url: "http://localhost/"
         # Custom VM image with CVMFS pre-installed for GCP Batch VMs
-        custom_vm_image: projects/anvil-and-terra-development/global/images/galaxy-k8s-minimal-debian12-v2026-03-05
+        custom_vm_image: projects/anvil-and-terra-development/global/images/galaxy-k8s-boot-debian12-v2026-02-24
     execution:
       environments:
         pulsar_gcp:
