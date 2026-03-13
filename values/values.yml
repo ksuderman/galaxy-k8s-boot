@@ -140,6 +140,19 @@ configs:
 jobs:
    rules:
     tpv_rules_local.yml:
+      tools:
+        param_value_from_file:
+          params:
+            walltime_limit: 900
+        compose_text_param:
+          params:
+            walltime_limit: 900
+        map_param_value:
+          params:
+            walltime_limit: 900
+        tp_awk_tool:
+          params:
+            walltime_limit: 900
       destinations:
         gcp_batch:
           runner: gcp_batch
