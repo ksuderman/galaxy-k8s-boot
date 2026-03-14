@@ -35,7 +35,7 @@ configs:
     <?xml version="1.0"?>
     <object_store type="cloud" provider="google">
         <auth credentials_file="/galaxy/server/config/gcp-sa-key.json" />
-        <bucket name="BUCKET_NAME_PLACEHOLDER" />
+        <bucket name="ks-batch-gcs-test-bucket" />
         <cache path="/galaxy/server/database/object_store_cache" size="50" />
         <extra_dir type="job_work" path="/galaxy/server/database/jobs_directory" />
         <extra_dir type="temp" path="/galaxy/server/database/tmp" />
