@@ -181,7 +181,9 @@
 - name: Get node internal IP for NFS access
   set_fact:
     nfs_server: "{{ ansible_default_ipv4.address }}"
-  when: enable_gcp_batch | default(false) | bool
+  when:
+    - enable_gcp_batch | default(false) | bool
+    - not (enable_gcs_object_store | default(false) | bool)
 
 - name: Verify NFS service exists
   kubernetes.core.k8s_info:
@@ -191,13 +193,16 @@
     namespace: nfs-provisioner
     kubeconfig: "{{ kubeconfig_path }}"
   register: nfs_service_info
-  when: enable_gcp_batch | default(false) | bool
+  when:
+    - enable_gcp_batch | default(false) | bool
+    - not (enable_gcs_object_store | default(false) | bool)
 
 - name: Fail if NFS service not found
   fail:
     msg: "NFS service not found. Make sure NFS setup completed successfully."
   when:
     - enable_gcp_batch | default(false) | bool
+    - not (enable_gcs_object_store | default(false) | bool)
     - nfs_service_info.resources | length == 0
 
 - name: Patch NFS service with node internal IP as externalIP
@@ -212,12 +217,16 @@
       spec:
         externalIPs:
           - "{{ nfs_server }}"
-  when: enable_gcp_batch | default(false) | bool
+  when:
+    - enable_gcp_batch | default(false) | bool
+    - not (enable_gcs_object_store | default(false) | bool)
 
 - name: Display NFS server access method
   debug:
     msg: "Using node internal IP for NFS: {{ nfs_server }} (accessible from GCP Batch VMs in same VPC)"
-  when: enable_gcp_batch | default(false) | bool
+  when:
+    - enable_gcp_batch | default(false) | bool
+    - not (enable_gcs_object_store | default(false) | bool)
 
 # ============================================================================
 # Install Galaxy
@@ -287,7 +296,11 @@
               k8s:
                 max_cores: "{{ galaxy_job_max_cores }}"
                 max_mem: "{{ galaxy_job_max_mem }}"
-    _helm_values_gcp_batch: {}
+    _helm_values_gcp_batch: "{{ _helm_gcs_batch_values if (enable_gcs_object_store | default(false) | bool) else {} }}"
+    _helm_gcs_batch_values:
+      extraEnvVars:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /galaxy/server/config/gcp-sa-key.json
     _helm_values_cnpg_plugin:
       postgresql:
         cluster:
@@ -308,7 +321,9 @@
   until: galaxy_pvc.resources | length > 0 and galaxy_pvc.resources[0].status.phase == "Bound"
   retries: 30
   delay: 10
-  when: enable_gcp_batch | default(false) | bool
+  when:
+    - enable_gcp_batch | default(false) | bool
+    - not (enable_gcs_object_store | default(false) | bool)
 
 - name: Detect NFS export path for Galaxy PVC
   shell: |
@@ -321,13 +336,16 @@
   retries: 10
   delay: 3
   until: nfs_export_detection.stdout != ""
-  when: enable_gcp_batch | default(false) | bool
+  when:
+    - enable_gcp_batch | default(false) | bool
+    - not (enable_gcs_object_store | default(false) | bool)
 
 - name: Set NFS export path for Galaxy database
   set_fact:
     nfs_export_path: "{{ nfs_export_detection.stdout }}"
   when:
     - enable_gcp_batch | default(false) | bool
+    - not (enable_gcs_object_store | default(false) | bool)
     - nfs_export_detection.stdout is defined
     - nfs_export_detection.stdout != ""
 
@@ -336,6 +354,7 @@
     msg: "Detected NFS export path for Galaxy PVC: {{ nfs_export_path }}"
   when:
     - enable_gcp_batch | default(false) | bool
+    - not (enable_gcs_object_store | default(false) | bool)
     - nfs_export_path is defined
 
 - name: Fail if NFS export path not detected
@@ -343,6 +362,7 @@
     msg: "Could not detect NFS export path for Galaxy PVC. Available exports: {{ nfs_export_detection.stdout_lines | default('none') }}"
   when:
     - enable_gcp_batch | default(false) | bool
+    - not (enable_gcs_object_store | default(false) | bool)
     - nfs_export_path is not defined or nfs_export_path == ""
 
 # ============================================================================
@@ -356,7 +376,9 @@
     namespace: galaxy
     kubeconfig: "{{ kubeconfig_path }}"
   register: galaxy_configs
-  when: enable_gcp_batch | default(false) | bool
+  when:
+    - enable_gcp_batch | default(false) | bool
+    - not (enable_gcs_object_store | default(false) | bool)
 
 - name: Update job_conf.yml with gcp_batch_volumes for NFS access
   kubernetes.core.k8s:
@@ -372,6 +394,7 @@
       data: "{{ galaxy_configs.resources[0].data | combine({'job_conf.yml': (galaxy_configs.resources[0].data['job_conf.yml'] | from_yaml | combine({'runners': {'gcp_batch': {'gcp_batch_volumes': nfs_server ~ ':' ~ nfs_export_path ~ ':/galaxy/server/database'}}}, recursive=True) | to_nice_yaml) }) }}"
   when:
     - enable_gcp_batch | default(false) | bool
+    - not (enable_gcs_object_store | default(false) | bool)
     - nfs_export_path is defined
 
 - name: Restart Galaxy deployments to pick up configuration changes
@@ -382,7 +405,51 @@
     - galaxy-workflow
   when:
     - enable_gcp_batch | default(false) | bool
+    - not (enable_gcs_object_store | default(false) | bool)
     - nfs_export_path is defined
+
+# ============================================================================
+# GCP Batch: GCS Object Store Configuration
+# ============================================================================
+# When using GCS object store, configure the Batch runner with GCS params
+# instead of NFS volume configuration.
+
+- name: Get current job_conf.yml from ConfigMap (for GCS mode)
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    name: galaxy-configs
+    namespace: galaxy
+    kubeconfig: "{{ kubeconfig_path }}"
+  register: galaxy_configs_gcs
+  when:
+    - enable_gcp_batch | default(false) | bool
+    - enable_gcs_object_store | default(false) | bool
+
+- name: Update job_conf.yml with GCS object store params for GCP Batch
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: galaxy-configs
+        namespace: galaxy
+      data: "{{ galaxy_configs_gcs.resources[0].data | combine({'job_conf.yml': (galaxy_configs_gcs.resources[0].data['job_conf.yml'] | from_yaml | combine({'runners': {'gcp_batch': {'use_object_store': true, 'gcs_bucket_name': gcs_bucket_name, 'gcs_mount_path': gcs_mount_path | default('/galaxy/server/database')}}}, recursive=True) | to_nice_yaml) }) }}"
+  when:
+    - enable_gcp_batch | default(false) | bool
+    - enable_gcs_object_store | default(false) | bool
+
+- name: Restart Galaxy deployments for GCS configuration
+  shell: kubectl rollout restart deployment {{ item }} -n galaxy
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  loop:
+    - galaxy-workflow
+  when:
+    - enable_gcp_batch | default(false) | bool
+    - enable_gcs_object_store | default(false) | bool
 
 # ============================================================================
 # Persistent Data Reuse: RabbitMQ Credential Synchronization

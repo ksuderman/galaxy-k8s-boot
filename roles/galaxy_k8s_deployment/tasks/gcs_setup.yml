@@ -1,0 +1,72 @@
+---
+# GCS Object Store Setup Tasks
+# Creates/verifies GCS bucket, grants permissions, creates K8s secret
+
+- name: Verify GCS bucket name is set
+  fail:
+    msg: "gcs_bucket_name must be set when enable_gcs_object_store is true"
+  when: gcs_bucket_name | default('') == ''
+
+- name: Verify GCS service account key file is set
+  fail:
+    msg: "gcs_service_account_key_file must be set when enable_gcs_object_store is true"
+  when: gcs_service_account_key_file | default('') == ''
+
+- name: Check if GCS bucket exists
+  shell: gcloud storage buckets describe gs://{{ gcs_bucket_name }} --format='value(name)' 2>/dev/null
+  register: gcs_bucket_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Create GCS bucket if it does not exist
+  shell: >
+    gcloud storage buckets create gs://{{ gcs_bucket_name }}
+    --location={{ gcp_batch_region }}
+    --uniform-bucket-level-access
+  when: gcs_bucket_check.rc != 0
+
+- name: Display GCS bucket status
+  debug:
+    msg: "GCS bucket gs://{{ gcs_bucket_name }} is {{ 'already existing' if gcs_bucket_check.rc == 0 else 'newly created' }}"
+
+- name: Grant storage.objectAdmin to Batch service account on GCS bucket
+  shell: >
+    gcloud storage buckets add-iam-policy-binding gs://{{ gcs_bucket_name }}
+    --member="serviceAccount:{{ gcp_batch_service_account_email }}"
+    --role="roles/storage.objectAdmin"
+  when: gcp_batch_service_account_email | default('') != ''
+
+- name: Create galaxy namespace if not exists
+  kubernetes.core.k8s:
+    kind: Namespace
+    name: galaxy
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+
+- name: Copy SA key file to remote host
+  ansible.builtin.copy:
+    src: "{{ gcs_service_account_key_file }}"
+    dest: /tmp/gcp-sa-key.json
+    mode: '0600'
+
+- name: Create Kubernetes secret for GCP service account key
+  shell: |
+    kubectl create secret generic gcp-object-store-key \
+      --from-file=key.json=/tmp/gcp-sa-key.json \
+      --namespace=galaxy \
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Remove temporary SA key file
+  ansible.builtin.file:
+    path: /tmp/gcp-sa-key.json
+    state: absent
+
+- name: Display GCS setup completion
+  debug:
+    msg: |
+      GCS Object Store setup complete:
+        Bucket: gs://{{ gcs_bucket_name }}
+        Service Account: {{ gcp_batch_service_account_email | default('not configured') }}
+        K8s Secret: gcp-object-store-key (in galaxy namespace)

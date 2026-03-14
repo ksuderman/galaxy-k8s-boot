@@ -1,0 +1,42 @@
+# GCS Object Store Configuration Mixin
+# Include this in galaxy_values_files to enable GCS-based storage
+# Requires:
+#   - enable_gcs_object_store: true
+#   - gcs_bucket_name set
+#   - gcs_service_account_key_file pointing to SA key JSON
+#   - K8s secret 'gcp-object-store-key' created by gcs_setup.yml
+
+persistence:
+  storageClass: blockstorage
+
+extraVolumes:
+  - name: gcp-sa-key
+    secret:
+      secretName: gcp-object-store-key
+  - name: static-images
+    configMap:
+      name: galaxy-static-images
+
+extraVolumeMounts:
+  - name: gcp-sa-key
+    mountPath: /galaxy/server/config/gcp-sa-key.json
+    subPath: key.json
+    readOnly: true
+  - name: static-images
+    mountPath: /galaxy/server/static/images
+    readOnly: true
+
+configs:
+  galaxy.yml:
+    galaxy:
+      object_store_store_by: uuid
+      object_store_config_file: /galaxy/server/config/object_store_conf.xml
+  object_store_conf.xml: |
+    <?xml version="1.0"?>
+    <object_store type="cloud" provider="google">
+        <auth credentials_file="/galaxy/server/config/gcp-sa-key.json" />
+        <bucket name="BUCKET_NAME_PLACEHOLDER" />
+        <cache path="/galaxy/server/database/object_store_cache" size="50" />
+        <extra_dir type="job_work" path="/galaxy/server/database/jobs_directory" />
+        <extra_dir type="temp" path="/galaxy/server/database/tmp" />
+    </object_store>

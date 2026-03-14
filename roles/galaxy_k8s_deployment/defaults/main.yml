@@ -124,6 +124,19 @@ enable_gcp_batch: true
 gcp_batch_service_account_email: ""
 gcp_batch_region: "us-east4"
 
+# GCS Object Store Configuration
+# Set enable_gcs_object_store=true to use GCS instead of NFS for Galaxy storage
+# This will:
+#   - Create/verify the GCS bucket
+#   - Grant storage permissions to the Batch service account
+#   - Create a Kubernetes secret with the SA key
+#   - Configure Galaxy to use GCS object store
+#   - Configure GCP Batch runner for GCS volume mounting
+enable_gcs_object_store: false
+gcs_bucket_name: ""
+gcs_mount_path: "/galaxy/server/database"
+gcs_service_account_key_file: ""  # Path on Ansible controller to SA key JSON
+
 # Pulsar Application Configuration
 pulsar_chart: cloudve/pulsar
 pulsar_chart_version: "0.2.0"
