@@ -20,6 +20,8 @@ PROJECT="anvil-and-terra-development"
 VM_USER="debian"
 ZONE="us-east4-c"
 RESTORE_GALAXY=false
+GCS_BUCKET_NAME=""
+GCS_MOUNT_PATH="/galaxy/server/database"
 
 # Parse command line arguments
 DISK_NAME=""
@@ -58,6 +60,8 @@ Options:
   --postgres-disk DISK_NAME         Name of PostgreSQL disk (default: galaxy-postgres-INSTANCE_NAME)
   --postgres-disk-size SIZE         Size of PostgreSQL disk (default: $POSTGRES_DISK_SIZE)
   --restore-galaxy                  Auto-detect and restore Galaxy from existing data
+  --gcs-bucket BUCKET               Enable GCS object store with this bucket name
+  --gcs-mount-path PATH             GCS mount path (default: /galaxy/server/database)
   -h, --help, help                  Show this help message
 
 Examples:
@@ -163,6 +167,14 @@ while [[ $# -gt 0 ]]; do
             RESTORE_GALAXY=true
             shift
             ;;
+        --gcs-bucket)
+            GCS_BUCKET_NAME="$2"
+            shift 2
+            ;;
+        --gcs-mount-path)
+            GCS_MOUNT_PATH="$2"
+            shift 2
+            ;;
         -h|--help|help)
             usage
             exit 0
@@ -236,6 +248,11 @@ echo "Git Branch: $GIT_BRANCH"
 
 if [ "$RESTORE_GALAXY" = true ]; then
     echo "Galaxy Restore Mode: Auto-detect and restore"
+fi
+
+if [ -n "$GCS_BUCKET_NAME" ]; then
+    echo "GCS Bucket: $GCS_BUCKET_NAME"
+    echo "GCS Mount Path: $GCS_MOUNT_PATH"
 fi
 
 if [ "$EPHEMERAL_ONLY" = false ]; then
@@ -393,6 +410,8 @@ cat >> "$TEMP_USER_DATA" << EOF
     GALAXY_DEPS_VERSION="${GALAXY_DEPS_VERSION}"
     GALAXY_VALUES_FILES_JSON='${GALAXY_VALUES_FILES_JSON}'
     RESTORE_GALAXY="${RESTORE_GALAXY}"
+    GCS_BUCKET_NAME="${GCS_BUCKET_NAME}"
+    GCS_MOUNT_PATH="${GCS_MOUNT_PATH}"
 EOF
 
 cat >> "$TEMP_USER_DATA" << 'EOF'
@@ -423,7 +442,14 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     echo "[`date`] - Galaxy Values Files: ${GALAXY_VALUES_FILES_JSON}"
     echo "[`date`] - Inventory file created at /tmp/ansible-inventory/localhost; running ansible-pull..."
 
-    ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/PLACEHOLDER_VM_USER/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "{\"enable_gcp_batch\": true, \"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}}" playbook.yml
+    # Build extra-vars JSON
+    EXTRA_VARS="{\"enable_gcp_batch\": true, \"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}"
+    if [ -n "${GCS_BUCKET_NAME}" ]; then
+      EXTRA_VARS="${EXTRA_VARS}, \"enable_gcs_object_store\": true, \"gcs_bucket_name\": \"${GCS_BUCKET_NAME}\", \"gcs_mount_path\": \"${GCS_MOUNT_PATH}\""
+    fi
+    EXTRA_VARS="${EXTRA_VARS}}"
+
+    ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/PLACEHOLDER_VM_USER/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "${EXTRA_VARS}" playbook.yml
 
     echo "[`date`] - User data script completed."
     '

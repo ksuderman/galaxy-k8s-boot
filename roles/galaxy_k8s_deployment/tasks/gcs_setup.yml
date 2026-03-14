@@ -1,16 +1,20 @@
 ---
 # GCS Object Store Setup Tasks
 # Creates/verifies GCS bucket, grants permissions, creates K8s secret
+#
+# SA key handling:
+#   - If gcs_service_account_key_file is set, copy it from the Ansible controller
+#   - Otherwise, generate a new key on the VM using gcloud (for cloud-init/ansible-pull)
 
 - name: Verify GCS bucket name is set
   fail:
     msg: "gcs_bucket_name must be set when enable_gcs_object_store is true"
   when: gcs_bucket_name | default('') == ''
 
-- name: Verify GCS service account key file is set
+- name: Verify GCP Batch service account email is set
   fail:
-    msg: "gcs_service_account_key_file must be set when enable_gcs_object_store is true"
-  when: gcs_service_account_key_file | default('') == ''
+    msg: "gcp_batch_service_account_email must be set when enable_gcs_object_store is true"
+  when: gcp_batch_service_account_email | default('') == ''
 
 - name: Check if GCS bucket exists
   shell: gcloud storage buckets describe gs://{{ gcs_bucket_name }} --format='value(name)' 2>/dev/null
@@ -34,7 +38,6 @@
     gcloud storage buckets add-iam-policy-binding gs://{{ gcs_bucket_name }}
     --member="serviceAccount:{{ gcp_batch_service_account_email }}"
     --role="roles/storage.objectAdmin"
-  when: gcp_batch_service_account_email | default('') != ''
 
 - name: Create galaxy namespace if not exists
   kubernetes.core.k8s:
@@ -43,11 +46,20 @@
     state: present
     kubeconfig: "{{ kubeconfig_path }}"
 
-- name: Copy SA key file to remote host
+# --- SA key: copy from controller if provided, otherwise generate on VM ---
+
+- name: Copy SA key file from Ansible controller
   ansible.builtin.copy:
     src: "{{ gcs_service_account_key_file }}"
     dest: /tmp/gcp-sa-key.json
     mode: '0600'
+  when: gcs_service_account_key_file | default('') != ''
+
+- name: Generate SA key on VM using gcloud
+  shell: >
+    gcloud iam service-accounts keys create /tmp/gcp-sa-key.json
+    --iam-account={{ gcp_batch_service_account_email }}
+  when: gcs_service_account_key_file | default('') == ''
 
 - name: Create Kubernetes secret for GCP service account key
   shell: |
@@ -68,5 +80,6 @@
     msg: |
       GCS Object Store setup complete:
         Bucket: gs://{{ gcs_bucket_name }}
-        Service Account: {{ gcp_batch_service_account_email | default('not configured') }}
+        Service Account: {{ gcp_batch_service_account_email }}
         K8s Secret: gcp-object-store-key (in galaxy namespace)
+        Key source: {{ 'provided file' if gcs_service_account_key_file | default('') != '' else 'generated on VM via gcloud' }}
