@@ -3,8 +3,10 @@
 # Requires:
 #   - enable_gcs_object_store: true
 #   - gcs_bucket_name set
-#   - gcs_service_account_key_file pointing to SA key JSON
 #   - K8s secret 'gcp-object-store-key' created by gcs_setup.yml
+#
+# The object_store_conf.xml with the actual bucket name is injected
+# by the Helm install task in galaxy_application.yml.
 
 persistence:
   storageClass: blockstorage
@@ -31,12 +33,3 @@ configs:
     galaxy:
       object_store_store_by: uuid
       object_store_config_file: /galaxy/server/config/object_store_conf.xml
-  object_store_conf.xml: |
-    <?xml version="1.0"?>
-    <object_store type="cloud" provider="google">
-        <auth credentials_file="/galaxy/server/config/gcp-sa-key.json" />
-        <bucket name="ks-batch-gcs-test-bucket" />
-        <cache path="/galaxy/server/database/object_store_cache" size="50" />
-        <extra_dir type="job_work" path="/galaxy/server/database/jobs_directory" />
-        <extra_dir type="temp" path="/galaxy/server/database/tmp" />
-    </object_store>

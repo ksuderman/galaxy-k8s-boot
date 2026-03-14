@@ -301,6 +301,16 @@
       extraEnvVars:
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /galaxy/server/config/gcp-sa-key.json
+      configs:
+        object_store_conf.xml: |
+          <?xml version="1.0"?>
+          <object_store type="cloud" provider="google">
+              <auth credentials_file="/galaxy/server/config/gcp-sa-key.json" />
+              <bucket name="{{ gcs_bucket_name }}" />
+              <cache path="/galaxy/server/database/object_store_cache" size="50" />
+              <extra_dir type="job_work" path="/galaxy/server/database/jobs_directory" />
+              <extra_dir type="temp" path="/galaxy/server/database/tmp" />
+          </object_store>
     _helm_values_cnpg_plugin:
       postgresql:
         cluster:
