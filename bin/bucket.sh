@@ -75,7 +75,7 @@ case $1 in
 		if [[ -e .kubeconfig ]] ; then
 			rm .kubeconfig
 		fi
-		bin/kube.sh --server $SERVER --cloud batch
+		bin/kube.sh --server $SERVER --cloud bucket
 		;;	
 	start) start ;;
 	stop) stop ;;
@@ -93,5 +93,4 @@ case $1 in
 		exit 1
 		;;
 esac
-#   -f mixins/multiuser.yml \
-#   -f mixins/admins.yml \
+
