@@ -18,7 +18,6 @@
   ansible.builtin.include_tasks: nfs_setup.yml
   when:
     - setup_nfs | default(true)
-    - not (enable_gcs_object_store | default(false) | bool)
 
 - name: Include GCS object store setup tasks
   ansible.builtin.include_tasks: gcs_setup.yml

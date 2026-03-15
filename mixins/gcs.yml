@@ -8,9 +8,6 @@
 # The object_store_conf.xml with the actual bucket name is injected
 # by the Helm install task in galaxy_application.yml.
 
-persistence:
-  storageClass: blockstorage
-
 extraVolumes:
   - name: gcp-sa-key
     secret:
