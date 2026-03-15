@@ -136,7 +136,6 @@ enable_gcs_object_store: false
 gcs_bucket_name: ""
 gcs_mount_path: "/galaxy/server/database"
 gcs_service_account_key_file: ""  # Optional: path to SA key JSON. If empty, key is generated on VM via gcloud.
-=======
 
 # Pulsar GCP Batch Configuration
 # Set enable_pulsar_gcp_batch=true to configure Galaxy for Pulsar GCP Batch runner
