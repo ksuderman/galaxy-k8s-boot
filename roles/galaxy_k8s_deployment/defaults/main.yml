@@ -121,7 +121,7 @@ galaxy_job_max_mem: 4
 #   - Update job_conf.yml with GCP Batch runner configuration
 #   - Restart Galaxy deployments to apply changes
 enable_gcp_batch: true
-gcp_batch_service_account_email: ""
+gcp_batch_service_account_email: "galaxy-batch-runner@anvil-and-terra-development.iam.gserviceaccount.com"
 gcp_batch_region: "us-east4"
 
 # GCS Object Store Configuration
