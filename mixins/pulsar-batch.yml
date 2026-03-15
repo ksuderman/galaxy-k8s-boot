@@ -1,0 +1,85 @@
+# Pulsar GCP Batch runner configuration (mixin)
+#
+# Adds Pulsar coexecution runner for benchmarking against the direct GCP Batch runner.
+# Uses PulsarGcpBatchJobRunner (Galaxy -> AMQP -> Pulsar sidecar on GCP Batch VM).
+# File transfer is via HTTP (remote_transfer), not NFS.
+#
+# Usage: bin/start.sh -f values/values.yml -f mixins/pulsar-batch.yml
+#
+# IMPORTANT: After deployment, the playbook must patch the galaxy-configs ConfigMap
+# with the real amqp_url and galaxy_url (detected from RabbitMQ NodePort and node IP).
+# The placeholder values below ensure the runner initializes with MessageJobClientManager
+# (not PollingJobClientManager, which crashes without ensure_has_status_update_callback).
+#
+# Known issues in pulsar-galaxy-lib requiring docker/pulsar-fix/:
+# - Deadlock: Pulsar sidecar runnable missing background=True
+# - Missing kill(): GcpMessageCoexecutionJobClient lacks kill() method
+
+image:
+  repository: ksuderman/galaxy-pulsar-fix
+  tag: 26.1.dev0
+
+configs:
+  galaxy.yml:
+    galaxy:
+      brand: Pulsar
+  job_conf.yml:
+    runners:
+      pulsar_gcp:
+        load: galaxy.jobs.runners.pulsar:PulsarGcpBatchJobRunner
+        # Placeholders: real values patched by playbook after RabbitMQ is running
+        amqp_url: "amqp://placeholder:placeholder@localhost:5672//"
+        galaxy_url: "http://localhost/"
+        # Custom VM image with CVMFS pre-installed for GCP Batch VMs
+        custom_vm_image: projects/anvil-and-terra-development/global/images/galaxy-k8s-boot-debian12-v2026-02-24
+    execution:
+      environments:
+        pulsar_gcp:
+          runner: pulsar_gcp
+          project_id: anvil-and-terra-development
+          region: us-east4
+          service_account_email: galaxy-batch-runner@anvil-and-terra-development.iam.gserviceaccount.com
+          machine_type: n2-standard-4
+          docker_extra_volumes: "/cvmfs/data.galaxyproject.org:/cvmfs/data.galaxyproject.org:ro,/cvmfs/cloud.galaxyproject.org:/cvmfs/cloud.galaxyproject.org:ro"
+
+jobs:
+  rules:
+    tpv_rules_local.yml:
+      tools:
+        param_value_from_file:
+          params:
+            walltime_limit: 900
+        compose_text_param:
+          params:
+            walltime_limit: 900
+        map_param_value:
+          params:
+            walltime_limit: 900
+        tp_awk_tool:
+          params:
+            walltime_limit: 900
+      destinations:
+        # Disable direct GCP Batch and K8s routing so all tools go through Pulsar
+        gcp_batch:
+          abstract: true
+        k8s:
+          abstract: true
+        # Route non-local tools through Pulsar GCP Batch coexecution
+        pulsar_gcp:
+          runner: pulsar_gcp
+          params:
+            docker_enabled: "true"
+            cores: "{cores}"
+            mem: "{mem}"
+            project_id: anvil-and-terra-development
+            region: us-east4
+            service_account_email: galaxy-batch-runner@anvil-and-terra-development.iam.gserviceaccount.com
+            machine_type: n2-standard-4
+            pulsar_container_image: ksuderman/pulsar-pod-staging:0.15.15.dev0
+            docker_extra_volumes: "/cvmfs/data.galaxyproject.org:/cvmfs/data.galaxyproject.org:ro,/cvmfs/cloud.galaxyproject.org:/cvmfs/cloud.galaxyproject.org:ro"
+            walltime_limit: 28800  # 8 hours, matching direct Batch runner
+            # Placeholder: patched by playbook with real AMQP URL after RabbitMQ is running.
+            # This config is passed to the remote Pulsar sidecar container on GCP Batch VMs
+            # so it can send job completion callbacks back to Galaxy via AMQP.
+            pulsar_app_config:
+              message_queue_url: "amqp://placeholder:placeholder@localhost:5672//"

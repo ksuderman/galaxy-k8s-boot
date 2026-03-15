@@ -573,3 +573,206 @@
     - restore_galaxy and detected_galaxy_pvc_uuid | default('') != ''
     - rabbitmq_user_exists is defined
     - not rabbitmq_user_exists
+
+# ============================================================================
+# Pulsar GCP Batch: RabbitMQ Configuration and External Access
+# ============================================================================
+# Configure RabbitMQ for external access from GCP Batch VMs and update
+# Galaxy job configuration with the correct AMQP URL and Galaxy URL.
+# The Pulsar coexecution model (Galaxy -> AMQP -> Pulsar sidecar on Batch VM)
+# requires Batch VMs to reach both RabbitMQ (for messaging) and Galaxy (for
+# HTTP file transfer). The mixin deploys with placeholder URLs; this section
+# patches the ConfigMap with the real values detected at runtime.
+
+- name: Get Galaxy public IP from GCP metadata
+  ansible.builtin.uri:
+    url: http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip
+    headers:
+      Metadata-Flavor: Google
+    return_content: true
+  register: galaxy_public_ip_result
+  ignore_errors: true
+  when: enable_pulsar_gcp_batch | default(false) | bool
+
+- name: Set Galaxy public URL for Pulsar
+  set_fact:
+    galaxy_public_url: "http://{{ galaxy_public_ip_result.content }}"
+  when:
+    - enable_pulsar_gcp_batch | default(false) | bool
+    - galaxy_public_ip_result is succeeded
+
+- name: Fallback to internal IP if public IP not available
+  set_fact:
+    galaxy_public_url: "http://{{ ansible_default_ipv4.address }}"
+  when:
+    - enable_pulsar_gcp_batch | default(false) | bool
+    - galaxy_public_ip_result is failed
+
+- name: Display Galaxy URL for Pulsar
+  debug:
+    msg: "Galaxy URL for Pulsar GCP Batch: {{ galaxy_public_url }}"
+  when: enable_pulsar_gcp_batch | default(false) | bool
+
+- name: Set RabbitMQ external IP (node internal IP for same-VPC access)
+  set_fact:
+    rabbitmq_external_ip: "{{ ansible_default_ipv4.address }}"
+  when: enable_pulsar_gcp_batch | default(false) | bool
+
+- name: Get RabbitMQ credentials for Pulsar GCP Batch
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: galaxy-rabbitmq-server-default-user
+    namespace: galaxy
+    kubeconfig: "{{ kubeconfig_path }}"
+  register: pulsar_rabbitmq_secret
+  when: enable_pulsar_gcp_batch | default(false) | bool
+
+- name: Decode RabbitMQ credentials for Pulsar AMQP URL
+  set_fact:
+    pulsar_rabbitmq_user: "{{ pulsar_rabbitmq_secret.resources[0].data.username | b64decode }}"
+    pulsar_rabbitmq_pass: "{{ pulsar_rabbitmq_secret.resources[0].data.password | b64decode }}"
+  when:
+    - enable_pulsar_gcp_batch | default(false) | bool
+    - pulsar_rabbitmq_secret.resources | length > 0
+
+- name: Construct Pulsar AMQP URL with node internal IP
+  set_fact:
+    pulsar_amqp_url: "pyamqp://{{ pulsar_rabbitmq_user }}:{{ pulsar_rabbitmq_pass }}@{{ rabbitmq_external_ip }}:5672//"
+  when:
+    - enable_pulsar_gcp_batch | default(false) | bool
+    - pulsar_rabbitmq_user is defined
+    - rabbitmq_external_ip is defined
+
+- name: Display Pulsar AMQP configuration
+  debug:
+    msg: "Pulsar GCP Batch AMQP URL: pyamqp://{{ pulsar_rabbitmq_user }}:****@{{ rabbitmq_external_ip }}:5672//"
+  when:
+    - enable_pulsar_gcp_batch | default(false) | bool
+    - pulsar_amqp_url is defined
+
+- name: Get RabbitMQ service for external IP patching
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Service
+    namespace: galaxy
+    kubeconfig: "{{ kubeconfig_path }}"
+    label_selectors:
+      - "app.kubernetes.io/component=rabbitmq"
+  register: rabbitmq_services
+  when: enable_pulsar_gcp_batch | default(false) | bool
+
+- name: Set RabbitMQ service name for patching
+  set_fact:
+    rabbitmq_service_name: "{{ (rabbitmq_services.resources | selectattr('spec.type', 'equalto', 'ClusterIP') | first).metadata.name }}"
+  when:
+    - enable_pulsar_gcp_batch | default(false) | bool
+    - rabbitmq_services.resources | length > 0
+
+- name: Patch RabbitMQ service with external IP
+  kubernetes.core.k8s:
+    state: patched
+    api_version: v1
+    kind: Service
+    name: "{{ rabbitmq_service_name }}"
+    namespace: galaxy
+    kubeconfig: "{{ kubeconfig_path }}"
+    definition:
+      spec:
+        externalIPs:
+          - "{{ rabbitmq_external_ip }}"
+  when:
+    - enable_pulsar_gcp_batch | default(false) | bool
+    - rabbitmq_service_name is defined
+    - rabbitmq_external_ip is defined
+
+- name: Display RabbitMQ external access info
+  debug:
+    msg: "RabbitMQ service '{{ rabbitmq_service_name }}' patched with external IP {{ rabbitmq_external_ip }}:5672"
+  when:
+    - enable_pulsar_gcp_batch | default(false) | bool
+    - rabbitmq_service_name is defined
+
+# Update Galaxy ConfigMap with the real AMQP URL and Galaxy URL
+- name: Get current job_conf.yml from ConfigMap for Pulsar update
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    name: galaxy-configs
+    namespace: galaxy
+    kubeconfig: "{{ kubeconfig_path }}"
+  register: galaxy_configs_pulsar
+  when: enable_pulsar_gcp_batch | default(false) | bool
+
+- name: Update job_conf.yml with Pulsar AMQP URL and Galaxy URL
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: galaxy-configs
+        namespace: galaxy
+      data: "{{ galaxy_configs_pulsar.resources[0].data | combine({'job_conf.yml': (galaxy_configs_pulsar.resources[0].data['job_conf.yml'] | from_yaml | combine({'runners': {'pulsar_gcp': {'amqp_url': pulsar_amqp_url, 'galaxy_url': galaxy_public_url, 'pulsar_app_config': {'message_queue_url': pulsar_amqp_url}}}}, recursive=True) | to_nice_yaml) }) }}"
+  when:
+    - enable_pulsar_gcp_batch | default(false) | bool
+    - pulsar_amqp_url is defined
+    - galaxy_configs_pulsar.resources | length > 0
+
+- name: Get galaxy-job-rules ConfigMap for TPV rules patching
+  kubernetes.core.k8s_info:
+    kind: ConfigMap
+    name: galaxy-job-rules
+    namespace: galaxy
+    kubeconfig: "{{ kubeconfig_path }}"
+  register: galaxy_job_rules_cm
+  when: enable_pulsar_gcp_batch | default(false) | bool
+
+- name: Update TPV rules with Pulsar AMQP URL for remote sidecar callbacks
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: galaxy-job-rules
+        namespace: galaxy
+      data: "{{ galaxy_job_rules_cm.resources[0].data | combine({'tpv_rules_local.yml': (galaxy_job_rules_cm.resources[0].data['tpv_rules_local.yml'] | from_yaml | combine({'destinations': {'pulsar_gcp': {'params': {'pulsar_app_config': {'message_queue_url': pulsar_amqp_url}}}}}, recursive=True) | to_nice_yaml) }) }}"
+  when:
+    - enable_pulsar_gcp_batch | default(false) | bool
+    - pulsar_amqp_url is defined
+    - galaxy_job_rules_cm.resources | length > 0
+
+- name: Restart Galaxy deployments to pick up Pulsar configuration
+  shell: kubectl rollout restart deployment {{ item }} -n galaxy
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  loop:
+    - galaxy-web
+    - galaxy-workflow
+    - galaxy-job-0
+  when:
+    - enable_pulsar_gcp_batch | default(false) | bool
+    - pulsar_amqp_url is defined
+
+- name: Display Pulsar GCP Batch configuration complete
+  debug:
+    msg: |
+      Pulsar GCP Batch configuration complete!
+      - Galaxy URL: {{ galaxy_public_url }}
+      - RabbitMQ external access: {{ rabbitmq_external_ip }}:5672
+      - AMQP URL configured in job_conf.yml
+      - Galaxy deployments restarted
+
+      IMPORTANT: Ensure firewall rule allows TCP port 5672 from GCP Batch VMs:
+        gcloud compute firewall-rules create allow-rabbitmq-for-batch \
+          --project=anvil-and-terra-development \
+          --description="Allow RabbitMQ access for GCP Batch VMs" \
+          --direction=INGRESS --priority=1000 --network=default \
+          --action=ALLOW --rules=tcp:5672 \
+          --source-ranges=10.128.0.0/9
+  when:
+    - enable_pulsar_gcp_batch | default(false) | bool
+    - pulsar_amqp_url is defined

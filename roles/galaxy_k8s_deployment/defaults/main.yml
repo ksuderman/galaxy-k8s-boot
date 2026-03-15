@@ -136,6 +136,17 @@ enable_gcs_object_store: false
 gcs_bucket_name: ""
 gcs_mount_path: "/galaxy/server/database"
 gcs_service_account_key_file: ""  # Optional: path to SA key JSON. If empty, key is generated on VM via gcloud.
+=======
+
+# Pulsar GCP Batch Configuration
+# Set enable_pulsar_gcp_batch=true to configure Galaxy for Pulsar GCP Batch runner
+# This will:
+#   - Detect Galaxy public URL for Pulsar file transfer
+#   - Extract RabbitMQ credentials and construct AMQP URL
+#   - Patch RabbitMQ service with external IP for Batch VM access
+#   - Update job_conf.yml ConfigMap with real amqp_url and galaxy_url
+#   - Restart Galaxy deployments to apply changes
+enable_pulsar_gcp_batch: false
 
 # Pulsar Application Configuration
 pulsar_chart: cloudve/pulsar
