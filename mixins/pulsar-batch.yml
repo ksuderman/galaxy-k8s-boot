@@ -32,6 +32,8 @@ configs:
         galaxy_url: "http://localhost/"
         # Custom VM image with CVMFS pre-installed for GCP Batch VMs
         custom_vm_image: projects/anvil-and-terra-development/global/images/galaxy-k8s-boot-debian12-v2026-02-24
+        boot_disk_size_gb: 100
+        boot_disk_type: pd-standard
     execution:
       environments:
         pulsar_gcp:
