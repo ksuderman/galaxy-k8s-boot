@@ -17,7 +17,7 @@
 
 image:
   repository: ksuderman/galaxy-pulsar-fix
-  tag: 26.1.dev0
+  tag: 26.1.dev1
 
 configs:
   galaxy.yml:

@@ -39,6 +39,12 @@
     --member="serviceAccount:{{ gcp_batch_service_account_email }}"
     --role="roles/storage.objectAdmin"
 
+- name: Grant storage.legacyBucketReader for bucket-level access (required by Galaxy object store)
+  shell: >
+    gcloud storage buckets add-iam-policy-binding gs://{{ gcs_bucket_name }}
+    --member="serviceAccount:{{ gcp_batch_service_account_email }}"
+    --role="roles/storage.legacyBucketReader"
+
 - name: Create galaxy namespace if not exists
   kubernetes.core.k8s:
     kind: Namespace
