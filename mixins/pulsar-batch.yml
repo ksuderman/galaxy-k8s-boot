@@ -32,8 +32,6 @@ configs:
         galaxy_url: "http://localhost/"
         # Custom VM image with CVMFS pre-installed for GCP Batch VMs
         custom_vm_image: projects/anvil-and-terra-development/global/images/galaxy-k8s-boot-debian12-v2026-02-24
-        boot_disk_size_gb: 100
-        boot_disk_type: pd-standard
     execution:
       environments:
         pulsar_gcp:
@@ -77,6 +75,7 @@ jobs:
             region: us-east4
             service_account_email: galaxy-batch-runner@anvil-and-terra-development.iam.gserviceaccount.com
             machine_type: n2-standard-4
+            boot_disk_size_gb: 100
             pulsar_container_image: ksuderman/pulsar-pod-staging:0.15.15.dev0
             docker_extra_volumes: "/cvmfs/data.galaxyproject.org:/cvmfs/data.galaxyproject.org:ro,/cvmfs/cloud.galaxyproject.org:/cvmfs/cloud.galaxyproject.org:ro"
             walltime_limit: 28800  # 8 hours, matching direct Batch runner
