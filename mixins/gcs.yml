@@ -28,5 +28,6 @@ extraVolumeMounts:
 configs:
   galaxy.yml:
     galaxy:
+      brand: GCP Buckets
       object_store_store_by: uuid
       object_store_config_file: /galaxy/server/config/object_store_conf.xml
