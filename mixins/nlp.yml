@@ -2,3 +2,7 @@ configs:
   galaxy.yml:
     galaxy:
       brand: NLP
+      admin_users: suderman@jhu.edu,schneidd@informatik.uni-freiburg.de
+      logo_url: null
+      logo_src: null
+      logo_src_secondary: null
