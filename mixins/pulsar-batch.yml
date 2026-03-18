@@ -46,18 +46,26 @@ jobs:
   rules:
     tpv_rules_local.yml:
       tools:
+        # Expression tools that read input file contents during parameter
+        # wrapping (exec_before_job/json_wrap). These fail on Pulsar because
+        # paths are rewritten to remote staging paths before files are staged.
+        # Route them to local execution instead.
         param_value_from_file:
-          params:
-            walltime_limit: 900
+          scheduling:
+            require:
+              - local
         compose_text_param:
-          params:
-            walltime_limit: 900
+          scheduling:
+            require:
+              - local
         map_param_value:
-          params:
-            walltime_limit: 900
+          scheduling:
+            require:
+              - local
         tp_awk_tool:
-          params:
-            walltime_limit: 900
+          scheduling:
+            require:
+              - local
       destinations:
         # Disable direct GCP Batch and K8s routing so all tools go through Pulsar
         gcp_batch:
