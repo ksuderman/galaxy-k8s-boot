@@ -15,8 +15,8 @@ jobs:
             job_id_prefix: galaxy-nlp
       tools:
         toolshed.g2.bx.psu.edu/repos/ksuderman/spacy_nlp/spacy_nlp/.*:
-          cores: 2
-          mem: 8
+          cores: 4
+          mem: 16
 extraFileMappings:
   /galaxy/server/static/welcome.html:
     applyToWeb: true
