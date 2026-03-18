@@ -154,18 +154,26 @@ jobs:
           scheduling:
             require:
               - local
+            reject:
+              - offline
         compose_text_param:
           scheduling:
             require:
               - local
+            reject:
+              - offline
         map_param_value:
           scheduling:
             require:
               - local
+            reject:
+              - offline
         tp_awk_tool:
           scheduling:
             require:
               - local
+            reject:
+              - offline
       destinations:
         gcp_batch:
           runner: gcp_batch
