@@ -6,3 +6,53 @@ configs:
       logo_url: null
       logo_src: null
       logo_src_secondary: null
+jobs:
+  rules:
+    tpv_rules_local.yml:
+      destinations:
+        gcp_batch:
+          params:
+            job_id_prefix: galaxy-nlp
+      tools:
+        toolshed.g2.bx.psu.edu/repos/ksuderman/spacy_nlp/spacy_nlp/.*:
+          cores: 2
+          mem: 8
+extraFileMappings:
+  /galaxy/server/static/welcome.html:
+    applyToWeb: true
+    applyToNginx: true
+    content: |
+      <!DOCTYPE html>
+      <html lang="en">
+          <head>
+              <meta charset="utf-8" />
+              <link rel="stylesheet" href="dist/base.css" type="text/css" />
+          </head>
+          <body class="m-0">
+              <div class="py-4">
+                  <div class="container">
+                      <div class="row mb-4">
+                          <div class="col-md-12">
+                              <h2>Welcome to Galaxy NLP</h2>
+                              <p>
+                                  This Galaxy instance provides natural language processing (NLP) tools
+                                  for text annotation and analysis. Available tools include:
+                              </p>
+                              <ul>
+                                  <li><strong>Stanford CoreNLP</strong> &mdash; tokenization, part-of-speech tagging,
+                                      named entity recognition, dependency parsing, coreference resolution,
+                                      and sentiment analysis for 8 languages</li>
+                                  <li><strong>spaCy</strong> &mdash; fast, industrial-strength NLP with tokenization,
+                                      POS tagging, NER, and dependency parsing for 25+ languages</li>
+                              </ul>
+                              <p>
+                                  To get started, upload a plain text file and select an NLP tool from
+                                  the tool panel on the left. Language models can be installed by an
+                                  administrator via <em>Admin &rarr; Local Data</em>.
+                              </p>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </body>
+      </html>
