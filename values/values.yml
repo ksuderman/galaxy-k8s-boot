@@ -137,6 +137,15 @@ configs:
         id: __IMPORT_WORKFLOW__
       - environment: local
         id: random_lines1
+      # Expression/param tools must run locally — TPV additive tag merge
+      # with the global DB causes reject:[local] to persist even when
+      # overridden, so route them here before TPV is consulted.
+      - environment: local
+        id: compose_text_param
+      - environment: local
+        id: map_param_value
+      - environment: local
+        id: param_value_from_file
     limits:
       - type: total_walltime
         window: 1  # number in days
@@ -154,26 +163,22 @@ jobs:
           scheduling:
             require:
               - local
-            reject:
-              - offline
+            reject: []
         compose_text_param:
           scheduling:
             require:
               - local
-            reject:
-              - offline
+            reject: []
         map_param_value:
           scheduling:
             require:
               - local
-            reject:
-              - offline
+            reject: []
         tp_awk_tool:
           scheduling:
             require:
               - local
-            reject:
-              - offline
+            reject: []
       destinations:
         gcp_batch:
           runner: gcp_batch
