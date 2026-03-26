@@ -1,0 +1,75 @@
+---
+# Istio Gateway API Setup Tasks
+# Installs Istio via Helm for use with Gateway API
+
+- name: Add Istio Helm repository
+  kubernetes.core.helm_repository:
+    name: istio
+    state: present
+    repo_url: https://istio-release.storage.googleapis.com/charts
+    force_update: true
+
+- name: Create istio-system namespace
+  kubernetes.core.k8s:
+    kind: Namespace
+    name: istio-system
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+
+- name: Install Istio base (CRDs)
+  kubernetes.core.helm:
+    name: istio-base
+    namespace: istio-system
+    chart_ref: istio/base
+    chart_version: "{{ istio_version }}"
+    kubeconfig: "{{ kubeconfig_path }}"
+    update_repo_cache: true
+
+- name: Install Istiod (control plane)
+  kubernetes.core.helm:
+    name: istiod
+    namespace: istio-system
+    chart_ref: istio/istiod
+    chart_version: "{{ istio_version }}"
+    kubeconfig: "{{ kubeconfig_path }}"
+    values:
+      pilot:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+
+- name: Wait for Istiod to be ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: istiod
+    namespace: istio-system
+    kubeconfig: "{{ kubeconfig_path }}"
+  register: istiod_deployment
+  until:
+    - istiod_deployment.resources | length > 0
+    - istiod_deployment.resources[0].status.readyReplicas | default(0) | int >= 1
+  retries: 30
+  delay: 10
+
+- name: Install Istio Gateway controller
+  kubernetes.core.helm:
+    name: istio-gateway
+    namespace: istio-system
+    chart_ref: istio/gateway
+    chart_version: "{{ istio_version }}"
+    kubeconfig: "{{ kubeconfig_path }}"
+    values:
+      service:
+        type: "{{ istio_gateway_service_type }}"
+
+- name: Install Gateway API CRDs
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    src: "https://github.com/kubernetes-sigs/gateway-api/releases/download/{{ gateway_api_version }}/standard-install.yaml"
+
+- name: Display Istio installation complete
+  debug:
+    msg: "Istio {{ istio_version }} installed with Gateway API {{ gateway_api_version }} support"

@@ -31,6 +31,10 @@
   ansible.builtin.include_tasks: ingress_setup.yml
   when: setup_ingress | default(true)
 
+- name: Include Istio Gateway API setup tasks
+  ansible.builtin.include_tasks: istio_setup.yml
+  when: setup_istio | default(false)
+
 - name: Include Galaxy application setup tasks
   ansible.builtin.include_tasks: galaxy_application.yml
   when: deploy_galaxy | default(false)

@@ -91,6 +91,12 @@ restore_galaxy: false
 # Ingress Configuration
 ingress_version: "4.13.2"  # https://github.com/kubernetes/ingress-nginx?tab=readme-ov-file#supported-versions-table
 
+# Istio / Gateway API Configuration
+setup_istio: false
+istio_version: "1.25.2"             # https://github.com/istio/istio/releases
+gateway_api_version: "v1.2.1"       # https://github.com/kubernetes-sigs/gateway-api/releases
+istio_gateway_service_type: LoadBalancer
+
 # Galaxy Application Configuration
 galaxy_chart: cloudve/galaxy
 galaxy_chart_version: "6.7.2"
