@@ -1,3 +1,8 @@
+# Jobs that only require a single core will be routed to the k8s runner
+configs:
+  galaxy.yml:
+    galaxy:
+      brand: "1 core: k8s"
 jobs:
   rules:
     tpv_rules_local.yml:
