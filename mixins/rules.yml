@@ -2,12 +2,15 @@ jobs:
   rules:
     tpv_rules_local.yml:
       tools:
-        toolshed.g2.bx.psu.edu/repos/iuc/metaphlan/metaphlan/.*:
-          cores: 16
-          mem: 96
-        toolshed.g2.bx.psu.edu/repos/iuc/fastp/fastp/.*:
-          cores: 8
-          mem: 32
-        toolshed.g2.bx.psu.edu/repos/devteam/fastqc/fastqc/.*:
-          cores: 16
-          mem: 64
+        default:
+          rules:
+            - id: force_default_container_for_built_in_tools
+              if: |
+                from galaxy.tools import GALAXY_LIB_TOOLS_UNVERSIONED
+                tool.id in GALAXY_LIB_TOOLS_UNVERSIONED or "CONVERTER_" == tool.id[:10] or tool.is_datatype_converter
+              params:
+                docker_container_id_override: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+            - id: route_single_core_to_k8s
+              if: not cores or cores <= 1
+              destination:
+                id: k8s
