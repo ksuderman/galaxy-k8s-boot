@@ -1,13 +1,50 @@
-# Jobs that only require a single core will be routed to the k8s runner
+# Small jobs (1 core, <=4GB) run on the k8s runner.
+# Larger jobs go to gcp_batch.
+# Reduce Galaxy pod CPU requests to leave room for k8s job pods.
 configs:
   galaxy.yml:
     galaxy:
       brand: "1 core: k8s"
+
+webHandlers:
+  handler:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 1G
+
+jobHandlers:
+  handler:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 1G
+
+workflowHandlers:
+  handler:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 500M
+
 jobs:
   rules:
     tpv_rules_local.yml:
+      destinations:
+        k8s:
+          max_cores: 1
+          max_mem: 4
+          scheduling:
+            prefer:
+              - small-job
+        gcp_batch:
+          params:
+            job_id_prefix: galaxy-single
       tools:
         default:
+          scheduling:
+            prefer:
+              - small-job
           rules:
             - id: force_default_container_for_built_in_tools
               if: |
@@ -15,7 +52,3 @@ jobs:
                 tool.id in GALAXY_LIB_TOOLS_UNVERSIONED or "CONVERTER_" == tool.id[:10] or tool.is_datatype_converter
               params:
                 docker_container_id_override: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-            - id: route_single_core_to_k8s
-              if: not cores or cores <= 1
-              destination:
-                id: k8s

@@ -10,8 +10,8 @@ configs:
 
 jobs:
   user_limits:
-    cores: 16
-    mem: 64
+    cores: 64
+    mem: 512
     walltime: 168
 
 extraFileMappings:

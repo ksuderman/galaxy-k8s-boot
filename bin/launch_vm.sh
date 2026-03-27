@@ -10,6 +10,7 @@ BOOT_DISK_SIZE="100GB"
 DISK_SIZE="512GB"
 POSTGRES_DISK_SIZE="10GB"
 DISK_TYPE="pd-balanced"
+GALAXY_CHART="cloudve/galaxy"
 GALAXY_CHART_VERSION="6.7.2"
 GALAXY_DEPS_VERSION="1.1.1"
 GIT_BRANCH="master"
@@ -28,6 +29,8 @@ DISK_NAME=""
 DRY_RUN=""
 ENABLE_PULSAR_GCP=""
 EPHEMERAL_ONLY=false
+SETUP_ISTIO=false
+SETUP_INGRESS=true
 GALAXY_VALUES_FILES=()  # Array to hold multiple values files
 INSTANCE_NAME=""
 POSTGRES_DISK_NAME=""
@@ -57,8 +60,11 @@ Options:
   -s, --disk-size SIZE              Size of NFS persistent disk (default: $DISK_SIZE)
   -z, --zone ZONE                   GCP zone (default: $ZONE)
   --enable-pulsar-batch             Use the Pulsar Batch runner instead of the direct GCP Batch runner
+  --galaxy-chart CHART              Galaxy Helm chart reference (default: $GALAXY_CHART)
   --galaxy-chart-version VERSION    Galaxy Helm chart version (default: $GALAXY_CHART_VERSION)
   --galaxy-deps-version VERSION     Galaxy dependencies chart version (default: $GALAXY_DEPS_VERSION)
+  --setup-istio                     Install Istio for Gateway API support
+  --no-ingress                      Skip nginx ingress controller installation
   --postgres-disk DISK_NAME         Name of PostgreSQL disk (default: galaxy-postgres-INSTANCE_NAME)
   --postgres-disk-size SIZE         Size of PostgreSQL disk (default: $POSTGRES_DISK_SIZE)
   --restore-galaxy                  Auto-detect and restore Galaxy from existing data
@@ -161,6 +167,10 @@ while [[ $# -gt 0 ]]; do
             ZONE="$2"
             shift 2
             ;;
+        --galaxy-chart)
+            GALAXY_CHART="$2"
+            shift 2
+            ;;
         --galaxy-chart-version)
             GALAXY_CHART_VERSION="$2"
             shift 2
@@ -171,6 +181,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --restore-galaxy)
             RESTORE_GALAXY=true
+            shift
+            ;;
+        --setup-istio)
+            SETUP_ISTIO=true
+            shift
+            ;;
+        --no-ingress)
+            SETUP_INGRESS=false
             shift
             ;;
         --gcs-bucket)
@@ -252,6 +270,7 @@ echo "Project: $PROJECT"
 echo "Zone: $ZONE"
 echo "Machine Type: $MACHINE_TYPE"
 echo "Machine Image: $MACHINE_IMAGE"
+echo "Galaxy Chart: $GALAXY_CHART"
 echo "Galaxy Chart Version: $GALAXY_CHART_VERSION"
 echo "Galaxy Deps Version: $GALAXY_DEPS_VERSION"
 echo "Galaxy Values Files: ${GALAXY_VALUES_FILES[@]}"
@@ -423,8 +442,11 @@ cat >> "$TEMP_USER_DATA" << EOF
     PV_SIZE="${PV_SIZE_VALUE}"
     GIT_REPO="${GIT_REPO}"
     GIT_BRANCH="${GIT_BRANCH}"
+    GALAXY_CHART="${GALAXY_CHART}"
     GALAXY_CHART_VERSION="${GALAXY_CHART_VERSION}"
     GALAXY_DEPS_VERSION="${GALAXY_DEPS_VERSION}"
+    SETUP_ISTIO="${SETUP_ISTIO}"
+    SETUP_INGRESS="${SETUP_INGRESS}"
     GALAXY_VALUES_FILES_JSON='${GALAXY_VALUES_FILES_JSON}'
     RESTORE_GALAXY="${RESTORE_GALAXY}"
     GCS_BUCKET_NAME="${GCS_BUCKET_NAME}"
@@ -462,11 +484,11 @@ EOF
 
 if [[ $ENABLE_PULSAR_GCP = "true" ]] ; then
     cat >> "$TEMP_USER_DATA" << 'EOF'
-    EXTRA_VARS="{\"enable_gcp_batch\": false, \"enable_pulsar_gcp_batch\": true, \"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}}"
+    EXTRA_VARS="{\"enable_gcp_batch\": false, \"enable_pulsar_gcp_batch\": true, \"galaxy_chart\": \"${GALAXY_CHART}\", \"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"setup_istio\": ${SETUP_ISTIO}, \"setup_ingress\": ${SETUP_INGRESS}, \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}}"
 EOF
 else
     cat >> "$TEMP_USER_DATA" << 'EOF'
-    EXTRA_VARS="{\"enable_gcp_batch\": true, \"enable_pulsar_gcp_batch\": false, \"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}"
+    EXTRA_VARS="{\"enable_gcp_batch\": true, \"enable_pulsar_gcp_batch\": false, \"galaxy_chart\": \"${GALAXY_CHART}\", \"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"setup_istio\": ${SETUP_ISTIO}, \"setup_ingress\": ${SETUP_INGRESS}, \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}"
     if [ -n "${GCS_BUCKET_NAME}" ]; then
       EXTRA_VARS="${EXTRA_VARS}, \"enable_gcs_object_store\": true, \"gcs_bucket_name\": \"${GCS_BUCKET_NAME}\", \"gcs_mount_path\": \"${GCS_MOUNT_PATH}\""
     fi

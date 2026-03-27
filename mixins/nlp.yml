@@ -15,8 +15,45 @@ jobs:
             job_id_prefix: galaxy-nlp
       tools:
         toolshed.g2.bx.psu.edu/repos/ksuderman/spacy_nlp/spacy_nlp/.*:
-          cores: 4
-          mem: 16
+          cores: 2
+          mem: 8
+          rules:
+            - id: spacy_heavy
+              if: |
+                param_dict = job.get_param_values(app)
+                param_dict.get('annotators', '') in ('parse',)
+              cores: 4
+              mem: 16
+        testtoolshed.g2.bx.psu.edu/repos/ksuderman/stanza_nlp/stanza_nlp/.*:
+          cores: 2
+          mem: 8
+          rules:
+            - id: stanza_heavy
+              if: |
+                param_dict = job.get_param_values(app)
+                param_dict.get('annotators', '') in ('parse', 'sentiment', 'constituency')
+              cores: 4
+              mem: 16
+        testtoolshed.g2.bx.psu.edu/repos/ksuderman/stanford_corenlp/stanford_corenlp/.*:
+          cores: 2
+          mem: 8
+          rules:
+            - id: corenlp_heavy_test
+              if: |
+                param_dict = job.get_param_values(app)
+                param_dict.get('annotators', '') in ('parse', 'coref', 'sentiment')
+              cores: 4
+              mem: 16
+        toolshed.g2.bx.psu.edu/repos/ksuderman/stanford_corenlp/stanford_corenlp/.*:
+          cores: 2
+          mem: 8
+          rules:
+            - id: corenlp_heavy
+              if: |
+                param_dict = job.get_param_values(app)
+                param_dict.get('annotators', '') in ('parse', 'coref', 'sentiment')
+              cores: 4
+              mem: 16
 extraFileMappings:
   /galaxy/server/static/welcome.html:
     applyToWeb: true

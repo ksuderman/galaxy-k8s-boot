@@ -1,11 +1,4 @@
 # Use the Gateway API with Istio instead of Ingress
-galaxy_chart: ksuderman/galaxy
-galaxy_chart_version: "6.8.0-dev0"
-
-# Install Istio, disable nginx ingress controller
-setup_istio: true
-setup_ingress: false
-
 gateway:
   enabled: true
   gatewayClassName: istio
