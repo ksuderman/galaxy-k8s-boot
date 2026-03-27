@@ -54,13 +54,12 @@
   delay: 10
 
 - name: Install Istio Gateway controller
-  kubernetes.core.helm:
-    name: istio-gateway
-    namespace: istio-system
-    chart_ref: istio/gateway
-    chart_version: "{{ istio_version }}"
-    kubeconfig: "{{ kubeconfig_path }}"
-    reset_values: false
+  shell: >
+    helm install istio-gateway istio/gateway
+    --namespace istio-system
+    --version {{ istio_version }}
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
 
 - name: Install Gateway API CRDs
   kubernetes.core.k8s:
