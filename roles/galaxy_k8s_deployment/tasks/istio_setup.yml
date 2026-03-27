@@ -60,6 +60,7 @@
     chart_ref: istio/gateway
     chart_version: "{{ istio_version }}"
     kubeconfig: "{{ kubeconfig_path }}"
+    reset_values: false
 
 - name: Install Gateway API CRDs
   kubernetes.core.k8s:
