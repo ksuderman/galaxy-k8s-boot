@@ -58,6 +58,7 @@
     helm install istio-gateway istio/gateway
     --namespace istio-system
     --version {{ istio_version }}
+    --skip-schema-validation
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
 
