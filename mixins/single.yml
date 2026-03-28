@@ -29,8 +29,8 @@ jobs:
     tpv_rules_local.yml:
       destinations:
         k8s:
-          max_cores: 1
-          max_mem: 4
+          max_accepted_cores: 1
+          max_accepted_mem: 4
           scheduling:
             prefer:
               - small-job
