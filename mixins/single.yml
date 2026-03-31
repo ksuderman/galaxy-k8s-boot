@@ -4,7 +4,7 @@
 configs:
   galaxy.yml:
     galaxy:
-      brand: "1 core: k8s"
+      brand: "Single Core"
 
 webHandlers:
   resources:
