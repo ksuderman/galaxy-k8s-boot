@@ -1,4 +1,8 @@
 # Use the Gateway API with Istio instead of Ingress
+configs:
+  galaxy.yml:
+    galaxy:
+      brand: Gateway API
 gateway:
   enabled: true
   gatewayClassName: istio
