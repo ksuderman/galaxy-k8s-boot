@@ -776,3 +776,42 @@
   when:
     - enable_pulsar_gcp_batch | default(false) | bool
     - pulsar_amqp_url is defined
+
+# ============================================================================
+# Gateway API: Bind Istio Gateway to host port 80
+# ============================================================================
+# GCP drops packets to ports without a host-level listener, so externalIPs
+# alone won't work. Adding hostPort: 80 to the gateway pod binds port 80
+# directly on the node, making Galaxy reachable from outside the cluster.
+
+- name: Patch Istio Gateway deployment with hostPort 80
+  kubernetes.core.k8s:
+    state: patched
+    api_version: apps/v1
+    kind: Deployment
+    name: galaxy-gateway-istio
+    namespace: galaxy
+    kubeconfig: "{{ kubeconfig_path }}"
+    definition:
+      spec:
+        template:
+          spec:
+            containers:
+              - name: istio-proxy
+                ports:
+                  - containerPort: 80
+                    hostPort: 80
+                    name: http-host
+                    protocol: TCP
+  when: setup_istio | default(false) | bool
+
+- name: Wait for Gateway deployment rollout
+  shell: kubectl rollout status deployment galaxy-gateway-istio -n galaxy --timeout=120s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  when: setup_istio | default(false) | bool
+
+- name: Display Gateway access info
+  debug:
+    msg: "Galaxy is accessible via Istio Gateway on port 80 (hostPort)"
+  when: setup_istio | default(false) | bool
