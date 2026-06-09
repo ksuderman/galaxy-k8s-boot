@@ -1,0 +1,4 @@
+configs:
+  galaxy.yml:
+    galaxy:
+      enable_quotas: true
