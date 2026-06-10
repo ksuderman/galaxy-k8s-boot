@@ -42,6 +42,7 @@ configs:
         max_retry_count: 3
         max_run_duration: 3600s
         polling_interval: 30
+        job_id_prefix: ks-test
     execution:
       default: tpv_dispatcher
       environments:
