@@ -43,6 +43,7 @@ configs:
         max_run_duration: 3600s
         polling_interval: 30
         job_id_prefix: ks-test
+        delete_completed_jobs: false
     execution:
       default: tpv_dispatcher
       environments:
