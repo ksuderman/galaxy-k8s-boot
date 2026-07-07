@@ -253,6 +253,9 @@
     _galaxy_values_files: >-
       {%- set base = galaxy_values_files if (galaxy_values_files is defined and galaxy_values_files | length > 0) else ['values/values.yml'] -%}
       {%- set profile = galaxy_import_profile | default([]) -%}
+      {%- if galaxy_import_profile_file is defined and galaxy_import_profile_file != '__use_role_default__' -%}
+      {%- set profile = [galaxy_import_profile_file] if (galaxy_import_profile_file | length > 0) else [] -%}
+      {%- endif -%}
       {%- set user_file = ['/tmp/galaxy-postinstall-user.yaml'] if (galaxy_user | default('') | length > 0) else [] -%}
       {{ base + profile + user_file }}
 

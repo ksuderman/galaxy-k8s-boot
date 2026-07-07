@@ -374,20 +374,18 @@ fi
 # Convert values files list to JSON array
 GALAXY_VALUES_FILES_JSON=$(echo "$GALAXY_VALUES_FILES_LIST" | sed -e 's/;/","/g' -e 's/^/["/' -e 's/$/"]/')
 
-# Build an optional galaxy_import_profile fragment for the ansible-pull --extra-vars.
-# Unset (--profile not given) -> omit the key so the role default is used.
-# --profile ''   -> [] (disable post-install imports).
-# --profile PATH -> ["PATH"].
-# NOTE: this fragment is spliced into the JSON inside a `sudo bash -c '...'`
-# single-quoted block, so it MUST be space-free (like GALAXY_VALUES_FILES_JSON);
-# a space here word-splits and breaks the whole ansible-pull command.
-GALAXY_IMPORT_PROFILE_ARG=""
+# Pass the --profile selection as a plain scalar string (galaxy_import_profile_file).
+# Raw JSON cannot be spliced into the ansible-pull --extra-vars reliably: it is
+# built inside a `sudo bash -c '...'` block that strips quotes and word-splits,
+# so a list/quoted value gets mangled. A plain string survives cleanly (like
+# ai_backend); the playbook turns it into the galaxy_import_profile list.
+#   not given -> "__use_role_default__" (playbook keeps the role default)
+#   --profile '' -> "" (playbook disables post-install imports)
+#   --profile PATH -> "PATH"
 if [ "$PROFILE_SET" = true ]; then
-    if [ -z "$PROFILE" ]; then
-        GALAXY_IMPORT_PROFILE_ARG=',"galaxy_import_profile":[]'
-    else
-        GALAXY_IMPORT_PROFILE_ARG=',"galaxy_import_profile":["'"$PROFILE"'"]'
-    fi
+    GALAXY_PROFILE_FILE="$PROFILE"
+else
+    GALAXY_PROFILE_FILE="__use_role_default__"
 fi
 
 cat > "$TEMP_USER_DATA" << 'EOF'
@@ -477,10 +475,10 @@ cat >> "$TEMP_USER_DATA" << EOF
     GALAXY_CHART_VERSION="${GALAXY_CHART_VERSION}"
     GALAXY_DEPS_VERSION="${GALAXY_DEPS_VERSION}"
     GALAXY_VALUES_FILES_JSON='${GALAXY_VALUES_FILES_JSON}'
-    GALAXY_IMPORT_PROFILE_ARG='${GALAXY_IMPORT_PROFILE_ARG}'
     RESTORE_GALAXY="${RESTORE_GALAXY}"
     AI_BACKEND="${AI_BACKEND}"
     AI_MASTER_KEY="${AI_MASTER_KEY}"
+    GALAXY_PROFILE_FILE="${GALAXY_PROFILE_FILE}"
 EOF
 
 cat >> "$TEMP_USER_DATA" << 'EOF'
@@ -503,6 +501,7 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     restore_galaxy=$RESTORE_GALAXY
     ai_backend="${AI_BACKEND}"
     litellm_master_key="${AI_MASTER_KEY}"
+    galaxy_import_profile_file="${GALAXY_PROFILE_FILE}"
     INVEOF
 
     echo "[`date`] - NFS storage size for Galaxy: ${PV_SIZE}"
@@ -514,7 +513,7 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     echo "[`date`] - Galaxy Values Files: ${GALAXY_VALUES_FILES_JSON}"
     echo "[`date`] - Inventory file created at /tmp/ansible-inventory/localhost; running ansible-pull..."
 
-    ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/PLACEHOLDER_VM_USER/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "{\"enable_gcp_batch\": true, \"galaxy_chart\": \"${GALAXY_CHART}\", \"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_chart\": \"${GALAXY_DEPS_CHART}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}${GALAXY_IMPORT_PROFILE_ARG}}" playbook.yml
+    ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/PLACEHOLDER_VM_USER/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "{\"enable_gcp_batch\": true, \"galaxy_chart\": \"${GALAXY_CHART}\", \"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_chart\": \"${GALAXY_DEPS_CHART}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}}" playbook.yml
 
     echo "[`date`] - User data script completed."
     '
