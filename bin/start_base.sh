@@ -33,6 +33,9 @@ VERSION=${VERSION:-""}
 # launch_vm.sh when left empty.
 AI_BACKEND=${AI_BACKEND:-""}
 AI_MASTER_KEY=${AI_MASTER_KEY:-""}
+# GiB reserved on the data disk so Galaxy does not claim the whole disk (leaves
+# room for the Ollama model cache and RabbitMQ). Empty -> launch_vm.sh default.
+NFS_RESERVE=${NFS_RESERVE:-""}
 
 DRY_RUN=""
 
@@ -75,7 +78,7 @@ function start() {
 	LAUNCH_CMD=($DIR/launch_vm.sh $SERVER
 	  --git-repo $REPO
 	  --git-branch $BRANCH
-	  --disk-size 256
+	  --disk-size $DISK_SIZE
 	  --profile ''
 	)
 	if [[ $# -gt 0 ]] ; then
@@ -102,6 +105,9 @@ function start() {
 	fi
 	if [[ -n $AI_MASTER_KEY ]] ; then
 	    LAUNCH_CMD+=(--ai-master-key $AI_MASTER_KEY)
+	fi
+	if [[ -n $NFS_RESERVE ]] ; then
+	    LAUNCH_CMD+=(--nfs-reserve $NFS_RESERVE)
 	fi
     LAUNCH_CMD+=(-f values/values.yml)
 	if [[ -n $MIXINS ]] ; then

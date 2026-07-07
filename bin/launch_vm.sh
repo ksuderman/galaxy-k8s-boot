@@ -9,6 +9,10 @@ set -e
 BOOT_DISK_SIZE="100GB"
 DISK_SIZE="150GB"
 POSTGRES_DISK_SIZE="10GB"
+# GiB reserved on the NFS/block-storage disk so Galaxy's PVC does NOT claim the
+# whole disk. Leaves room for co-tenant PVCs on that disk (Ollama model cache,
+# RabbitMQ) plus filesystem overhead. galaxy_persistence_size = PV_SIZE - reserve.
+NFS_RESERVE="${NFS_RESERVE:-30}"
 DISK_TYPE="pd-balanced"
 GALAXY_CHART="cloudve/galaxy"
 GALAXY_CHART_VERSION="6.7.0"
@@ -58,6 +62,9 @@ Options:
   -p, --project PROJECT             GCP project ID (default: $PROJECT)
   -r, --git-repo REPO               Git repository URL (default: $GIT_REPO)
   -s, --disk-size SIZE              Size of NFS persistent disk (default: $DISK_SIZE)
+      --nfs-reserve GIB             GiB reserved on the data disk so Galaxy's PVC does not
+                                    claim the whole disk, leaving room for co-tenant PVCs
+                                    (Ollama, RabbitMQ) (default: $NFS_RESERVE)
   -z, --zone ZONE                   GCP zone (default: $ZONE)
   --galaxy-chart CHART              Galaxy Helm chart location (default: $GALAXY_CHART)
   --galaxy-chart-version VERSION    Galaxy Helm chart version (default: $GALAXY_CHART_VERSION)
@@ -203,6 +210,10 @@ while [[ $# -gt 0 ]]; do
             PROFILE_SET=true
             shift 2
             ;;
+        --nfs-reserve)
+            NFS_RESERVE="$2"
+            shift 2
+            ;;
         --ai-backend)
             AI_BACKEND="$2"
             shift 2
@@ -344,6 +355,16 @@ if [ "$EPHEMERAL_ONLY" = false ]; then
     PV_SIZE=$(( (DISK_SIZE_GB * 931) / 1000 ))
     echo "ℹ NFS storage will be configured for ${PV_SIZE}Gi (converted from ${DISK_SIZE_GB}GB disk)"
 
+    # Galaxy claims PV_SIZE minus reserved headroom (so other PVCs on the same
+    # disk have room). Guard against tiny disks: never drop below a sane floor.
+    GALAXY_PV_SIZE=$(( PV_SIZE - NFS_RESERVE ))
+    if [ "$GALAXY_PV_SIZE" -lt 10 ]; then
+        GALAXY_PV_SIZE="$PV_SIZE"
+        echo "⚠ Disk too small for ${NFS_RESERVE}Gi reserve; Galaxy will use full ${PV_SIZE}Gi."
+    else
+        echo "ℹ Galaxy PVC will request ${GALAXY_PV_SIZE}Gi (reserved ${NFS_RESERVE}Gi headroom for Ollama/RabbitMQ)."
+    fi
+
     # Handle PostgreSQL disk
     if gcloud compute disks describe "$POSTGRES_DISK_NAME" --project="$PROJECT" --zone="$ZONE" &>/dev/null; then
         echo "✓ PostgreSQL disk '$POSTGRES_DISK_NAME' already exists, will attach existing disk."
@@ -367,8 +388,10 @@ fi
 # Add the configuration values directly into the script
 if [ "$EPHEMERAL_ONLY" = false ]; then
     PV_SIZE_VALUE="${PV_SIZE}Gi"
+    GALAXY_PV_SIZE_VALUE="${GALAXY_PV_SIZE}Gi"
 else
     PV_SIZE_VALUE="20Gi"
+    GALAXY_PV_SIZE_VALUE="20Gi"
 fi
 
 # Convert values files list to JSON array
@@ -469,6 +492,7 @@ EOF
 cat >> "$TEMP_USER_DATA" << EOF
     # Configuration from launch_vm.sh
     PV_SIZE="${PV_SIZE_VALUE}"
+    GALAXY_PERSISTENCE_SIZE="${GALAXY_PV_SIZE_VALUE}"
     GIT_REPO="${GIT_REPO}"
     GIT_BRANCH="${GIT_BRANCH}"
     GALAXY_CHART="${GALAXY_CHART}"
@@ -494,7 +518,7 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     rke2_additional_sans=["${HOST_IP}"]
     rke2_debug=true
     nfs_size="${PV_SIZE}"
-    galaxy_persistence_size="${PV_SIZE}"
+    galaxy_persistence_size="${GALAXY_PERSISTENCE_SIZE}"
     galaxy_db_password="gxy-db-password"
     galaxy_user="default-user@galaxyproject.org"
     galaxy_bootstrap_api_key="galaxypassword"

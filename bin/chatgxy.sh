@@ -12,6 +12,12 @@ MIXINS=(dev multiuser admins logo)
 # AI_MASTER_KEY is left unset so launch_vm.sh auto-generates one.
 AI_BACKEND=ollama-cpu
 
+# Bigger data disk with reserved headroom so Galaxy keeps ample storage while
+# the Ollama model cache and RabbitMQ (which share this disk) have room.
+# 512GB -> ~476Gi pool, minus 64Gi reserve -> ~412Gi to Galaxy.
+DISK_SIZE=512
+NFS_RESERVE=64
+
 # The chatgxy branch lives on the personal fork used for test deploys; push it
 # there before launching (ansible-pull fetches REPO@BRANCH on the VM).
 REPO=https://github.com/ksuderman/galaxy-k8s-boot
