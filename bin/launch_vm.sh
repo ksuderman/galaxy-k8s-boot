@@ -378,12 +378,15 @@ GALAXY_VALUES_FILES_JSON=$(echo "$GALAXY_VALUES_FILES_LIST" | sed -e 's/;/","/g'
 # Unset (--profile not given) -> omit the key so the role default is used.
 # --profile ''   -> [] (disable post-install imports).
 # --profile PATH -> ["PATH"].
+# NOTE: this fragment is spliced into the JSON inside a `sudo bash -c '...'`
+# single-quoted block, so it MUST be space-free (like GALAXY_VALUES_FILES_JSON);
+# a space here word-splits and breaks the whole ansible-pull command.
 GALAXY_IMPORT_PROFILE_ARG=""
 if [ "$PROFILE_SET" = true ]; then
     if [ -z "$PROFILE" ]; then
-        GALAXY_IMPORT_PROFILE_ARG=', "galaxy_import_profile": []'
+        GALAXY_IMPORT_PROFILE_ARG=',"galaxy_import_profile":[]'
     else
-        GALAXY_IMPORT_PROFILE_ARG=', "galaxy_import_profile": ["'"$PROFILE"'"]'
+        GALAXY_IMPORT_PROFILE_ARG=',"galaxy_import_profile":["'"$PROFILE"'"]'
     fi
 fi
 
