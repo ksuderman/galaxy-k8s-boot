@@ -164,7 +164,11 @@ litellm_master_key: "sk-galaxy-litellm-changeme"
 ollama_image: "ollama/ollama:latest"
 ollama_model_cpu: "qwen2.5:3b"
 ollama_model_gpu: "qwen2.5:7b"
-ollama_storage_class: "nfs"
+# Node-local single-consumer storage for the model cache. Must NOT be the `nfs`
+# class: Galaxy's main PVC claims the entire NFS pool, so an ollama PVC there
+# starves it (ProvisioningFailed: insufficient available space). `blockstorage`
+# uses the local-path provisioner and does not draw from the NFS pool.
+ollama_storage_class: "blockstorage"
 ollama_storage_size: "20Gi"
 ollama_memory_request: "6Gi"
 ollama_memory_limit: "10Gi"
