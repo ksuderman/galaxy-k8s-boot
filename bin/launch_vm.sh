@@ -22,6 +22,10 @@ PROJECT="anvil-and-terra-development"
 VM_USER="debian"
 ZONE="us-east4-c"
 RESTORE_GALAXY=false
+AI_BACKEND="none"
+AI_MASTER_KEY=""
+PROFILE=""
+PROFILE_SET=false
 
 # Parse command line arguments
 DISK_NAME=""
@@ -62,6 +66,19 @@ Options:
   --postgres-disk DISK_NAME         Name of PostgreSQL disk (default: galaxy-postgres-INSTANCE_NAME)
   --postgres-disk-size SIZE         Size of PostgreSQL disk (default: $POSTGRES_DISK_SIZE)
   --restore-galaxy                  Auto-detect and restore Galaxy from existing data
+  --profile PROFILE                 Post-install import profile file passed to galaxy-helm's
+                                    postInstallJob.imports (sets galaxy_import_profile).
+                                    Pass '' to disable post-install imports. When omitted the
+                                    role default (files/profiles/anvil.yaml) is used.
+  --ai-backend BACKEND              ChatGXY inference backend: none, ollama-cpu,
+                                    ollama-gpu, external (default: $AI_BACKEND).
+                                    Anything other than 'none' deploys a LiteLLM
+                                    front door (and Ollama for the ollama-* options)
+                                    and enables ChatGXY in Galaxy. Requires a Galaxy
+                                    image that includes ChatGXY (e.g. add
+                                    '-f mixins/dev.yml').
+  --ai-master-key KEY               Key Galaxy presents to LiteLLM. Auto-generated
+                                    when omitted and --ai-backend is not 'none'.
   -h, --help, help                  Show this help message
 
 Examples:
@@ -181,6 +198,19 @@ while [[ $# -gt 0 ]]; do
             RESTORE_GALAXY=true
             shift
             ;;
+        --profile)
+            PROFILE="$2"
+            PROFILE_SET=true
+            shift 2
+            ;;
+        --ai-backend)
+            AI_BACKEND="$2"
+            shift 2
+            ;;
+        --ai-master-key)
+            AI_MASTER_KEY="$2"
+            shift 2
+            ;;
         -h|--help|help)
             usage
             exit 0
@@ -221,6 +251,20 @@ if [ "$EPHEMERAL_ONLY" = false ] && [ -z "$SSH_KEY" ]; then
     fi
 fi
 
+# Validate the AI backend selection and prepare the LiteLLM master key
+case "$AI_BACKEND" in
+    none|ollama-cpu|ollama-gpu|external) ;;
+    *)
+        echo "Error: invalid --ai-backend '$AI_BACKEND' (expected: none, ollama-cpu, ollama-gpu, external)"
+        usage
+        exit 1
+        ;;
+esac
+
+if [ "$AI_BACKEND" != "none" ] && [ -z "$AI_MASTER_KEY" ]; then
+    AI_MASTER_KEY="sk-galaxy-$(openssl rand -hex 16)"
+fi
+
 # Set default disk names if not provided
 if [ -z "$DISK_NAME" ]; then
     DISK_NAME="galaxy-data-$INSTANCE_NAME"
@@ -254,6 +298,12 @@ echo "Git Branch: $GIT_BRANCH"
 
 if [ "$RESTORE_GALAXY" = true ]; then
     echo "Galaxy Restore Mode: Auto-detect and restore"
+fi
+
+if [ "$AI_BACKEND" != "none" ]; then
+    echo "ChatGXY Inference Backend: $AI_BACKEND"
+    echo "LiteLLM Master Key: $AI_MASTER_KEY"
+    echo "ℹ ChatGXY requires a Galaxy image that includes it (e.g. add '-f mixins/dev.yml')."
 fi
 
 if [ "$EPHEMERAL_ONLY" = false ]; then
@@ -323,6 +373,19 @@ fi
 
 # Convert values files list to JSON array
 GALAXY_VALUES_FILES_JSON=$(echo "$GALAXY_VALUES_FILES_LIST" | sed -e 's/;/","/g' -e 's/^/["/' -e 's/$/"]/')
+
+# Build an optional galaxy_import_profile fragment for the ansible-pull --extra-vars.
+# Unset (--profile not given) -> omit the key so the role default is used.
+# --profile ''   -> [] (disable post-install imports).
+# --profile PATH -> ["PATH"].
+GALAXY_IMPORT_PROFILE_ARG=""
+if [ "$PROFILE_SET" = true ]; then
+    if [ -z "$PROFILE" ]; then
+        GALAXY_IMPORT_PROFILE_ARG=', "galaxy_import_profile": []'
+    else
+        GALAXY_IMPORT_PROFILE_ARG=', "galaxy_import_profile": ["'"$PROFILE"'"]'
+    fi
+fi
 
 cat > "$TEMP_USER_DATA" << 'EOF'
 #cloud-config
@@ -411,7 +474,10 @@ cat >> "$TEMP_USER_DATA" << EOF
     GALAXY_CHART_VERSION="${GALAXY_CHART_VERSION}"
     GALAXY_DEPS_VERSION="${GALAXY_DEPS_VERSION}"
     GALAXY_VALUES_FILES_JSON='${GALAXY_VALUES_FILES_JSON}'
+    GALAXY_IMPORT_PROFILE_ARG='${GALAXY_IMPORT_PROFILE_ARG}'
     RESTORE_GALAXY="${RESTORE_GALAXY}"
+    AI_BACKEND="${AI_BACKEND}"
+    AI_MASTER_KEY="${AI_MASTER_KEY}"
 EOF
 
 cat >> "$TEMP_USER_DATA" << 'EOF'
@@ -432,6 +498,8 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     galaxy_user="default-user@galaxyproject.org"
     galaxy_bootstrap_api_key="galaxypassword"
     restore_galaxy=$RESTORE_GALAXY
+    ai_backend="${AI_BACKEND}"
+    litellm_master_key="${AI_MASTER_KEY}"
     INVEOF
 
     echo "[`date`] - NFS storage size for Galaxy: ${PV_SIZE}"
@@ -443,7 +511,7 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     echo "[`date`] - Galaxy Values Files: ${GALAXY_VALUES_FILES_JSON}"
     echo "[`date`] - Inventory file created at /tmp/ansible-inventory/localhost; running ansible-pull..."
 
-    ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/PLACEHOLDER_VM_USER/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "{\"enable_gcp_batch\": true, \"galaxy_chart\": \"${GALAXY_CHART}\", \"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_chart\": \"${GALAXY_DEPS_CHART}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}}" playbook.yml
+    ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/PLACEHOLDER_VM_USER/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "{\"enable_gcp_batch\": true, \"galaxy_chart\": \"${GALAXY_CHART}\", \"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_chart\": \"${GALAXY_DEPS_CHART}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}${GALAXY_IMPORT_PROFILE_ARG}}" playbook.yml
 
     echo "[`date`] - User data script completed."
     '

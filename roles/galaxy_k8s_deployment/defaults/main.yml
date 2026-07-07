@@ -137,6 +137,44 @@ pulsar_chart_version: "0.2.0"
 pulsar_deps_version: "1.1.1"
 pulsar_api_key: ""
 
+# ChatGXY / AI Inference Configuration
+# ChatGXY (Galaxy's AI multi-agent framework) talks to an OpenAI-compatible
+# endpoint. We front all backends with a LiteLLM proxy so Galaxy always points
+# at one stable URL/model/key and backend swaps happen only in LiteLLM's routing.
+#
+# ai_backend selects what gets deployed and how LiteLLM routes the virtual model:
+#   none        - no inference server deployed; ChatGXY disabled (default)
+#   ollama-cpu  - self-hosted Ollama (CPU) behind LiteLLM
+#   ollama-gpu  - self-hosted Ollama (GPU) behind LiteLLM   [requires GPU node]
+#   external    - LiteLLM only, routing to an external provider (OpenAI/Anthropic)
+ai_backend: "none"
+inference_namespace: "galaxy"
+
+# Virtual model name Galaxy requests from LiteLLM (routing target is set per backend).
+ai_model_name: "galaxy-default"
+
+# LiteLLM front door
+litellm_image: "ghcr.io/berriai/litellm:main-latest"
+litellm_port: 4000
+# SECRET: the key Galaxy presents to LiteLLM. Override at launch
+# (e.g. -e litellm_master_key=sk-...) rather than committing a real value.
+litellm_master_key: "sk-galaxy-litellm-changeme"
+
+# Ollama (self-hosted engine for ollama-cpu / ollama-gpu)
+ollama_image: "ollama/ollama:latest"
+ollama_model_cpu: "qwen2.5:3b"
+ollama_model_gpu: "qwen2.5:7b"
+ollama_storage_class: "nfs"
+ollama_storage_size: "20Gi"
+ollama_memory_request: "6Gi"
+ollama_memory_limit: "10Gi"
+ollama_gpu_count: 1
+
+# External provider (only used when ai_backend=external)
+ai_external_provider: "openai"        # openai | anthropic
+ai_external_model: "gpt-4o-mini"
+ai_external_api_key: ""               # SECRET: provider API key
+
 # Galaxy K8s Monitor Configuration
 monitor_chart: cloudve/galaxy-k8s-monitor
 monitor_chart_version: "0.1.1"

@@ -1,0 +1,73 @@
+---
+# AI Inference Server Setup Tasks (ChatGXY)
+# Deploys the OpenAI-compatible inference stack that Galaxy's ChatGXY talks to:
+# a LiteLLM front door, optionally backed by a self-hosted Ollama engine.
+# Runs only when ai_backend != 'none' (gated by the include in main.yml).
+
+- name: Compute AI inference facts
+  set_fact:
+    _ai_use_ollama: "{{ ai_backend in ['ollama-cpu', 'ollama-gpu'] }}"
+    _ai_use_gpu: "{{ ai_backend == 'ollama-gpu' }}"
+    _ollama_model: "{{ ollama_model_gpu if ai_backend == 'ollama-gpu' else ollama_model_cpu }}"
+
+- name: Display AI inference configuration
+  debug:
+    msg: >-
+      ChatGXY inference: backend={{ ai_backend }},
+      {{ ('ollama model=' ~ _ollama_model) if _ai_use_ollama
+         else ('external ' ~ ai_external_provider ~ '/' ~ ai_external_model) }},
+      Galaxy model={{ ai_model_name }} via LiteLLM in namespace {{ inference_namespace }}
+
+- name: Ensure inference namespace exists
+  kubernetes.core.k8s:
+    kind: Namespace
+    name: "{{ inference_namespace }}"
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+
+# ----------------------------------------------------------------------------
+# Ollama self-hosted engine (ollama-cpu / ollama-gpu)
+# ----------------------------------------------------------------------------
+- name: Deploy Ollama engine
+  kubernetes.core.k8s:
+    template:
+      path: templates/ollama.yaml.j2
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+  when: _ai_use_ollama | bool
+
+# ----------------------------------------------------------------------------
+# LiteLLM front door (all backends)
+# ----------------------------------------------------------------------------
+- name: Deploy LiteLLM front door
+  kubernetes.core.k8s:
+    template:
+      path: templates/litellm.yaml.j2
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+
+# ----------------------------------------------------------------------------
+# Pull the Ollama model and wait for it to be ready
+# ----------------------------------------------------------------------------
+- name: Launch Ollama model pull Job
+  kubernetes.core.k8s:
+    template:
+      path: templates/ollama_pull_job.yaml.j2
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+  when: _ai_use_ollama | bool
+
+- name: Wait for Ollama model pull Job to complete
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    name: "ollama-pull-{{ _ollama_model | regex_replace('[^a-z0-9]', '-') }}"
+    namespace: "{{ inference_namespace }}"
+    kubeconfig: "{{ kubeconfig_path }}"
+  register: _ollama_pull_job
+  until: >-
+    _ollama_pull_job.resources | length > 0 and
+    (_ollama_pull_job.resources[0].status.succeeded | default(0) | int) >= 1
+  retries: 60
+  delay: 15
+  when: _ai_use_ollama | bool

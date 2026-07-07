@@ -278,7 +278,7 @@
     kubeconfig: "{{ kubeconfig_path }}"
     update_repo_cache: true
     values_files: "{{ lookup('sequence', 'start=0 end=' ~ (_galaxy_values_files|length - 1) ~ ' format=/tmp/galaxy_values_%d.yml', wantlist=True) }}"
-    values: "{{ _helm_values_base | combine(_helm_values_gcp_batch if (enable_gcp_batch | default(false) | bool) else {}, recursive=True) | combine(_helm_values_cnpg_plugin if (restore_galaxy and detected_galaxy_pvc_uuid | default('') != '') else {}, recursive=True) }}"
+    values: "{{ _helm_values_base | combine(_helm_values_gcp_batch if (enable_gcp_batch | default(false) | bool) else {}, recursive=True) | combine(_helm_values_cnpg_plugin if (restore_galaxy and detected_galaxy_pvc_uuid | default('') != '') else {}, recursive=True) | combine(_helm_values_ai if (ai_backend | default('none') != 'none') else {}, recursive=True) }}"
     set_values: "{{ galaxy_helm_extra_sets | default([]) + _helm_prefix_sets }}"
   vars:
     _helm_prefix_sets:
@@ -301,6 +301,15 @@
                 max_cores: "{{ galaxy_job_max_cores }}"
                 max_mem: "{{ galaxy_job_max_mem }}"
     _helm_values_gcp_batch: {}
+    _helm_values_ai:
+      configs:
+        galaxy.yml:
+          galaxy:
+            # ChatGXY points at the in-cluster LiteLLM front door. Backend swaps
+            # happen in LiteLLM's routing, so these three values stay constant.
+            ai_api_base_url: "http://litellm.{{ inference_namespace }}.svc.cluster.local:{{ litellm_port }}/v1"
+            ai_model: "{{ ai_model_name }}"
+            ai_api_key: "{{ litellm_master_key }}"
     _helm_values_cnpg_plugin:
       postgresql:
         cluster:

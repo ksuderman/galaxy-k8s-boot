@@ -1,0 +1,92 @@
+# Ollama self-hosted inference engine (OpenAI-compatible via LiteLLM front door).
+# Deployed only for ai_backend in (ollama-cpu, ollama-gpu).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-models
+  namespace: {{ inference_namespace }}
+  labels:
+    app: ollama
+    app.kubernetes.io/part-of: chatgxy
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ ollama_storage_class }}
+  resources:
+    requests:
+      storage: {{ ollama_storage_size }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: {{ inference_namespace }}
+  labels:
+    app: ollama
+    app.kubernetes.io/part-of: chatgxy
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+        app.kubernetes.io/part-of: chatgxy
+    spec:
+{% if _ai_use_gpu %}
+      runtimeClassName: nvidia
+{% endif %}
+      containers:
+        - name: ollama
+          image: {{ ollama_image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 11434
+              name: http
+          env:
+            - name: OLLAMA_HOST
+              value: "0.0.0.0"
+            - name: OLLAMA_KEEP_ALIVE
+              value: "24h"
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+          resources:
+            requests:
+              memory: {{ ollama_memory_request }}
+            limits:
+              memory: {{ ollama_memory_limit }}
+{% if _ai_use_gpu %}
+              nvidia.com/gpu: {{ ollama_gpu_count }}
+{% endif %}
+          readinessProbe:
+            httpGet:
+              path: /api/version
+              port: 11434
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: ollama-models
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: {{ inference_namespace }}
+  labels:
+    app: ollama
+    app.kubernetes.io/part-of: chatgxy
+spec:
+  type: ClusterIP
+  selector:
+    app: ollama
+  ports:
+    - name: http
+      port: 11434
+      targetPort: 11434
