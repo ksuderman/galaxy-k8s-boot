@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # The SERVER and CLOUD variables MUST BE set.
-CLOUD=chatgxy
+CLOUD=ai
 SERVER=ks-${CLOUD}-test
 
 MACHINE_TYPE="e2-standard-8"
