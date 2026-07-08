@@ -15,6 +15,7 @@
     msg: >-
       ChatGXY inference: backend={{ ai_backend }},
       {{ ('ollama model=' ~ _ollama_model) if _ai_use_ollama
+         else ('vertex ' ~ vertex_model ~ ' @ ' ~ vertex_location) if ai_backend == 'vertex'
          else ('external ' ~ ai_external_provider ~ '/' ~ ai_external_model) }},
       Galaxy model={{ ai_model_name }} via LiteLLM in namespace {{ inference_namespace }}
 

@@ -147,6 +147,8 @@ pulsar_api_key: ""
 #   ollama-cpu  - self-hosted Ollama (CPU) behind LiteLLM
 #   ollama-gpu  - self-hosted Ollama (GPU) behind LiteLLM   [requires GPU node]
 #   external    - LiteLLM only, routing to an external provider (OpenAI/Anthropic)
+#   vertex      - LiteLLM only, routing to Google Vertex AI (Gemini); auth via the
+#                 VM service account (ADC), no API key needed
 ai_backend: "none"
 inference_namespace: "galaxy"
 
@@ -178,6 +180,19 @@ ollama_gpu_count: 1
 ai_external_provider: "openai"        # openai | anthropic
 ai_external_model: "gpt-4o-mini"
 ai_external_api_key: ""               # SECRET: provider API key
+
+# Google Vertex AI / Gemini (only used when ai_backend=vertex).
+# LiteLLM authenticates via the VM service account (Application Default
+# Credentials over the GCE metadata server) -- no API key. The default compute
+# SA's Editor role already covers Vertex AI predict.
+vertex_model: "gemini-2.5-flash"
+vertex_location: "us-central1"
+# Leave empty to let LiteLLM infer the project from the VM's credentials.
+vertex_project: ""
+# gemini-2.5-flash is a "thinking" model that spends tokens on internal reasoning;
+# with a tight max_tokens it can return empty output. Disabling reasoning keeps
+# short/structured agent calls reliable. Set to "" to keep Gemini's default thinking.
+vertex_reasoning_effort: "disable"
 
 # Galaxy K8s Monitor Configuration
 monitor_chart: cloudve/galaxy-k8s-monitor

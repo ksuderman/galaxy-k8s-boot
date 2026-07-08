@@ -78,7 +78,7 @@ Options:
                                     Pass '' to disable post-install imports. When omitted the
                                     role default (files/profiles/anvil.yaml) is used.
   --ai-backend BACKEND              ChatGXY inference backend: none, ollama-cpu,
-                                    ollama-gpu, external (default: $AI_BACKEND).
+                                    ollama-gpu, external, vertex (default: $AI_BACKEND).
                                     Anything other than 'none' deploys a LiteLLM
                                     front door (and Ollama for the ollama-* options)
                                     and enables ChatGXY in Galaxy. Requires a Galaxy
@@ -264,9 +264,9 @@ fi
 
 # Validate the AI backend selection and prepare the LiteLLM master key
 case "$AI_BACKEND" in
-    none|ollama-cpu|ollama-gpu|external) ;;
+    none|ollama-cpu|ollama-gpu|external|vertex) ;;
     *)
-        echo "Error: invalid --ai-backend '$AI_BACKEND' (expected: none, ollama-cpu, ollama-gpu, external)"
+        echo "Error: invalid --ai-backend '$AI_BACKEND' (expected: none, ollama-cpu, ollama-gpu, external, vertex)"
         usage
         exit 1
         ;;

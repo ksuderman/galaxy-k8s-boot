@@ -30,7 +30,16 @@ data:
     model_list:
       - model_name: {{ ai_model_name }}
         litellm_params:
-{% if _ai_use_ollama %}
+{% if ai_backend == 'vertex' %}
+          model: vertex_ai/{{ vertex_model }}
+          vertex_location: {{ vertex_location }}
+{% if vertex_project %}
+          vertex_project: {{ vertex_project }}
+{% endif %}
+{% if vertex_reasoning_effort %}
+          reasoning_effort: {{ vertex_reasoning_effort }}
+{% endif %}
+{% elif _ai_use_ollama %}
           model: ollama_chat/{{ _ollama_model }}
           api_base: http://ollama.{{ inference_namespace }}.svc.cluster.local:11434
 {% elif ai_backend == 'external' and ai_external_provider == 'anthropic' %}
