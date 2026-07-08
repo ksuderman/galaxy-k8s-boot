@@ -36,6 +36,7 @@ AI_MASTER_KEY=${AI_MASTER_KEY:-""}
 # GiB reserved on the data disk so Galaxy does not claim the whole disk (leaves
 # room for the Ollama model cache and RabbitMQ). Empty -> launch_vm.sh default.
 NFS_RESERVE=${NFS_RESERVE:-""}
+MACHINE_TYPE=${MACHINE_TYPE:-""}
 
 DRY_RUN=""
 
@@ -87,7 +88,9 @@ function start() {
     else
     	echo "Launching ${SERVER}"
 	fi
-
+    if [[ -n $MACHINE_TYPE ]] ; then
+        LAUNCH_CMD+=(--machine-type $MACHINE_TYPE)
+    fi
 	if [[ -n $DEPS_CHART ]] ; then
 	    LAUNCH_CMD+=(--galaxy-deps-chart $DEPS_CHART)
 	fi

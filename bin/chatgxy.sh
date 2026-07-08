@@ -4,6 +4,8 @@
 CLOUD=chatgxy
 SERVER=ks-${CLOUD}-test
 
+MACHINE_TYPE="e2-standard-8"
+
 # Deploy the galaxy-min:dev image (mixins/dev.yml) because ChatGXY is only
 # available in Galaxy dev, not the released images.
 MIXINS=(dev multiuser admins logo)
