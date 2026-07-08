@@ -1,5 +1,9 @@
 # ChatGXY / GalaxyAI agent tuning for CPU-only self-hosted inference.
-#
+# The latest development build is needed for the latest GalaxyAI.
+image:
+  repository: quay.io/galaxyproject/galaxy-min
+  tag: "dev"
+
 # Small models served on CPU (e.g. qwen2.5:3b behind Ollama/LiteLLM) struggle to
 # emit the tool-call / JSON structured output the GalaxyAI agents expect. Left at
 # defaults, the router retries 3x on each failure -- each retry a fresh ~40-50s
@@ -16,6 +20,8 @@
 configs:
   galaxy.yml:
     galaxy:
+      logo_url: null
+      brand: GalaxyAI
       inference_services:
         default:
           # Parse plain-text responses instead of demanding structured/tool-call
