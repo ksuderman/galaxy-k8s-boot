@@ -8,7 +8,7 @@ MACHINE_TYPE="e2-standard-8"
 
 # Deploy the galaxy-min:dev image (mixins/dev.yml) because ChatGXY is only
 # available in Galaxy dev, not the released images.
-MIXINS=(dev multiuser admins logo)
+MIXINS=(dev multiuser admins logo chatgxy)
 
 # Enable ChatGXY with a self-hosted, CPU-only Ollama engine behind LiteLLM.
 # AI_MASTER_KEY is left unset so launch_vm.sh auto-generates one.
