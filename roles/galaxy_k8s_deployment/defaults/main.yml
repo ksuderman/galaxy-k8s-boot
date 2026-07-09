@@ -175,6 +175,9 @@ ollama_storage_size: "20Gi"
 ollama_memory_request: "6Gi"
 ollama_memory_limit: "10Gi"
 ollama_gpu_count: 1
+# NVIDIA device plugin (ollama-gpu only): advertises nvidia.com/gpu so the GPU
+# Ollama pod can be scheduled. Requires the host driver + toolkit (gpu_setup.yml).
+nvidia_device_plugin_image: "nvcr.io/nvidia/k8s-device-plugin:v0.17.1"
 
 # External provider (only used when ai_backend=external)
 ai_external_provider: "openai"        # openai | anthropic

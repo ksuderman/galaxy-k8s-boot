@@ -27,6 +27,29 @@
     kubeconfig: "{{ kubeconfig_path }}"
 
 # ----------------------------------------------------------------------------
+# GPU: NVIDIA device plugin (ollama-gpu only) so nvidia.com/gpu is schedulable
+# ----------------------------------------------------------------------------
+- name: Deploy NVIDIA device plugin
+  kubernetes.core.k8s:
+    template:
+      path: templates/nvidia-device-plugin.yaml.j2
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+  when: _ai_use_gpu | bool
+
+- name: Wait for the node to advertise nvidia.com/gpu
+  kubernetes.core.k8s_info:
+    kind: Node
+    kubeconfig: "{{ kubeconfig_path }}"
+  register: _gpu_nodes
+  until: >-
+    _gpu_nodes.resources | map(attribute='status.allocatable') |
+    select('contains', 'nvidia.com/gpu') | list | length > 0
+  retries: 30
+  delay: 10
+  when: _ai_use_gpu | bool
+
+# ----------------------------------------------------------------------------
 # Ollama self-hosted engine (ollama-cpu / ollama-gpu)
 # ----------------------------------------------------------------------------
 - name: Deploy Ollama engine

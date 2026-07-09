@@ -91,6 +91,9 @@ function start() {
     if [[ -n $MACHINE_TYPE ]] ; then
         LAUNCH_CMD+=(--machine-type $MACHINE_TYPE)
     fi
+    if [[ -n $ZONE ]] ; then
+        LAUNCH_CMD+=(--zone $ZONE)
+    fi
 	if [[ -n $DEPS_CHART ]] ; then
 	    LAUNCH_CMD+=(--galaxy-deps-chart $DEPS_CHART)
 	fi

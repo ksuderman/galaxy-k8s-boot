@@ -13,6 +13,11 @@ POSTGRES_DISK_SIZE="10GB"
 # whole disk. Leaves room for co-tenant PVCs on that disk (Ollama model cache,
 # RabbitMQ) plus filesystem overhead. galaxy_persistence_size = PV_SIZE - reserve.
 NFS_RESERVE="${NFS_RESERVE:-30}"
+# GPU accelerator attached when --ai-backend=ollama-gpu. T4 by default (fits
+# qwen2.5:7b, cheapest, available in us-east4-a/-b). NOTE: L4 uses g2-* machine
+# types and does NOT take --accelerator, so this path is for N1 + T4/V100/etc.
+GPU_TYPE="${GPU_TYPE:-nvidia-tesla-t4}"
+GPU_COUNT="${GPU_COUNT:-1}"
 DISK_TYPE="pd-balanced"
 GALAXY_CHART="cloudve/galaxy"
 GALAXY_CHART_VERSION="6.7.0"
@@ -589,6 +594,15 @@ GCLOUD_CMD=(
 if [ "$EPHEMERAL_ONLY" = false ]; then
     GCLOUD_CMD+=($DISK_FLAG)
     GCLOUD_CMD+=($POSTGRES_DISK_FLAG)
+fi
+
+# Attach a GPU for the self-hosted GPU inference backend. GPUs cannot live-migrate,
+# so the host maintenance policy must be TERMINATE. Requires a GPU-capable machine
+# type (e.g. n1-standard-8) and a zone with the accelerator (e.g. us-east4-a).
+if [ "$AI_BACKEND" = "ollama-gpu" ]; then
+    echo "ℹ GPU backend: attaching ${GPU_COUNT}x ${GPU_TYPE} (maintenance-policy=TERMINATE)"
+    GCLOUD_CMD+=(--accelerator="type=${GPU_TYPE},count=${GPU_COUNT}")
+    GCLOUD_CMD+=(--maintenance-policy=TERMINATE)
 fi
 
 # Execute the command
