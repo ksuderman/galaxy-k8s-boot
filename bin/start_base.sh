@@ -37,6 +37,8 @@ AI_MASTER_KEY=${AI_MASTER_KEY:-""}
 # room for the Ollama model cache and RabbitMQ). Empty -> launch_vm.sh default.
 NFS_RESERVE=${NFS_RESERVE:-""}
 MACHINE_TYPE=${MACHINE_TYPE:-""}
+# Override the base machine image (e.g. a GPU image with drivers baked in).
+MACHINE_IMAGE=${MACHINE_IMAGE:-""}
 
 DRY_RUN=""
 
@@ -93,6 +95,9 @@ function start() {
     fi
     if [[ -n $ZONE ]] ; then
         LAUNCH_CMD+=(--zone $ZONE)
+    fi
+    if [[ -n $MACHINE_IMAGE ]] ; then
+        LAUNCH_CMD+=(--machine-image $MACHINE_IMAGE)
     fi
 	if [[ -n $DEPS_CHART ]] ; then
 	    LAUNCH_CMD+=(--galaxy-deps-chart $DEPS_CHART)

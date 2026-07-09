@@ -1,14 +1,15 @@
 ---
-# GPU host setup (ai_backend=ollama-gpu). Installs the NVIDIA driver and the
-# NVIDIA container toolkit on the Debian 12 host BEFORE RKE2 starts, so RKE2
-# auto-detects the runtime and creates the `nvidia` RuntimeClass that the Ollama
-# pod requests via runtimeClassName.
+# GPU host verification (ai_backend=ollama-gpu). The NVIDIA driver + container
+# toolkit are baked into the GPU machine image (galaxy-k8s-boot-gpu-*, set via
+# MACHINE_IMAGE in bin/gpu.sh), so this task only confirms the GPU is usable --
+# it does NOT install the driver. Runs before rke2_setup so RKE2 detects the
+# nvidia-container-runtime and creates the `nvidia` RuntimeClass.
 #
-# NOTE: ansible-pull runs locally on this VM, so we cannot reboot mid-run (it
-# would kill the playbook). The driver must load via modprobe without a reboot;
-# on headless GCE Debian nouveau is normally not loaded, so this works. If the
-# nvidia-smi check fails, bake the driver into the machine image instead (the
-# planned optimization).
+# Installing the driver at boot on a stock image is unreliable: the base image's
+# kernel drifts behind the Debian repos, so the matching headers for the DKMS
+# build disappear, and ansible-pull cannot reboot into a newer kernel. Baking the
+# driver into the image (matched kernel + driver) sidesteps all of that. To
+# rebuild the image, see SESSION_NOTES.md / the gpu image bake procedure.
 
 - name: Detect NVIDIA GPU on the host
   ansible.builtin.shell: lspci | grep -i nvidia
@@ -24,93 +25,27 @@
       a GPU accelerator (e.g. nvidia-tesla-t4) in a GPU-capable zone (us-east4-a).
   when: _gpu_lspci.rc != 0
 
-- name: Get running kernel version
-  ansible.builtin.command: uname -r
-  register: _kernel
-  changed_when: false
-
-- name: Blacklist nouveau (prevents conflicts with the NVIDIA driver)
-  ansible.builtin.copy:
-    dest: /etc/modprobe.d/blacklist-nouveau.conf
-    content: |
-      blacklist nouveau
-      options nouveau modeset=0
-    mode: '0644'
-  become: true
-
-- name: Unload nouveau if currently loaded (best effort; no reboot under ansible-pull)
-  ansible.builtin.shell: "modprobe -r nouveau || true"
-  changed_when: false
-  become: true
-
-- name: Install kernel headers and build tooling (for the driver DKMS build)
-  ansible.builtin.apt:
-    name:
-      - "linux-headers-{{ _kernel.stdout }}"
-      - build-essential
-      - gcc
-      - dkms
-    update_cache: true
-  become: true
-
-- name: Add the NVIDIA CUDA repository keyring (Debian 12)
-  ansible.builtin.apt:
-    deb: https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/cuda-keyring_1.1-1_all.deb
-  become: true
-
-- name: Install the NVIDIA driver (cuda-drivers meta-package)
-  ansible.builtin.apt:
-    name: cuda-drivers
-    update_cache: true
-  become: true
-
-- name: Fetch the NVIDIA container toolkit repo key
-  ansible.builtin.get_url:
-    url: https://nvidia.github.io/libnvidia-container/gpgkey
-    dest: /tmp/nvidia-container-toolkit.gpgkey
-    mode: '0644'
-  become: true
-
-- name: Install the NVIDIA container toolkit repo key
-  ansible.builtin.shell: >-
-    gpg --yes --dearmor
-    -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-    /tmp/nvidia-container-toolkit.gpgkey
-  args:
-    creates: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-  become: true
-
-- name: Add the NVIDIA container toolkit apt repository
-  ansible.builtin.copy:
-    dest: /etc/apt/sources.list.d/nvidia-container-toolkit.list
-    content: >-
-      deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg]
-      https://nvidia.github.io/libnvidia-container/stable/deb/$(ARCH) /
-    mode: '0644'
-  become: true
-
-- name: Install nvidia-container-toolkit
-  ansible.builtin.apt:
-    name: nvidia-container-toolkit
-    update_cache: true
-  become: true
-
-- name: Load the NVIDIA kernel modules (no reboot available)
+- name: Ensure the NVIDIA kernel modules are loaded
   ansible.builtin.shell: "modprobe nvidia && modprobe nvidia_uvm"
   register: _modprobe
   failed_when: false
-  changed_when: true
-  become: true
-
-- name: Verify the GPU is visible to the host (nvidia-smi)
-  ansible.builtin.command: nvidia-smi
-  register: _smi
-  retries: 6
-  delay: 10
-  until: _smi.rc == 0
   changed_when: false
   become: true
 
+- name: Verify the GPU is visible (nvidia-smi) -- driver must be baked into the image
+  ansible.builtin.command: nvidia-smi
+  register: _smi
+  retries: 6
+  delay: 5
+  until: _smi.rc == 0
+  changed_when: false
+  become: true
+  failed_when: _smi.rc != 0
+
+- name: Verify the NVIDIA container runtime is present (for RKE2 auto-detect)
+  ansible.builtin.command: which nvidia-container-runtime
+  changed_when: false
+
 - name: Show detected GPU
   ansible.builtin.debug:
-    msg: "{{ _smi.stdout_lines | select('search', 'Tesla|NVIDIA|CUDA Version') | list }}"
+    msg: "{{ _smi.stdout_lines | select('search', 'Tesla|NVIDIA|Driver Version') | list }}"
