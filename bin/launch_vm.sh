@@ -440,7 +440,7 @@ runcmd:
       # Add to fstab for persistent mounting across reboots
       DISK_UUID=$(blkid -s UUID -o value "$DISK_DEVICE")
       if ! grep -q "$DISK_UUID" /etc/fstab; then
-        echo "UUID=$DISK_UUID /mnt/block_storage ext4 defaults 0 2" >> /etc/fstab
+        echo "UUID=$DISK_UUID /mnt/block_storage ext4 defaults,nofail 0 2" >> /etc/fstab
       fi
 
       # Set proper ownership (VM_USER injected below)
@@ -469,7 +469,7 @@ runcmd:
       # Add to fstab for persistent mounting across reboots
       POSTGRES_DISK_UUID=$(blkid -s UUID -o value "$POSTGRES_DISK_DEVICE")
       if ! grep -q "$POSTGRES_DISK_UUID" /etc/fstab; then
-        echo "UUID=$POSTGRES_DISK_UUID /mnt/postgres_storage ext4 defaults 0 2" >> /etc/fstab
+        echo "UUID=$POSTGRES_DISK_UUID /mnt/postgres_storage ext4 defaults,nofail 0 2" >> /etc/fstab
       fi
 
       # Set proper ownership (VM_USER injected below)

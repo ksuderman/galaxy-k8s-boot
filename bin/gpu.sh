@@ -14,7 +14,7 @@ MACHINE_TYPE="n1-standard-8"
 # GPU machine image with the NVIDIA driver (610, T4) + container toolkit baked in
 # (built from ks-gpu-test on 2026-07-08). Avoids a fragile ~10min driver install
 # at boot; gpu_setup.yml then only verifies the driver is present.
-MACHINE_IMAGE="galaxy-k8s-boot-gpu-debian12-v2026-07-08"
+MACHINE_IMAGE="galaxy-k8s-boot-gpu-debian12-v2026-07-09"
 
 # Self-hosted Ollama on a GPU behind LiteLLM, running qwen2.5:7b (ollama_model_gpu).
 # The playbook installs the NVIDIA driver + container toolkit at boot (gpu_setup)
