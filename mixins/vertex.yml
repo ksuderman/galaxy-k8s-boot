@@ -1,0 +1,36 @@
+# ChatGXY / GalaxyAI agent tuning for CPU-only self-hosted inference.
+# The latest development build is needed for the latest GalaxyAI.
+image:
+  repository: quay.io/galaxyproject/galaxy-min
+  tag: "dev"
+
+# Small models served on CPU (e.g. qwen2.5:3b behind Ollama/LiteLLM) struggle to
+# emit the tool-call / JSON structured output the GalaxyAI agents expect. Left at
+# defaults, the router retries 3x on each failure -- each retry a fresh ~40-50s
+# CPU inference -- then gives up with "AI service is currently unavailable"
+# ("Exceeded maximum output retries (3)").
+#
+# These knobs make ChatGXY usable (not fast) on a CPU backend. For real speed,
+# use a GPU backend (ai_backend=ollama-gpu); then structured output usually
+# succeeds first try and this tuning is unnecessary.
+#
+# The runtime ai_api_base_url / ai_model / ai_api_key are injected by the
+# playbook (they depend on the in-cluster LiteLLM service + generated key), so
+# this mixin only carries the static agent tuning.
+configs:
+  galaxy.yml:
+    galaxy:
+      logo_url: null
+      brand: Gemini
+      inference_services:
+        default:
+          # Parse plain-text responses instead of demanding structured/tool-call
+          # output the small CPU model can't reliably produce. Avoids the
+          # validation-retry death loop that returns the fallback message.
+          structured_output_override: false
+          # Fail fast instead of burning ~40-50s x 3 on doomed retries.
+          retries: 1
+        custom_tool:
+          # The custom-tool agent (code generation + its own reflection loop) is
+          # the most expensive; disable it to cut per-question fan-out.
+          enabled: false
