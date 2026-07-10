@@ -23,7 +23,7 @@ AI_BACKEND=ollama-gpu
 
 # ChatGXY/GalaxyAI dev image + branding + the CPU-oriented agent tuning (safe for
 # the 7b model too; relax later if qwen2.5:7b handles tool-calling well on GPU).
-MIXINS=(ai)
+MIXINS=(gpu)
 
 # Ollama's model cache shares the data disk (blockstorage); reserve headroom so
 # Galaxy does not claim the whole disk.

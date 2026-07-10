@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
 # The SERVER and CLOUD variables MUST BE set.
-CLOUD=ai
+CLOUD=cpu
 SERVER=ks-${CLOUD}-test
 
 MACHINE_TYPE="e2-standard-8"
 
 # Deploy the galaxy-min:dev image (mixins/dev.yml) because ChatGXY is only
 # available in Galaxy dev, not the released images.
-MIXINS=(ai)
+MIXINS=(cpu)
 
 # Enable ChatGXY with a self-hosted, CPU-only Ollama engine behind LiteLLM.
 # AI_MASTER_KEY is left unset so launch_vm.sh auto-generates one.
