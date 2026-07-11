@@ -33,6 +33,14 @@ VERSION=${VERSION:-""}
 # launch_vm.sh when left empty.
 AI_BACKEND=${AI_BACKEND:-""}
 AI_MASTER_KEY=${AI_MASTER_KEY:-""}
+# GPU selection for AI_BACKEND=ollama-gpu (see launch_vm.sh). GPU_TYPE is a GPU
+# model (t4|l4|a100|h100); GPU_CPUS is the desired vCPU count (rounded up to a valid
+# machine size); GPU_COUNT is the accelerator count (T4 only); GPU_MODEL overrides
+# the Ollama model. Empty -> launch_vm.sh defaults.
+GPU_TYPE=${GPU_TYPE:-""}
+GPU_CPUS=${GPU_CPUS:-""}
+GPU_COUNT=${GPU_COUNT:-""}
+GPU_MODEL=${GPU_MODEL:-""}
 # GiB reserved on the data disk so Galaxy does not claim the whole disk (leaves
 # room for the Ollama model cache and RabbitMQ). Empty -> launch_vm.sh default.
 NFS_RESERVE=${NFS_RESERVE:-""}
@@ -116,6 +124,18 @@ function start() {
 	fi
 	if [[ -n $AI_MASTER_KEY ]] ; then
 	    LAUNCH_CMD+=(--ai-master-key $AI_MASTER_KEY)
+	fi
+	if [[ -n $GPU_TYPE ]] ; then
+	    LAUNCH_CMD+=(--gpu-type $GPU_TYPE)
+	fi
+	if [[ -n $GPU_CPUS ]] ; then
+	    LAUNCH_CMD+=(--gpu-cpus $GPU_CPUS)
+	fi
+	if [[ -n $GPU_COUNT ]] ; then
+	    LAUNCH_CMD+=(--gpu-count $GPU_COUNT)
+	fi
+	if [[ -n $GPU_MODEL ]] ; then
+	    LAUNCH_CMD+=(--gpu-model $GPU_MODEL)
 	fi
 	if [[ -n $NFS_RESERVE ]] ; then
 	    LAUNCH_CMD+=(--nfs-reserve $NFS_RESERVE)

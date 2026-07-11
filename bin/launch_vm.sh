@@ -13,11 +13,25 @@ POSTGRES_DISK_SIZE="10GB"
 # whole disk. Leaves room for co-tenant PVCs on that disk (Ollama model cache,
 # RabbitMQ) plus filesystem overhead. galaxy_persistence_size = PV_SIZE - reserve.
 NFS_RESERVE="${NFS_RESERVE:-30}"
-# GPU accelerator attached when --ai-backend=ollama-gpu. T4 by default (fits
-# qwen2.5:7b, cheapest, available in us-east4-a/-b). NOTE: L4 uses g2-* machine
-# types and does NOT take --accelerator, so this path is for N1 + T4/V100/etc.
-GPU_TYPE="${GPU_TYPE:-nvidia-tesla-t4}"
-GPU_COUNT="${GPU_COUNT:-1}"
+# GPU selection for --ai-backend=ollama-gpu. The user asks for a GPU *model*
+# (--gpu-type) and a desired vCPU count (--gpu-cpus); the script picks the right
+# machine type and decides how the GPU is requested. Each GPU model lives in one
+# machine family, and the family dictates the mechanism:
+#   t4   -> N1 family, FLEXIBLE attach: n1-standard-<cpus> + --accelerator (count
+#           = --gpu-count). Cheapest, 16GB VRAM, fits qwen2.5:7b (us-east4-a/-b).
+#   l4   -> G2 family, BUNDLED:  g2-standard-<cpus>   (24GB VRAM, fits 14b).
+#   a100 -> A2 family, BUNDLED:  a2-highgpu-<n>g      (40GB VRAM).
+#   h100 -> A3 family, BUNDLED:  a3-highgpu-<n>g      (80GB VRAM).
+# BUNDLED families ship the GPU with the machine type and reject --accelerator;
+# --gpu-cpus is rounded up to the smallest valid size in the chosen family. GPUs
+# cannot live-migrate, so maintenance-policy is forced to TERMINATE in every case.
+GPU_TYPE="${GPU_TYPE:-t4}"        # t4 | l4 | a100 | h100
+GPU_CPUS="${GPU_CPUS:-8}"         # desired vCPUs; rounded up to a valid machine size
+GPU_COUNT="${GPU_COUNT:-1}"       # number of accelerators (T4/N1 flexible attach only)
+# Optional override of the GPU Ollama model (role default ollama_model_gpu, normally
+# qwen2.5:7b). Set via --gpu-model, e.g. qwen2.5:14b on an L4's 24GB of VRAM. Empty
+# leaves the role default untouched.
+GPU_MODEL="${GPU_MODEL:-}"
 DISK_TYPE="pd-balanced"
 GALAXY_CHART="cloudve/galaxy"
 GALAXY_CHART_VERSION="6.7.0"
@@ -27,6 +41,7 @@ GIT_BRANCH="master"
 GIT_REPO="https://github.com/galaxyproject/galaxy-k8s-boot.git"
 MACHINE_IMAGE="galaxy-k8s-boot-debian12-v2026-02-24"
 MACHINE_TYPE="e2-standard-4"
+MACHINE_TYPE_SET=false
 PROJECT="anvil-and-terra-development"
 VM_USER="debian"
 ZONE="us-east4-c"
@@ -91,6 +106,19 @@ Options:
                                     '-f mixins/dev.yml').
   --ai-master-key KEY               Key Galaxy presents to LiteLLM. Auto-generated
                                     when omitted and --ai-backend is not 'none'.
+  --gpu-type TYPE                   GPU model for --ai-backend ollama-gpu: t4, l4,
+                                    a100, h100 (default: $GPU_TYPE). Selects the
+                                    machine family and how the GPU is attached.
+  --gpu-cpus N                      Desired vCPUs for the GPU VM; rounded up to the
+                                    smallest valid machine size in the GPU's family
+                                    (default: $GPU_CPUS). Ignored if --machine-type
+                                    is given explicitly.
+  --gpu-count N                     Number of accelerators to attach (T4/N1 only;
+                                    other GPU types set the count by machine type)
+                                    (default: $GPU_COUNT).
+  --gpu-model MODEL                 Override the GPU Ollama model (role default
+                                    ollama_model_gpu, e.g. qwen2.5:14b on an L4).
+                                    Only meaningful with --ai-backend ollama-gpu.
   -h, --help, help                  Show this help message
 
 Examples:
@@ -168,6 +196,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -m|--machine-type)
             MACHINE_TYPE="$2"
+            MACHINE_TYPE_SET=true
             shift 2
             ;;
         -p|--project)
@@ -227,6 +256,22 @@ while [[ $# -gt 0 ]]; do
             AI_MASTER_KEY="$2"
             shift 2
             ;;
+        --gpu-type)
+            GPU_TYPE="$2"
+            shift 2
+            ;;
+        --gpu-cpus)
+            GPU_CPUS="$2"
+            shift 2
+            ;;
+        --gpu-count)
+            GPU_COUNT="$2"
+            shift 2
+            ;;
+        --gpu-model)
+            GPU_MODEL="$2"
+            shift 2
+            ;;
         -h|--help|help)
             usage
             exit 0
@@ -281,6 +326,63 @@ if [ "$AI_BACKEND" != "none" ] && [ -z "$AI_MASTER_KEY" ]; then
     AI_MASTER_KEY="sk-galaxy-$(openssl rand -hex 16)"
 fi
 
+# Resolve the GPU machine type and attach mechanism for the self-hosted GPU backend.
+# The user asks for a GPU model (--gpu-type) and a desired vCPU count (--gpu-cpus);
+# we pick the smallest machine in that GPU's family that meets the vCPU request (an
+# explicit --machine-type always wins). GPU_ACCELERATOR holds the --accelerator spec
+# for the flexible-attach families (T4/N1) and is empty for bundled families
+# (L4/A100/H100), which ship the GPU with the machine type.
+GPU_ACCELERATOR=""
+if [ "$AI_BACKEND" = "ollama-gpu" ]; then
+    # Round a desired vCPU count up to the smallest offered size in a family.
+    _gpu_round_up() {
+        local want="$1"; shift
+        local size
+        for size in "$@"; do
+            if [ "$want" -le "$size" ]; then echo "$size"; return; fi
+        done
+        echo "$size"   # nothing large enough: fall back to the largest offered size
+    }
+    case "$GPU_TYPE" in
+        t4)
+            # N1 flexible attach: a T4 rides on any n1-standard size.
+            [ "$MACHINE_TYPE_SET" = true ] || \
+                MACHINE_TYPE="n1-standard-$(_gpu_round_up "$GPU_CPUS" 1 2 4 8 16 32 64 96)"
+            GPU_ACCELERATOR="type=nvidia-tesla-t4,count=${GPU_COUNT}"
+            ;;
+        l4)
+            # G2 bundled: g2-standard-{4,8,12,16,24,32,48,96}.
+            [ "$MACHINE_TYPE_SET" = true ] || \
+                MACHINE_TYPE="g2-standard-$(_gpu_round_up "$GPU_CPUS" 4 8 12 16 24 32 48 96)"
+            ;;
+        a100)
+            # A2 bundled, sized by GPU count: 1g=12, 2g=24, 4g=48, 8g=96 vCPU.
+            if [ "$MACHINE_TYPE_SET" != true ]; then
+                if   [ "$GPU_CPUS" -le 12 ]; then MACHINE_TYPE="a2-highgpu-1g"
+                elif [ "$GPU_CPUS" -le 24 ]; then MACHINE_TYPE="a2-highgpu-2g"
+                elif [ "$GPU_CPUS" -le 48 ]; then MACHINE_TYPE="a2-highgpu-4g"
+                else                              MACHINE_TYPE="a2-highgpu-8g"
+                fi
+            fi
+            ;;
+        h100)
+            # A3 bundled, sized by GPU count: 1g=26, 2g=52, 4g=104, 8g=208 vCPU.
+            if [ "$MACHINE_TYPE_SET" != true ]; then
+                if   [ "$GPU_CPUS" -le 26 ];  then MACHINE_TYPE="a3-highgpu-1g"
+                elif [ "$GPU_CPUS" -le 52 ];  then MACHINE_TYPE="a3-highgpu-2g"
+                elif [ "$GPU_CPUS" -le 104 ]; then MACHINE_TYPE="a3-highgpu-4g"
+                else                               MACHINE_TYPE="a3-highgpu-8g"
+                fi
+            fi
+            ;;
+        *)
+            echo "Error: invalid --gpu-type '$GPU_TYPE' (expected: t4, l4, a100, h100)"
+            usage
+            exit 1
+            ;;
+    esac
+fi
+
 # Set default disk names if not provided
 if [ -z "$DISK_NAME" ]; then
     DISK_NAME="galaxy-data-$INSTANCE_NAME"
@@ -319,6 +421,10 @@ fi
 if [ "$AI_BACKEND" != "none" ]; then
     echo "ChatGXY Inference Backend: $AI_BACKEND"
     echo "LiteLLM Master Key: $AI_MASTER_KEY"
+    if [ "$AI_BACKEND" = "ollama-gpu" ]; then
+        echo "GPU: $GPU_TYPE (machine type $MACHINE_TYPE)"
+        [ -n "$GPU_MODEL" ] && echo "GPU Ollama Model: $GPU_MODEL"
+    fi
     echo "ℹ ChatGXY requires a Galaxy image that includes it (e.g. add '-f mixins/dev.yml')."
 fi
 
@@ -508,6 +614,7 @@ cat >> "$TEMP_USER_DATA" << EOF
     AI_BACKEND="${AI_BACKEND}"
     AI_MASTER_KEY="${AI_MASTER_KEY}"
     GALAXY_PROFILE_FILE="${GALAXY_PROFILE_FILE}"
+    OLLAMA_MODEL_GPU="${GPU_MODEL}"
 EOF
 
 cat >> "$TEMP_USER_DATA" << 'EOF'
@@ -532,6 +639,14 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     litellm_master_key="${AI_MASTER_KEY}"
     galaxy_import_profile_file="${GALAXY_PROFILE_FILE}"
     INVEOF
+
+    # Override the GPU Ollama model only when --gpu-model was given, so an empty
+    # value leaves the role default (ollama_model_gpu) untouched. Appended under the
+    # [all:vars] section (the last section in the inventory).
+    if [ -n "${OLLAMA_MODEL_GPU}" ]; then
+      echo "    ollama_model_gpu=\"${OLLAMA_MODEL_GPU}\"" >> /tmp/ansible-inventory/localhost
+      echo "[`date`] - GPU Ollama model override: ${OLLAMA_MODEL_GPU}"
+    fi
 
     echo "[`date`] - NFS storage size for Galaxy: ${PV_SIZE}"
     echo "[`date`] - Git Repository: ${GIT_REPO}"
@@ -596,13 +711,19 @@ if [ "$EPHEMERAL_ONLY" = false ]; then
     GCLOUD_CMD+=($POSTGRES_DISK_FLAG)
 fi
 
-# Attach a GPU for the self-hosted GPU inference backend. GPUs cannot live-migrate,
-# so the host maintenance policy must be TERMINATE. Requires a GPU-capable machine
-# type (e.g. n1-standard-8) and a zone with the accelerator (e.g. us-east4-a).
+# Attach the GPU for the self-hosted GPU inference backend. GPUs cannot live-migrate,
+# so the host maintenance policy must be TERMINATE in every case. The GPU machine type
+# and attach mechanism were resolved earlier from --gpu-type/--gpu-cpus: GPU_ACCELERATOR
+# is set for flexible-attach families (T4/N1) and empty for bundled families (L4/A100/
+# H100), which ship the GPU with the machine type and reject --accelerator.
 if [ "$AI_BACKEND" = "ollama-gpu" ]; then
-    echo "ℹ GPU backend: attaching ${GPU_COUNT}x ${GPU_TYPE} (maintenance-policy=TERMINATE)"
-    GCLOUD_CMD+=(--accelerator="type=${GPU_TYPE},count=${GPU_COUNT}")
     GCLOUD_CMD+=(--maintenance-policy=TERMINATE)
+    if [ -n "$GPU_ACCELERATOR" ]; then
+        echo "ℹ GPU backend: ${GPU_TYPE} on '$MACHINE_TYPE' via --accelerator=${GPU_ACCELERATOR} (maintenance-policy=TERMINATE)"
+        GCLOUD_CMD+=(--accelerator="$GPU_ACCELERATOR")
+    else
+        echo "ℹ GPU backend: ${GPU_TYPE} bundled with machine type '$MACHINE_TYPE' (maintenance-policy=TERMINATE)"
+    fi
 fi
 
 # Execute the command

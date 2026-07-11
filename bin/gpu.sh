@@ -4,12 +4,13 @@
 CLOUD=gpu
 SERVER=ks-${CLOUD}-test
 
-# GPU zone + machine. T4 lives in us-east4-a/-b (NOT the default us-east4-c).
-# n1-standard-8 (30GB) leaves host-RAM headroom for the full Galaxy stack while
-# the model runs in GPU VRAM. launch_vm.sh auto-attaches a T4 (GPU_TYPE default)
-# with maintenance-policy=TERMINATE because AI_BACKEND=ollama-gpu.
+# GPU zone + selection. T4 lives in us-east4-a/-b (NOT the default us-east4-c).
+# GPU_TYPE=t4 + GPU_CPUS=8 -> launch_vm.sh picks n1-standard-8 (30GB, host-RAM
+# headroom for the full Galaxy stack while the model runs in GPU VRAM) and attaches
+# a T4 with maintenance-policy=TERMINATE because AI_BACKEND=ollama-gpu.
 ZONE=us-east4-a
-MACHINE_TYPE="n1-standard-8"
+GPU_TYPE=t4
+GPU_CPUS=8
 
 # GPU machine image with the NVIDIA driver (610, T4) + container toolkit baked in
 # (built from ks-gpu-test on 2026-07-08). Avoids a fragile ~10min driver install

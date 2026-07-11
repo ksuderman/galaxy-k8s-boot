@@ -1,0 +1,69 @@
+# GalaxyAI configuration for the self-hosted L4 GPU backend (ai_backend=ollama-gpu
+# with --gpu-type l4): Ollama running qwen2.5:14b on an NVIDIA L4 behind LiteLLM.
+# The dev image is required for the latest GalaxyAI.
+image:
+  repository: quay.io/galaxyproject/galaxy-min
+  tag: "dev"
+
+# The 14b model on the L4's 24GB of VRAM reliably produces the tool-call / JSON
+# structured output the GalaxyAI agents expect, so the CPU band-aids are left
+# commented out below (structured_output_override, and disabling custom_tool) --
+# unlike mixins/cpu.yml, which needs them for the weaker CPU 3b model. Only a small
+# retry budget is kept.
+#
+# The runtime ai_api_base_url / ai_model / ai_api_key are injected by the
+# playbook (they depend on the in-cluster LiteLLM service + generated key), so
+# this mixin only carries the static agent tuning.
+configs:
+  galaxy.yml:
+    galaxy:
+      logo_url: null
+      brand: Ollama-L4
+      inference_services:
+        default:
+          # A capable 14b model does not need the plain-text fallback the small CPU
+          # model requires, so structured/tool-call output stays enabled.
+          # structured_output_override: false
+          # Fail fast instead of burning retries on the rare doomed request.
+          retries: 1
+        custom_tool:
+          # The custom-tool agent (code generation + its own reflection loop) is the
+          # most expensive; the 14b model handles it, so leave it enabled.
+          # enabled: false
+
+extraFileMappings:
+  /galaxy/server/static/welcome.html:
+    applyToWeb: true
+    applyToNginx: true
+    content: |
+      <!DOCTYPE html>
+      <html lang="en">
+          <head>
+              <meta charset="utf-8" />
+              <link rel="stylesheet" href="dist/base.css" type="text/css" />
+          </head>
+          <body class="m-0">
+              <div class="py-4">
+                  <div class="container">
+                      <div class="row mb-4">
+                          <div class="col-md-12">
+                              <h2>Welcome to Galaxy</h2>
+                              <p>
+                                  Galaxy is an interactive and workflow analysis
+                                  platform providing a graphical user interface
+                                  for computational tools. This is your own
+                                  Galaxy instance that you can customize and use
+                                  for your own research.
+                              </p>
+                              <h2>GalaxyAI</h2>
+                              <p>
+                                This Galaxy instance has been configured to route
+                                GalaxyAI to a self-hosted Ollama on an NVIDIA L4
+                                GPU behind LiteLLM, running qwen2.5:14b.
+                              </p>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </body>
+      </html>
