@@ -52,6 +52,11 @@ spec:
               value: "0.0.0.0"
             - name: OLLAMA_KEEP_ALIVE
               value: "24h"
+            # Default context window (Ollama's own default is only 4096, too small
+            # for the ~2-4k-token GalaxyAI agent prompts -> mid-generation context
+            # shift + runaway/looping output). See ollama_context_length in defaults.
+            - name: OLLAMA_CONTEXT_LENGTH
+              value: "{{ ollama_context_length }}"
           volumeMounts:
             - name: models
               mountPath: /root/.ollama

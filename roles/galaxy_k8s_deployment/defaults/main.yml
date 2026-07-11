@@ -175,6 +175,14 @@ ollama_storage_size: "20Gi"
 ollama_memory_request: "6Gi"
 ollama_memory_limit: "10Gi"
 ollama_gpu_count: 1
+# Default context window Ollama serves models with (OLLAMA_CONTEXT_LENGTH). Ollama's
+# built-in default is only 4096, but the GalaxyAI agent prompts run ~2-4k tokens; at
+# 4096 a request overflows mid-generation, triggering a context shift that discards
+# half the prompt and makes the model loop / over-generate. 16384 fits the prompt
+# plus a full reply with headroom for agent hand-offs. KV-cache cost for qwen2.5:14b
+# at 16k is ~3GB on top of ~9GB weights -- comfortable on an L4's 24GB (raise for
+# larger context, but watch VRAM on smaller GPUs).
+ollama_context_length: 16384
 # NVIDIA device plugin (ollama-gpu only): advertises nvidia.com/gpu so the GPU
 # Ollama pod can be scheduled. Requires the host driver + toolkit (gpu_setup.yml).
 nvidia_device_plugin_image: "nvcr.io/nvidia/k8s-device-plugin:v0.17.1"

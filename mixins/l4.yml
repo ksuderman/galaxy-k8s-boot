@@ -5,11 +5,21 @@ image:
   repository: quay.io/galaxyproject/galaxy-min
   tag: "dev"
 
-# The 14b model on the L4's 24GB of VRAM reliably produces the tool-call / JSON
-# structured output the GalaxyAI agents expect, so the CPU band-aids are left
-# commented out below (structured_output_override, and disabling custom_tool) --
-# unlike mixins/cpu.yml, which needs them for the weaker CPU 3b model. Only a small
-# retry budget is kept.
+# Unlike the CPU 3b, the qwen2.5:14b on the L4 does the GalaxyAI agents'
+# structured/tool-call output NATIVELY -- so the mixins/cpu.yml band-aids
+# (structured_output_override, disabling custom_tool) are intentionally NOT used
+# here: they break real tool-calling (the history/graph agent fails with
+# "Seed hda:... not found in graph") without fixing anything.
+#
+# The runaway over-generation seen during bring-up (router/history agents burning
+# 2.7k-3.2k+ tokens per call, minutes at ~24 tok/s, UI unresponsive) was NOT a
+# model-capability problem: it was Ollama's default 4096 context window overflowing
+# on the ~2-4k-token agent prompts, forcing a mid-generation context shift that
+# discarded half the prompt and made the model loop. The fix is the larger context
+# window -- ollama_context_length: 16384 in the role defaults (OLLAMA_CONTEXT_LENGTH
+# on the Ollama deployment) -- NOT any agent-output tuning. Verified: with 16k
+# context and structured output ON, a real query routed + ran tool-using agents to a
+# 200 answer in ~36s.
 #
 # The runtime ai_api_base_url / ai_model / ai_api_key are injected by the
 # playbook (they depend on the in-cluster LiteLLM service + generated key), so
@@ -21,15 +31,9 @@ configs:
       brand: Ollama-L4
       inference_services:
         default:
-          # A capable 14b model does not need the plain-text fallback the small CPU
-          # model requires, so structured/tool-call output stays enabled.
-          # structured_output_override: false
-          # Fail fast instead of burning retries on the rare doomed request.
+          # Fail fast on the rare doomed request rather than burning the full retry
+          # budget; structured output normally succeeds first try on the 14b.
           retries: 1
-        custom_tool:
-          # The custom-tool agent (code generation + its own reflection loop) is the
-          # most expensive; the 14b model handles it, so leave it enabled.
-          # enabled: false
 
 extraFileMappings:
   /galaxy/server/static/welcome.html:
