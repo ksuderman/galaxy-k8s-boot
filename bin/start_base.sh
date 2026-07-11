@@ -41,6 +41,12 @@ GPU_TYPE=${GPU_TYPE:-""}
 GPU_CPUS=${GPU_CPUS:-""}
 GPU_COUNT=${GPU_COUNT:-""}
 GPU_MODEL=${GPU_MODEL:-""}
+# HTTPS at a hostname: GALAXY_HOSTNAME serves Galaxy over TLS (Let's Encrypt),
+# ADDRESS attaches a reserved static IP so the public IP matches the DNS record,
+# ACME_EMAIL is the Let's Encrypt account email. Empty -> launch_vm.sh defaults.
+GALAXY_HOSTNAME=${GALAXY_HOSTNAME:-""}
+ADDRESS=${ADDRESS:-""}
+ACME_EMAIL=${ACME_EMAIL:-""}
 # GiB reserved on the data disk so Galaxy does not claim the whole disk (leaves
 # room for the Ollama model cache and RabbitMQ). Empty -> launch_vm.sh default.
 NFS_RESERVE=${NFS_RESERVE:-""}
@@ -136,6 +142,15 @@ function start() {
 	fi
 	if [[ -n $GPU_MODEL ]] ; then
 	    LAUNCH_CMD+=(--gpu-model $GPU_MODEL)
+	fi
+	if [[ -n $GALAXY_HOSTNAME ]] ; then
+	    LAUNCH_CMD+=(--hostname $GALAXY_HOSTNAME)
+	fi
+	if [[ -n $ADDRESS ]] ; then
+	    LAUNCH_CMD+=(--address $ADDRESS)
+	fi
+	if [[ -n $ACME_EMAIL ]] ; then
+	    LAUNCH_CMD+=(--acme-email $ACME_EMAIL)
 	fi
 	if [[ -n $NFS_RESERVE ]] ; then
 	    LAUNCH_CMD+=(--nfs-reserve $NFS_RESERVE)

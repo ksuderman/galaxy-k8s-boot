@@ -48,6 +48,13 @@ ZONE="us-east4-c"
 RESTORE_GALAXY=false
 AI_BACKEND="none"
 AI_MASTER_KEY=""
+# HTTPS: when GALAXY_HOSTNAME is set, Galaxy is served over TLS at that FQDN via a
+# Let's Encrypt cert (cert-manager). ADDRESS attaches a reserved GCP static IP (name
+# or IP) so the VM's public IP matches the hostname's DNS record. ACME_EMAIL is the
+# Let's Encrypt account email (required when a hostname is set).
+GALAXY_HOSTNAME=""
+ADDRESS=""
+ACME_EMAIL=""
 PROFILE=""
 PROFILE_SET=false
 
@@ -119,6 +126,16 @@ Options:
   --gpu-model MODEL                 Override the GPU Ollama model (role default
                                     ollama_model_gpu, e.g. qwen2.5:14b on an L4).
                                     Only meaningful with --ai-backend ollama-gpu.
+  --hostname FQDN                   Serve Galaxy over HTTPS at this hostname. Issues a
+                                    Let's Encrypt cert via cert-manager (HTTP-01), so
+                                    the FQDN's DNS must resolve to the VM's public IP
+                                    and ports 80/443 must be open. Requires --acme-email.
+                                    Pair with --address for a stable IP.
+  --address NAME|IP                 Attach a reserved GCP static external IP (address
+                                    name or IP) instead of an ephemeral one. Must be in
+                                    the same region as --zone.
+  --acme-email EMAIL                Let's Encrypt account email (expiry/renewal
+                                    notices). Required with --hostname.
   -h, --help, help                  Show this help message
 
 Examples:
@@ -272,6 +289,18 @@ while [[ $# -gt 0 ]]; do
             GPU_MODEL="$2"
             shift 2
             ;;
+        --hostname)
+            GALAXY_HOSTNAME="$2"
+            shift 2
+            ;;
+        --address)
+            ADDRESS="$2"
+            shift 2
+            ;;
+        --acme-email)
+            ACME_EMAIL="$2"
+            shift 2
+            ;;
         -h|--help|help)
             usage
             exit 0
@@ -383,6 +412,13 @@ if [ "$AI_BACKEND" = "ollama-gpu" ]; then
     esac
 fi
 
+# HTTPS requires an ACME account email for the Let's Encrypt certificate.
+if [ -n "$GALAXY_HOSTNAME" ] && [ -z "$ACME_EMAIL" ]; then
+    echo "Error: --hostname '$GALAXY_HOSTNAME' requires --acme-email (Let's Encrypt account email)"
+    usage
+    exit 1
+fi
+
 # Set default disk names if not provided
 if [ -z "$DISK_NAME" ]; then
     DISK_NAME="galaxy-data-$INSTANCE_NAME"
@@ -426,6 +462,14 @@ if [ "$AI_BACKEND" != "none" ]; then
         [ -n "$GPU_MODEL" ] && echo "GPU Ollama Model: $GPU_MODEL"
     fi
     echo "ℹ ChatGXY requires a Galaxy image that includes it (e.g. add '-f mixins/dev.yml')."
+fi
+
+if [ -n "$ADDRESS" ]; then
+    echo "Static IP: $ADDRESS"
+fi
+if [ -n "$GALAXY_HOSTNAME" ]; then
+    echo "HTTPS Hostname: $GALAXY_HOSTNAME (Let's Encrypt, ACME email $ACME_EMAIL)"
+    echo "ℹ Ensure DNS for $GALAXY_HOSTNAME resolves to the VM's public IP and 80/443 are open."
 fi
 
 if [ "$EPHEMERAL_ONLY" = false ]; then
@@ -615,9 +659,18 @@ cat >> "$TEMP_USER_DATA" << EOF
     AI_MASTER_KEY="${AI_MASTER_KEY}"
     GALAXY_PROFILE_FILE="${GALAXY_PROFILE_FILE}"
     OLLAMA_MODEL_GPU="${GPU_MODEL}"
+    GALAXY_HOSTNAME="${GALAXY_HOSTNAME}"
+    ACME_EMAIL="${ACME_EMAIL}"
 EOF
 
 cat >> "$TEMP_USER_DATA" << 'EOF'
+
+    # Include the HTTPS hostname in the RKE2 API cert SANs when one is set.
+    if [ -n "${GALAXY_HOSTNAME}" ]; then
+      RKE2_SANS="[\"${HOST_IP}\",\"${GALAXY_HOSTNAME}\"]"
+    else
+      RKE2_SANS="[\"${HOST_IP}\"]"
+    fi
 
     mkdir -p /tmp/ansible-inventory
     cat > /tmp/ansible-inventory/localhost << INVEOF
@@ -627,7 +680,7 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     [all:vars]
     ansible_user="PLACEHOLDER_VM_USER"
     rke2_token="defaultSecret12345"
-    rke2_additional_sans=["${HOST_IP}"]
+    rke2_additional_sans=${RKE2_SANS}
     rke2_debug=true
     nfs_size="${PV_SIZE}"
     galaxy_persistence_size="${GALAXY_PERSISTENCE_SIZE}"
@@ -638,6 +691,8 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     ai_backend="${AI_BACKEND}"
     litellm_master_key="${AI_MASTER_KEY}"
     galaxy_import_profile_file="${GALAXY_PROFILE_FILE}"
+    galaxy_hostname="${GALAXY_HOSTNAME}"
+    acme_email="${ACME_EMAIL}"
     INVEOF
 
     # Override the GPU Ollama model only when --gpu-model was given, so an empty
@@ -709,6 +764,13 @@ GCLOUD_CMD=(
 if [ "$EPHEMERAL_ONLY" = false ]; then
     GCLOUD_CMD+=($DISK_FLAG)
     GCLOUD_CMD+=($POSTGRES_DISK_FLAG)
+fi
+
+# Attach a reserved static external IP so the VM's public IP matches the hostname's
+# DNS record (required for HTTPS). Accepts an address name or a literal IP; a named
+# regional address must be in the same region as --zone.
+if [ -n "$ADDRESS" ]; then
+    GCLOUD_CMD+=(--address="$ADDRESS")
 fi
 
 # Attach the GPU for the self-hosted GPU inference backend. GPUs cannot live-migrate,

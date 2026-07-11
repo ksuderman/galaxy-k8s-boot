@@ -281,7 +281,7 @@
     kubeconfig: "{{ kubeconfig_path }}"
     update_repo_cache: true
     values_files: "{{ lookup('sequence', 'start=0 end=' ~ (_galaxy_values_files|length - 1) ~ ' format=/tmp/galaxy_values_%d.yml', wantlist=True) }}"
-    values: "{{ _helm_values_base | combine(_helm_values_gcp_batch if (enable_gcp_batch | default(false) | bool) else {}, recursive=True) | combine(_helm_values_cnpg_plugin if (restore_galaxy and detected_galaxy_pvc_uuid | default('') != '') else {}, recursive=True) | combine(_helm_values_ai if (ai_backend | default('none') != 'none') else {}, recursive=True) }}"
+    values: "{{ _helm_values_base | combine(_helm_values_gcp_batch if (enable_gcp_batch | default(false) | bool) else {}, recursive=True) | combine(_helm_values_cnpg_plugin if (restore_galaxy and detected_galaxy_pvc_uuid | default('') != '') else {}, recursive=True) | combine(_helm_values_ai if (ai_backend | default('none') != 'none') else {}, recursive=True) | combine(_helm_values_tls if (galaxy_hostname | default('') | length > 0) else {}, recursive=True) }}"
     set_values: "{{ galaxy_helm_extra_sets | default([]) + _helm_prefix_sets }}"
   register: _galaxy_helm_install
   # The cloudve galaxy chart is fetched from raw.githubusercontent.com, which
@@ -323,6 +323,26 @@
             ai_api_base_url: "http://litellm.{{ inference_namespace }}.svc.cluster.local:{{ litellm_port }}/v1"
             ai_model: "{{ ai_model_name }}"
             ai_api_key: "{{ litellm_master_key }}"
+    # HTTPS at galaxy_hostname: point the Galaxy ingress at the FQDN with a TLS
+    # block (cert-manager fills tls_secret_name via the letsencrypt ClusterIssuer),
+    # and tell Galaxy its public https URL so it builds correct absolute links.
+    _helm_values_tls:
+      ingress:
+        ingressClassName: nginx
+        annotations:
+          cert-manager.io/cluster-issuer: "{{ letsencrypt_issuer_name }}"
+        hosts:
+          - host: "{{ galaxy_hostname }}"
+            paths:
+              - path: "{{ galaxy_prefix }}"
+        tls:
+          - hosts:
+              - "{{ galaxy_hostname }}"
+            secretName: "{{ tls_secret_name }}"
+      configs:
+        galaxy.yml:
+          galaxy:
+            galaxy_infrastructure_url: "https://{{ galaxy_hostname }}"
     _helm_values_cnpg_plugin:
       postgresql:
         cluster:
