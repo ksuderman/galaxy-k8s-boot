@@ -179,6 +179,13 @@ litellm_port: 4000
 # SECRET: the key Galaxy presents to LiteLLM. Override at launch
 # (e.g. -e litellm_master_key=sk-...) rather than committing a real value.
 litellm_master_key: "sk-galaxy-litellm-changeme"
+# Publish LiteLLM's OpenAI-compatible API externally so desktop clients (e.g. Orbit)
+# can use this instance's self-hosted inference. Off by default: this exposes an LLM
+# endpoint on the public internet, protected only by litellm_master_key (bearer). It
+# is served under litellm_path on galaxy_hostname, reusing the Galaxy TLS cert, so it
+# REQUIRES galaxy_hostname (HTTPS). Clients set base URL https://<host><litellm_path>/v1.
+expose_litellm: false
+litellm_path: "/llm"
 
 # Ollama (self-hosted engine for ollama-cpu / ollama-gpu)
 ollama_image: "ollama/ollama:latest"

@@ -70,6 +70,18 @@
     state: present
     kubeconfig: "{{ kubeconfig_path }}"
 
+# Optionally publish LiteLLM externally (under litellm_path on galaxy_hostname,
+# reusing the Galaxy TLS cert) for OpenAI-compatible desktop clients like Orbit.
+- name: Expose LiteLLM over the HTTPS ingress
+  kubernetes.core.k8s:
+    template:
+      path: templates/litellm_ingress.yaml.j2
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+  when:
+    - expose_litellm | default(false) | bool
+    - galaxy_hostname | default('') | length > 0
+
 # ----------------------------------------------------------------------------
 # Pull the Ollama model and wait for it to be ready
 # ----------------------------------------------------------------------------

@@ -47,6 +47,9 @@ GPU_MODEL=${GPU_MODEL:-""}
 GALAXY_HOSTNAME=${GALAXY_HOSTNAME:-""}
 ADDRESS=${ADDRESS:-""}
 ACME_EMAIL=${ACME_EMAIL:-""}
+# Publish LiteLLM's OpenAI-compatible API at https://<hostname>/llm/v1 (for Orbit).
+# Requires GALAXY_HOSTNAME. Set to "true" to enable.
+EXPOSE_LITELLM=${EXPOSE_LITELLM:-false}
 # GiB reserved on the data disk so Galaxy does not claim the whole disk (leaves
 # room for the Ollama model cache and RabbitMQ). Empty -> launch_vm.sh default.
 NFS_RESERVE=${NFS_RESERVE:-""}
@@ -151,6 +154,9 @@ function start() {
 	fi
 	if [[ -n $ACME_EMAIL ]] ; then
 	    LAUNCH_CMD+=(--acme-email $ACME_EMAIL)
+	fi
+	if [[ $EXPOSE_LITELLM == true ]] ; then
+	    LAUNCH_CMD+=(--expose-litellm)
 	fi
 	if [[ -n $NFS_RESERVE ]] ; then
 	    LAUNCH_CMD+=(--nfs-reserve $NFS_RESERVE)

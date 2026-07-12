@@ -55,6 +55,9 @@ AI_MASTER_KEY=""
 GALAXY_HOSTNAME=""
 ADDRESS=""
 ACME_EMAIL=""
+# Publish LiteLLM's OpenAI-compatible API under /llm on the HTTPS host (for Orbit and
+# other OpenAI-compatible clients). Requires --hostname. Off by default.
+EXPOSE_LITELLM=false
 PROFILE=""
 PROFILE_SET=false
 
@@ -136,6 +139,10 @@ Options:
                                     the same region as --zone.
   --acme-email EMAIL                Let's Encrypt account email (expiry/renewal
                                     notices). Required with --hostname.
+  --expose-litellm                  Publish LiteLLM's OpenAI-compatible API at
+                                    https://<hostname>/llm/v1 (for Orbit and other
+                                    OpenAI-compatible clients). Requires --hostname;
+                                    the endpoint is protected by the LiteLLM key.
   -h, --help, help                  Show this help message
 
 Examples:
@@ -301,6 +308,10 @@ while [[ $# -gt 0 ]]; do
             ACME_EMAIL="$2"
             shift 2
             ;;
+        --expose-litellm)
+            EXPOSE_LITELLM=true
+            shift
+            ;;
         -h|--help|help)
             usage
             exit 0
@@ -419,6 +430,13 @@ if [ -n "$GALAXY_HOSTNAME" ] && [ -z "$ACME_EMAIL" ]; then
     exit 1
 fi
 
+# Exposing LiteLLM reuses the HTTPS host + cert, so it requires a hostname.
+if [ "$EXPOSE_LITELLM" = true ] && [ -z "$GALAXY_HOSTNAME" ]; then
+    echo "Error: --expose-litellm requires --hostname (it is served over HTTPS on that host)"
+    usage
+    exit 1
+fi
+
 # Set default disk names if not provided
 if [ -z "$DISK_NAME" ]; then
     DISK_NAME="galaxy-data-$INSTANCE_NAME"
@@ -470,6 +488,9 @@ fi
 if [ -n "$GALAXY_HOSTNAME" ]; then
     echo "HTTPS Hostname: $GALAXY_HOSTNAME (Let's Encrypt, ACME email $ACME_EMAIL)"
     echo "ℹ Ensure DNS for $GALAXY_HOSTNAME resolves to the VM's public IP and 80/443 are open."
+    if [ "$EXPOSE_LITELLM" = true ]; then
+        echo "LiteLLM exposed at: https://$GALAXY_HOSTNAME/llm/v1 (OpenAI-compatible; bearer = LiteLLM key)"
+    fi
 fi
 
 if [ "$EPHEMERAL_ONLY" = false ]; then
@@ -661,6 +682,7 @@ cat >> "$TEMP_USER_DATA" << EOF
     OLLAMA_MODEL_GPU="${GPU_MODEL}"
     GALAXY_HOSTNAME="${GALAXY_HOSTNAME}"
     ACME_EMAIL="${ACME_EMAIL}"
+    EXPOSE_LITELLM="${EXPOSE_LITELLM}"
 EOF
 
 cat >> "$TEMP_USER_DATA" << 'EOF'
@@ -693,6 +715,7 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     galaxy_import_profile_file="${GALAXY_PROFILE_FILE}"
     galaxy_hostname="${GALAXY_HOSTNAME}"
     acme_email="${ACME_EMAIL}"
+    expose_litellm=${EXPOSE_LITELLM}
     INVEOF
 
     # Override the GPU Ollama model only when --gpu-model was given, so an empty

@@ -1,0 +1,43 @@
+# Optional public ingress for LiteLLM's OpenAI-compatible API, so external clients
+# (e.g. the Orbit desktop app) can use this instance's self-hosted inference.
+# Created only when expose_litellm is true AND galaxy_hostname is set (see
+# inference_server.yml). Served under litellm_path on the Galaxy hostname, reusing
+# the Galaxy TLS cert (tls_secret_name, provisioned by the Galaxy ingress) — no
+# extra DNS record or certificate. Protected only by the LiteLLM master key, so the
+# client must send `Authorization: Bearer <litellm_master_key>`.
+#
+# Path rewrite: a request to  https://<host><litellm_path>/v1/chat/completions
+# is rewritten to  /v1/chat/completions  on the litellm service. Clients therefore
+# set their OpenAI base URL to  https://<host><litellm_path>/v1.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: litellm
+  namespace: {{ inference_namespace }}
+  labels:
+    app: litellm
+    app.kubernetes.io/part-of: chatgxy
+  annotations:
+    # Strip the litellm_path prefix before proxying to the service.
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    # LLM responses stream and can run long; give them room and don't buffer SSE.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - {{ galaxy_hostname }}
+      secretName: {{ tls_secret_name }}
+  rules:
+    - host: {{ galaxy_hostname }}
+      http:
+        paths:
+          - path: {{ litellm_path }}(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: litellm
+                port:
+                  number: {{ litellm_port }}
