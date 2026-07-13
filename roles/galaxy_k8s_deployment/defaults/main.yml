@@ -222,12 +222,14 @@ ai_external_api_key: ""               # SECRET: provider API key
 # Credentials over the GCE metadata server) -- no API key. The default compute
 # SA's Editor role already covers Vertex AI predict.
 #
-# Configured for Gemini for Government (GFG): pick any GA Gemini model, and the
-# location is the US multi-region ("us"), which Assured Workloads' data-residency
-# policy enforces for GFG (FedRAMP High / IL4). Change vertex_model to select a
-# different model (e.g. gemini-2.5-pro).
+# Pick any GA Gemini model (change vertex_model, e.g. gemini-2.5-pro).
+# vertex_location defaults to a commercial Vertex region (us-central1, US data) so
+# it works on a normal project. For ACTUAL Gemini for Government (GFG), set it to the
+# US multi-region "us" -- Assured Workloads' data-residency policy enforces "us" for
+# GFG (FedRAMP High / IL4). NOTE: "us" 404s on a commercial project (Gemini is not
+# served at the multi-region endpoint there), so only use it with a GFG/AW project.
 vertex_model: "gemini-2.5-flash"
-vertex_location: "us"
+vertex_location: "us-central1"
 # GFG REQUIREMENT: for actual Gemini-for-Government (not commercial Vertex), set
 # this to a project INSIDE an Assured Workloads folder (Data Boundary for FedRAMP
 # High or IL4), and run the VM / its service account in that same project. Left
