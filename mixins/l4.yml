@@ -1,11 +1,11 @@
 # GalaxyAI configuration for the self-hosted L4 GPU backend (ai_backend=ollama-gpu
-# with --gpu-type l4): Ollama running qwen2.5:14b on an NVIDIA L4 behind LiteLLM.
+# with --gpu-type l4): Ollama running mistral-small:24b on an NVIDIA L4 behind LiteLLM.
 # The dev image is required for the latest GalaxyAI.
 image:
   repository: quay.io/galaxyproject/galaxy-min
   tag: "dev"
 
-# Unlike the CPU 3b, the qwen2.5:14b on the L4 does the GalaxyAI agents'
+# Unlike the CPU 3b, the mistral-small:24b on the L4 does the GalaxyAI agents'
 # structured/tool-call output NATIVELY -- so the mixins/cpu.yml band-aids
 # (structured_output_override, disabling custom_tool) are intentionally NOT used
 # here: they break real tool-calling (the history/graph agent fails with
@@ -32,7 +32,7 @@ configs:
       inference_services:
         default:
           # Fail fast on the rare doomed request rather than burning the full retry
-          # budget; structured output normally succeeds first try on the 14b.
+          # budget; structured output normally succeeds first try on the 24b.
           retries: 1
 
 extraFileMappings:
@@ -63,7 +63,7 @@ extraFileMappings:
                               <p>
                                 This Galaxy instance has been configured to route
                                 GalaxyAI to a self-hosted Ollama on an NVIDIA L4
-                                GPU behind LiteLLM, running qwen2.5:14b.
+                                GPU behind LiteLLM, running mistral-small:24b.
                               </p>
                           </div>
                       </div>
