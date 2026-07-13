@@ -1,6 +1,8 @@
-# GalaxyAI configuration for the Google Vertex AI (Gemini) backend
-# (ai_backend=vertex): LiteLLM routes to gemini-2.5-flash; no local model runs.
-# The dev image is required for the latest GalaxyAI.
+# GalaxyAI configuration for the Gemini for Government (GFG) backend
+# (ai_backend=vertex): LiteLLM routes to a GFG Gemini model on Vertex AI in an
+# Assured Workloads project (US multi-region); no local model runs. Model +
+# location + project come from the role defaults (vertex_model / vertex_location /
+# vertex_project). The dev image is required for the latest GalaxyAI.
 image:
   repository: quay.io/galaxyproject/galaxy-min
   tag: "dev"
@@ -17,7 +19,7 @@ configs:
   galaxy.yml:
     galaxy:
       logo_url: null
-      brand: Vertex
+      brand: Gemini-Gov
       inference_services:
         default:
           # Parse plain-text responses instead of demanding structured/tool-call
@@ -56,9 +58,9 @@ extraFileMappings:
                               </p>
                               <h2>GalaxyAI</h2>
                               <p>
-                                This Galaxy instance has been configure to route 
-                                GalaxyAI to Google Vertex AI (Gemini) via the 
-                                LiteLLM front door.
+                                This Galaxy instance has been configured to route
+                                GalaxyAI to Gemini for Government (Vertex AI, in an
+                                Assured Workloads project) via the LiteLLM front door.
                               </p>
                           </div>
                       </div>

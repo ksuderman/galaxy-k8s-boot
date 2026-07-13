@@ -221,9 +221,18 @@ ai_external_api_key: ""               # SECRET: provider API key
 # LiteLLM authenticates via the VM service account (Application Default
 # Credentials over the GCE metadata server) -- no API key. The default compute
 # SA's Editor role already covers Vertex AI predict.
+#
+# Configured for Gemini for Government (GFG): pick any GA Gemini model, and the
+# location is the US multi-region ("us"), which Assured Workloads' data-residency
+# policy enforces for GFG (FedRAMP High / IL4). Change vertex_model to select a
+# different model (e.g. gemini-2.5-pro).
 vertex_model: "gemini-2.5-flash"
-vertex_location: "us-central1"
-# Leave empty to let LiteLLM infer the project from the VM's credentials.
+vertex_location: "us"
+# GFG REQUIREMENT: for actual Gemini-for-Government (not commercial Vertex), set
+# this to a project INSIDE an Assured Workloads folder (Data Boundary for FedRAMP
+# High or IL4), and run the VM / its service account in that same project. Left
+# empty, LiteLLM infers the project from the VM's credentials -- which on a
+# commercial project is the COMMERCIAL Vertex endpoint, NOT GFG.
 vertex_project: ""
 # gemini-2.5-flash is a "thinking" model that spends tokens on internal reasoning;
 # with a tight max_tokens it can return empty output. Disabling reasoning keeps
