@@ -172,9 +172,11 @@ function start() {
 	    done
 	fi
 	"${LAUNCH_CMD[@]}"
-#	  -f mixins/local.yml \
-#	  -f mixins/v26.1.yml
 
+    if [[ -n $AI_MASTER_KEY ]] ; then
+        echo "The AI master key is: ${AI_MASTER_KEY}"
+        echo $AI_MASTER_KEY > ~/.secret/${CLOUD}-ai-master-key.txt
+    fi
 }
 
 function stop() {
@@ -183,6 +185,9 @@ function stop() {
 	for disk in $(gcloud compute disks list --filter="name~.*${SERVER}.*" --format='value(name)') ; do
 		gcloud compute disks delete $disk --zone $ZONE --quiet
 	done
+	if [[ -e ~/.secret/${CLOUD}-ai-master-key.txt ]] ; then
+	    rm ~/.secret/${CLOUD}-ai-master-key.txt
+	fi
 }
 
 function main() {
