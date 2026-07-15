@@ -1,4 +1,4 @@
 configs:
   galaxy.yml:
     galaxy:
-      admin_users: default-user@galaxyproject.org,suderman@jhu.edu,michael.schatz@gmail.com,afgane@gmail.com
+      admin_users: default-user@galaxyproject.org,suderman@jhu.edu,michael.schatz@gmail.com,afgane@gmail.com,dannon.baker@gmail.com
