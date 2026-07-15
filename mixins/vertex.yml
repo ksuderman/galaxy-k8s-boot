@@ -19,7 +19,7 @@ configs:
   galaxy.yml:
     galaxy:
       logo_url: null
-      brand: Gemini-Gov
+      brand: Gemini
       inference_services:
         default:
           # Parse plain-text responses instead of demanding structured/tool-call
