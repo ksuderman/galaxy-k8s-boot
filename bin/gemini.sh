@@ -13,7 +13,7 @@ MACHINE_TYPE="e2-standard-4"
 # (structured_output_override:false, custom_tool off) is unnecessary on Gemini --
 # which handles structured/tool-call output natively -- but it is harmless. Drop
 # it later if you want Gemini to use full tool-calling.
-MIXINS=(multiuser admins vertex)
+MIXINS=(multiuser admins gemini postinstall-ks)
 
 # Route GalaxyAI to Google Vertex AI (Gemini) via the LiteLLM front door. LiteLLM
 # authenticates with the VM service account (Application Default Credentials over
