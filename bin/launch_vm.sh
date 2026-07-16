@@ -62,6 +62,9 @@ ACME_EMAIL=""
 # Publish LiteLLM's OpenAI-compatible API under /llm on the HTTPS host (for Orbit and
 # other OpenAI-compatible clients). Requires --hostname. Off by default.
 EXPOSE_LITELLM=false
+# Provision the VM as a Spot (preemptible) instance: ~60-91% cheaper, but GCP can
+# reclaim it at any time. Requires maintenance-policy=TERMINATE. Off by default.
+SPOT="${SPOT:-false}"
 PROFILE=""
 PROFILE_SET=false
 
@@ -87,6 +90,9 @@ Options:
   -b, --git-branch BRANCH           Git branch to deploy (default: $GIT_BRANCH)
   -d, --disk-name DISK_NAME         Name of NFS persistent disk (default: galaxy-data-INSTANCE_NAME)
       --dry-run                     Saves the cloud-init user data and exits
+      --spot                        Provision a Spot (preemptible) VM: ~60-91% cheaper
+                                    but reclaimable by GCP at any time (uses separate
+                                    PREEMPTIBLE_* quota; forces maintenance-policy=TERMINATE)
   -e, --ephemeral-only              Create VM without persistent disk
   -f, --values FILE                 Helm values file (can be specified multiple times, default: values/values.yml)
   -i, --machine-image IMAGE         Machine image name (default: $MACHINE_IMAGE)
@@ -201,6 +207,10 @@ while [[ $# -gt 0 ]]; do
         	DRY_RUN="yes"
         	shift
         	;;
+        --spot)
+            SPOT=true
+            shift
+            ;;
         -e|--ephemeral-only)
             EPHEMERAL_ONLY=true
             shift
@@ -826,6 +836,19 @@ if [ "$AI_BACKEND" = "ollama-gpu" ]; then
     else
         echo "ℹ GPU backend: ${GPU_TYPE} bundled with machine type '$MACHINE_TYPE' (maintenance-policy=TERMINATE)"
     fi
+fi
+
+# Spot (preemptible) provisioning: ~60-91% cheaper, but GCP can reclaim the VM at any
+# time. Spot requires maintenance-policy=TERMINATE (already added above for GPU
+# backends, so only add it here when it wasn't). --instance-termination-action=STOP
+# keeps the disks on preemption so the instance can be restarted (cloud-init runs once,
+# so a restart resumes the already-installed cluster rather than redeploying).
+if [ "$SPOT" = true ]; then
+    GCLOUD_CMD+=(--provisioning-model=SPOT --instance-termination-action=STOP)
+    if [ "$AI_BACKEND" != "ollama-gpu" ]; then
+        GCLOUD_CMD+=(--maintenance-policy=TERMINATE)
+    fi
+    echo "ℹ Spot VM: reclaimable by GCP at any time; ~60-91% cheaper than on-demand."
 fi
 
 # Execute the command
