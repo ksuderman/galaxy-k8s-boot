@@ -41,6 +41,7 @@ GPU_TYPE=${GPU_TYPE:-""}
 GPU_CPUS=${GPU_CPUS:-""}
 GPU_COUNT=${GPU_COUNT:-""}
 GPU_MODEL=${GPU_MODEL:-""}
+GPU_STORAGE=${GPU_STORAGE:-""}
 # HTTPS at a hostname: GALAXY_HOSTNAME serves Galaxy over TLS (Let's Encrypt),
 # ADDRESS attaches a reserved static IP so the public IP matches the DNS record,
 # ACME_EMAIL is the Let's Encrypt account email. Empty -> launch_vm.sh defaults.
@@ -146,6 +147,9 @@ function start() {
 	if [[ -n $GPU_MODEL ]] ; then
 	    LAUNCH_CMD+=(--gpu-model $GPU_MODEL)
 	fi
+	if [[ -n $GPU_STORAGE ]] ; then
+	    LAUNCH_CMD+=(--ollama-storage-size $GPU_STORAGE)
+	fi
 	if [[ -n $GALAXY_HOSTNAME ]] ; then
 	    LAUNCH_CMD+=(--hostname $GALAXY_HOSTNAME)
 	fi
@@ -175,7 +179,7 @@ function start() {
 
     if [[ -n $AI_MASTER_KEY ]] ; then
         echo "The AI master key is: ${AI_MASTER_KEY}"
-        echo $AI_MASTER_KEY > ~/.secret/${CLOUD}-ai-master-key.txt
+        echo $AI_MASTER_KEY > ~/.secret/ai-master-key-${CLOUD}.txt
     fi
 }
 
@@ -185,8 +189,8 @@ function stop() {
 	for disk in $(gcloud compute disks list --filter="name~.*${SERVER}.*" --format='value(name)') ; do
 		gcloud compute disks delete $disk --zone $ZONE --quiet
 	done
-	if [[ -e ~/.secret/${CLOUD}-ai-master-key.txt ]] ; then
-	    rm ~/.secret/${CLOUD}-ai-master-key.txt
+	if [[ -e ~/.secret/ai-master-key-${CLOUD}.txt ]] ; then
+	    rm ~/.secret/ai-master-key-${CLOUD}.txt
 	fi
 }
 
