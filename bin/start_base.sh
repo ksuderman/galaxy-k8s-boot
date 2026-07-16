@@ -3,7 +3,7 @@
 NAME=$(basename "$0")
 DIR=$(dirname $(realpath $0))
 
-ZONE=${ZONE:-us-east4-c}
+export ZONE=${ZONE:-us-east4-c}
 
 # ANSI formatting
 reset="\033[0m"
@@ -79,6 +79,7 @@ $(hi OPTIONS)
     $(hi pause)             stop the Galaxy VM but keep the disks
     $(hi resume)            start the Galaxy VM and reuse existing disks
     $(hi kube)              download the kubeconfig file for the cluster
+    $(hi tail)              tail the cloud-init startup log on the VM
     $(hi -h)|$(hi --help)|$(hi help)    show this help message
 
 $(hi EXAMPLES)
@@ -213,6 +214,14 @@ function main() {
             ;;
         start) start ;;
         stop) stop ;;
+        tail)
+            if [[ -z $CLOUD ]] ; then
+                echo "The name for the saved kubeconfig has not been set. Please check"
+                echo "your startup script ($0)"
+                exit 1
+            fi
+            $DIR/tail.sh $CLOUD
+            ;;
         restart|bounce)
             stop
             start
