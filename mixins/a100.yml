@@ -1,0 +1,71 @@
+# GalaxyAI configuration for the self-hosted A100 GPU backend (ai_backend=ollama-gpu
+# with --gpu-type a100): Ollama running qwen2.5:32b on a single NVIDIA A100 40GB
+# behind LiteLLM. The dev image is required for the latest GalaxyAI.
+#
+# A single A100 40GB has ~2x the VRAM of the L4 (24GB), so it runs a larger/higher-
+# precision model than the L4's mistral-small:24b. qwen2.5:32b (~20GB q4) fits with
+# plenty of headroom -- room to raise the quant (q8 ~34GB) or the context window.
+# The model is set at launch via --gpu-model (bin/a100.sh -> ollama_model_gpu), and
+# the model-cache PVC is sized via --ollama-storage-size (the 20Gi role default is
+# too small for a ~20GB model).
+#
+# Like the L4, the 32b handles the GalaxyAI agents' structured/tool-call output
+# NATIVELY, so the mixins/cpu.yml band-aids (structured_output_override, disabling
+# custom_tool) are intentionally NOT used here -- they break real tool-calling
+# without fixing anything. The large context window (ollama_context_length: 16384
+# in the role defaults) is what prevents the mid-generation context-shift runaway.
+#
+# The runtime ai_api_base_url / ai_model / ai_api_key are injected by the playbook
+# (they depend on the in-cluster LiteLLM service + generated key), so this mixin
+# only carries the static agent tuning and branding.
+image:
+  repository: quay.io/galaxyproject/galaxy-min
+  tag: "dev"
+
+configs:
+  galaxy.yml:
+    galaxy:
+      logo_url: null
+      brand: Ollama-A100
+      inference_services:
+        default:
+          # Fail fast on the rare doomed request rather than burning the full retry
+          # budget; structured output normally succeeds first try on the 32b.
+          retries: 1
+
+extraFileMappings:
+  /galaxy/server/static/welcome.html:
+    applyToWeb: true
+    applyToNginx: true
+    content: |
+      <!DOCTYPE html>
+      <html lang="en">
+          <head>
+              <meta charset="utf-8" />
+              <link rel="stylesheet" href="dist/base.css" type="text/css" />
+          </head>
+          <body class="m-0">
+              <div class="py-4">
+                  <div class="container">
+                      <div class="row mb-4">
+                          <div class="col-md-12">
+                              <h2>Welcome to Galaxy</h2>
+                              <p>
+                                  Galaxy is an interactive and workflow analysis
+                                  platform providing a graphical user interface
+                                  for computational tools. This is your own
+                                  Galaxy instance that you can customize and use
+                                  for your own research.
+                              </p>
+                              <h2>GalaxyAI</h2>
+                              <p>
+                                This Galaxy instance has been configured to route
+                                GalaxyAI to a self-hosted Ollama on a single NVIDIA
+                                A100 40GB GPU behind LiteLLM, running qwen2.5:32b.
+                              </p>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </body>
+      </html>
