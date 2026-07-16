@@ -32,6 +32,10 @@ GPU_COUNT="${GPU_COUNT:-1}"       # number of accelerators (T4/N1 flexible attac
 # qwen2.5:7b). Set via --gpu-model, e.g. qwen2.5:14b on an L4's 24GB of VRAM. Empty
 # leaves the role default untouched.
 GPU_MODEL="${GPU_MODEL:-}"
+# Optional override of the Ollama model-cache PVC size (role default
+# ollama_storage_size, 20Gi). Set via --ollama-storage-size, e.g. 40Gi for a ~20GB
+# qwen2.5:32b that won't fit the 20Gi default. Empty leaves the role default untouched.
+GPU_STORAGE="${GPU_STORAGE:-}"
 DISK_TYPE="pd-balanced"
 GALAXY_CHART="cloudve/galaxy"
 GALAXY_CHART_VERSION="6.7.0"
@@ -129,6 +133,9 @@ Options:
   --gpu-model MODEL                 Override the GPU Ollama model (role default
                                     ollama_model_gpu, e.g. qwen2.5:14b on an L4).
                                     Only meaningful with --ai-backend ollama-gpu.
+  --ollama-storage-size SIZE        Override the Ollama model-cache PVC size (role
+                                    default ollama_storage_size 20Gi; e.g. 40Gi for
+                                    a ~20GB qwen2.5:32b). Only with --ai-backend ollama-gpu.
   --hostname FQDN                   Serve Galaxy over HTTPS at this hostname. Issues a
                                     Let's Encrypt cert via cert-manager (HTTP-01), so
                                     the FQDN's DNS must resolve to the VM's public IP
@@ -294,6 +301,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --gpu-model)
             GPU_MODEL="$2"
+            shift 2
+            ;;
+        --ollama-storage-size)
+            GPU_STORAGE="$2"
             shift 2
             ;;
         --hostname)
@@ -680,6 +691,7 @@ cat >> "$TEMP_USER_DATA" << EOF
     AI_MASTER_KEY="${AI_MASTER_KEY}"
     GALAXY_PROFILE_FILE="${GALAXY_PROFILE_FILE}"
     OLLAMA_MODEL_GPU="${GPU_MODEL}"
+    OLLAMA_STORAGE_SIZE="${GPU_STORAGE}"
     GALAXY_HOSTNAME="${GALAXY_HOSTNAME}"
     ACME_EMAIL="${ACME_EMAIL}"
     EXPOSE_LITELLM="${EXPOSE_LITELLM}"
@@ -724,6 +736,11 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     if [ -n "${OLLAMA_MODEL_GPU}" ]; then
       echo "    ollama_model_gpu=\"${OLLAMA_MODEL_GPU}\"" >> /tmp/ansible-inventory/localhost
       echo "[`date`] - GPU Ollama model override: ${OLLAMA_MODEL_GPU}"
+    fi
+
+    if [ -n "${OLLAMA_STORAGE_SIZE}" ]; then
+      echo "    ollama_storage_size=\"${OLLAMA_STORAGE_SIZE}\"" >> /tmp/ansible-inventory/localhost
+      echo "[`date`] - Ollama model-cache size override: ${OLLAMA_STORAGE_SIZE}"
     fi
 
     echo "[`date`] - NFS storage size for Galaxy: ${PV_SIZE}"
