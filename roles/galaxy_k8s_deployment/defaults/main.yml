@@ -148,6 +148,13 @@ galaxy_job_max_mem: 4
 enable_gcp_batch: true
 gcp_batch_service_account_email: ""
 gcp_batch_region: "us-east4"
+# Prefix for GCP Batch job names so Batch jobs are identifiable per cluster. The
+# runner builds the job name as "<prefix>-<id>", so keep it short and valid for a
+# Batch job name: ^[a-z]([a-z0-9-]*[a-z0-9])?$ (lowercase letters, digits, hyphens;
+# start with a letter). launch_vm.sh overrides this per cluster (explicit
+# --job-id-prefix, else the sanitized instance name). Never leave empty -- an unset
+# prefix surfaces as a literal "None" in the Batch job name and is rejected (400).
+gcp_batch_job_id_prefix: "galaxy-batch"
 
 # Pulsar Application Configuration
 pulsar_chart: cloudve/pulsar

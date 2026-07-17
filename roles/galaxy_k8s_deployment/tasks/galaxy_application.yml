@@ -313,6 +313,12 @@
               k8s:
                 max_cores: "{{ galaxy_job_max_cores }}"
                 max_mem: "{{ galaxy_job_max_mem }}"
+              # Per-cluster GCP Batch job-name prefix. Deep-merges over the
+              # gcp_batch destination in values/values.yml, overriding only
+              # job_id_prefix (docker_enabled/cores/mem there are preserved).
+              gcp_batch:
+                params:
+                  job_id_prefix: "{{ gcp_batch_job_id_prefix }}"
     _helm_values_gcp_batch: {}
     _helm_values_ai:
       configs:
