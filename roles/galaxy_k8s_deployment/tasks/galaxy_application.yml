@@ -237,16 +237,20 @@
         galaxy-project-logo-white-square.png: "{{ lookup('file', 'files/galaxy-project-logo-white-square.png') | b64encode }}"
         anvil-project-logo-white.png: "{{ lookup('file', 'files/anvil-project-logo-white.png') | b64encode }}"
 
-- name: Write Galaxy post-install user values
-  ansible.builtin.copy:
-    dest: /tmp/galaxy-postinstall-user.yaml
-    content: |
-      postInstallJob:
-        galaxyUser: "{{ galaxy_user }}"
-    mode: '0644'
-  delegate_to: localhost
-  become: false
-  when: galaxy_user | default('') | length > 0
+# The postInstallJob.galaxyUser is taken from the profile/mixin (e.g. postinstall-ks.yml).
+# The task below, which overrode it with the playbook-wide `galaxy_user`, is disabled so a
+# mixin's own galaxyUser wins. To restore the override, uncomment this task and re-append
+# `+ user_file` in the "Prepare Galaxy values files list" task below.
+# - name: Write Galaxy post-install user values
+#   ansible.builtin.copy:
+#     dest: /tmp/galaxy-postinstall-user.yaml
+#     content: |
+#       postInstallJob:
+#         galaxyUser: "{{ galaxy_user }}"
+#     mode: '0644'
+#   delegate_to: localhost
+#   become: false
+#   when: galaxy_user | default('') | length > 0
 
 - name: Prepare Galaxy values files list
   set_fact:
@@ -256,8 +260,7 @@
       {%- if galaxy_import_profile_file is defined and galaxy_import_profile_file != '__use_role_default__' -%}
       {%- set profile = [galaxy_import_profile_file] if (galaxy_import_profile_file | length > 0) else [] -%}
       {%- endif -%}
-      {%- set user_file = ['/tmp/galaxy-postinstall-user.yaml'] if (galaxy_user | default('') | length > 0) else [] -%}
-      {{ base + profile + user_file }}
+      {{ base + profile }}
 
 - name: Display Galaxy values files being used
   debug:
@@ -280,6 +283,7 @@
     chart_version: "{{ galaxy_chart_version }}"
     kubeconfig: "{{ kubeconfig_path }}"
     update_repo_cache: true
+    timeout: "20m0s"
     values_files: "{{ lookup('sequence', 'start=0 end=' ~ (_galaxy_values_files|length - 1) ~ ' format=/tmp/galaxy_values_%d.yml', wantlist=True) }}"
     values: "{{ _helm_values_base | combine(_helm_values_gcp_batch if (enable_gcp_batch | default(false) | bool) else {}, recursive=True) | combine(_helm_values_cnpg_plugin if (restore_galaxy and detected_galaxy_pvc_uuid | default('') != '') else {}, recursive=True) | combine(_helm_values_ai if (ai_backend | default('none') != 'none') else {}, recursive=True) | combine(_helm_values_tls if (galaxy_hostname | default('') | length > 0) else {}, recursive=True) }}"
     set_values: "{{ galaxy_helm_extra_sets | default([]) + _helm_prefix_sets }}"
