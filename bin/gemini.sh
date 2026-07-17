@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
+REPO=https://github.com/ksuderman/galaxy-k8s-boot
+BRANCH=chatgxy
+
 # The SERVER and CLOUD variables MUST BE set.
-CLOUD=vertex
+CLOUD=gemini
 SERVER=ks-${CLOUD}-test
 
 # Vertex/Gemini runs no local model engine, so a standard machine is plenty
@@ -43,12 +46,6 @@ EXPOSE_LITELLM=true
 # share it).
 DISK_SIZE=256
 NFS_RESERVE=16
-
-# The chatgxy branch (which carries the ai_backend=vertex support) lives on the
-# personal fork used for test deploys; push it before launching (ansible-pull
-# fetches REPO@BRANCH on the VM).
-REPO=https://github.com/ksuderman/galaxy-k8s-boot
-BRANCH=chatgxy
 
 # Source the base script so the hi function is defined for the DESCRIPTION
 DIR=$(dirname $(realpath $0))

@@ -65,6 +65,9 @@ EXPOSE_LITELLM=false
 # Provision the VM as a Spot (preemptible) instance: ~60-91% cheaper, but GCP can
 # reclaim it at any time. Requires maintenance-policy=TERMINATE. Off by default.
 SPOT="${SPOT:-false}"
+# GCP Batch job-name prefix so Batch jobs are identifiable per cluster. Explicit
+# --job-id-prefix wins; when empty it defaults to the sanitized instance name below.
+JOB_ID_PREFIX="${JOB_ID_PREFIX:-}"
 PROFILE=""
 PROFILE_SET=false
 
@@ -142,6 +145,9 @@ Options:
   --ollama-storage-size SIZE        Override the Ollama model-cache PVC size (role
                                     default ollama_storage_size 20Gi; e.g. 40Gi for
                                     a ~20GB qwen2.5:32b). Only with --ai-backend ollama-gpu.
+  --job-id-prefix PREFIX            Prefix for GCP Batch job names, so Batch jobs are
+                                    identifiable per cluster (default: sanitized
+                                    INSTANCE_NAME). Must match ^[a-z]([a-z0-9-]*[a-z0-9])?$.
   --hostname FQDN                   Serve Galaxy over HTTPS at this hostname. Issues a
                                     Let's Encrypt cert via cert-manager (HTTP-01), so
                                     the FQDN's DNS must resolve to the VM's public IP
@@ -317,6 +323,10 @@ while [[ $# -gt 0 ]]; do
             GPU_STORAGE="$2"
             shift 2
             ;;
+        --job-id-prefix)
+            JOB_ID_PREFIX="$2"
+            shift 2
+            ;;
         --hostname)
             GALAXY_HOSTNAME="$2"
             shift 2
@@ -362,6 +372,14 @@ if [ -z "$INSTANCE_NAME" ]; then
     usage
     exit 1
 fi
+
+# Default the GCP Batch job-name prefix to the sanitized instance name when it was not
+# set explicitly (--job-id-prefix). Batch job names must match ^[a-z]([a-z0-9-]*[a-z0-9])?$:
+# lowercase, collapse invalid chars to '-', strip leading non-letters and trailing '-'.
+if [ -z "$JOB_ID_PREFIX" ]; then
+    JOB_ID_PREFIX=$(echo "$INSTANCE_NAME" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9-' '-' | sed 's/^[^a-z]*//; s/-*$//')
+fi
+echo "GCP Batch job-id prefix: $JOB_ID_PREFIX"
 
 if [ "$EPHEMERAL_ONLY" = false ] && [ -z "$SSH_KEY" ]; then
     if [[ -e ~/.ssh/id_rsa.pub ]] ; then
@@ -702,6 +720,7 @@ cat >> "$TEMP_USER_DATA" << EOF
     GALAXY_PROFILE_FILE="${GALAXY_PROFILE_FILE}"
     OLLAMA_MODEL_GPU="${GPU_MODEL}"
     OLLAMA_STORAGE_SIZE="${GPU_STORAGE}"
+    GCP_BATCH_JOB_ID_PREFIX="${JOB_ID_PREFIX}"
     GALAXY_HOSTNAME="${GALAXY_HOSTNAME}"
     ACME_EMAIL="${ACME_EMAIL}"
     EXPOSE_LITELLM="${EXPOSE_LITELLM}"
@@ -751,6 +770,12 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     if [ -n "${OLLAMA_STORAGE_SIZE}" ]; then
       echo "    ollama_storage_size=\"${OLLAMA_STORAGE_SIZE}\"" >> /tmp/ansible-inventory/localhost
       echo "[`date`] - Ollama model-cache size override: ${OLLAMA_STORAGE_SIZE}"
+    fi
+
+    # Per-cluster GCP Batch job-name prefix (always set: explicit or instance-name derived).
+    if [ -n "${GCP_BATCH_JOB_ID_PREFIX}" ]; then
+      echo "    gcp_batch_job_id_prefix=\"${GCP_BATCH_JOB_ID_PREFIX}\"" >> /tmp/ansible-inventory/localhost
+      echo "[`date`] - GCP Batch job-id prefix: ${GCP_BATCH_JOB_ID_PREFIX}"
     fi
 
     echo "[`date`] - NFS storage size for Galaxy: ${PV_SIZE}"

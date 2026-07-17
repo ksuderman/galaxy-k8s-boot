@@ -54,6 +54,9 @@ EXPOSE_LITELLM=${EXPOSE_LITELLM:-false}
 # Provision the VM as a Spot (preemptible) instance (~60-91% cheaper, reclaimable
 # anytime). Set to "true" in the calling script to enable.
 SPOT=${SPOT:-false}
+# Explicit GCP Batch job-name prefix for this launcher. Empty -> launch_vm.sh defaults
+# it to the sanitized instance name.
+JOB_ID_PREFIX=${JOB_ID_PREFIX:-""}
 # GiB reserved on the data disk so Galaxy does not claim the whole disk (leaves
 # room for the Ollama model cache and RabbitMQ). Empty -> launch_vm.sh default.
 NFS_RESERVE=${NFS_RESERVE:-""}
@@ -168,6 +171,9 @@ function start() {
 	fi
 	if [[ $SPOT == true ]] ; then
 	    LAUNCH_CMD+=(--spot)
+	fi
+	if [[ -n $JOB_ID_PREFIX ]] ; then
+	    LAUNCH_CMD+=(--job-id-prefix $JOB_ID_PREFIX)
 	fi
 	if [[ -n $NFS_RESERVE ]] ; then
 	    LAUNCH_CMD+=(--nfs-reserve $NFS_RESERVE)
