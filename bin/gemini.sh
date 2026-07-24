@@ -9,7 +9,7 @@ SERVER=ks-${CLOUD}-test
 
 # Vertex/Gemini runs no local model engine, so a standard machine is plenty
 # (there is no Ollama pod competing for node memory).
-MACHINE_TYPE="e2-standard-4"
+MACHINE_TYPE="n2-standard-8"
 
 # ChatGXY/GalaxyAI is only in the Galaxy dev image; the `ai` mixin supplies that
 # image plus the GalaxyAI branding. Its inference_services CPU tuning
@@ -44,8 +44,8 @@ EXPOSE_LITELLM=true
 # Modest storage: no Ollama model cache to hold, just Galaxy's own NFS PVC. A
 # small reserve keeps Galaxy from claiming the entire disk (RabbitMQ + overhead
 # share it).
-DISK_SIZE=256
-NFS_RESERVE=16
+DISK_SIZE=1024
+NFS_RESERVE=64
 
 # Source the base script so the hi function is defined for the DESCRIPTION
 DIR=$(dirname $(realpath $0))
