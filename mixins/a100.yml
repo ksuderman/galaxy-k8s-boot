@@ -32,14 +32,6 @@ configs:
           # Fail fast on the rare doomed request rather than burning the full retry
           # budget; structured output normally succeeds first try on the 32b.
           retries: 1
-  # The A100 launches in us-central1 (bin/a100.sh ZONE=us-central1-f), but the
-  # gcp_batch region defaults to us-east4 in values/values.yml. Override it here so
-  # Batch VMs run in-region with the cluster's NFS server instead of mounting it
-  # across regions. Deep-merges over the values.yml gcp_batch runner block.
-  job_conf.yml:
-    runners:
-      gcp_batch:
-        region: us-central1
 
 extraFileMappings:
   /galaxy/server/static/welcome.html:
