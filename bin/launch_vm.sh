@@ -121,7 +121,8 @@ Options:
                                     Pass '' to disable post-install imports. When omitted the
                                     role default (files/profiles/anvil.yaml) is used.
   --ai-backend BACKEND              ChatGXY inference backend: none, ollama-cpu,
-                                    ollama-gpu, external, vertex (default: $AI_BACKEND).
+                                    ollama-gpu, vllm-gpu, external, vertex
+                                    (default: $AI_BACKEND).
                                     Anything other than 'none' deploys a LiteLLM
                                     front door (and Ollama for the ollama-* options)
                                     and enables ChatGXY in Galaxy. Requires a Galaxy
@@ -393,12 +394,20 @@ fi
 
 # Validate the AI backend selection and prepare the LiteLLM master key
 case "$AI_BACKEND" in
-    none|ollama-cpu|ollama-gpu|external|vertex) ;;
+    none|ollama-cpu|ollama-gpu|vllm-gpu|external|vertex) ;;
     *)
-        echo "Error: invalid --ai-backend '$AI_BACKEND' (expected: none, ollama-cpu, ollama-gpu, external, vertex)"
+        echo "Error: invalid --ai-backend '$AI_BACKEND' (expected: none, ollama-cpu, ollama-gpu, vllm-gpu, external, vertex)"
         usage
         exit 1
         ;;
+esac
+
+# GPU-backed inference backends (ollama-gpu, vllm-gpu) share the same VM-side
+# provisioning: pick a GPU machine type from --gpu-type/--gpu-cpus and force
+# maintenance-policy=TERMINATE. This flag is the single switch for all of it.
+GPU_BACKEND=false
+case "$AI_BACKEND" in
+    ollama-gpu|vllm-gpu) GPU_BACKEND=true ;;
 esac
 
 if [ "$AI_BACKEND" != "none" ] && [ -z "$AI_MASTER_KEY" ]; then
@@ -412,7 +421,7 @@ fi
 # for the flexible-attach families (T4/N1) and is empty for bundled families
 # (L4/A100/H100), which ship the GPU with the machine type.
 GPU_ACCELERATOR=""
-if [ "$AI_BACKEND" = "ollama-gpu" ]; then
+if [ "$GPU_BACKEND" = true ]; then
     # Round a desired vCPU count up to the smallest offered size in a family.
     _gpu_round_up() {
         local want="$1"; shift
@@ -514,7 +523,7 @@ fi
 if [ "$AI_BACKEND" != "none" ]; then
     echo "ChatGXY Inference Backend: $AI_BACKEND"
     echo "LiteLLM Master Key: $AI_MASTER_KEY"
-    if [ "$AI_BACKEND" = "ollama-gpu" ]; then
+    if [ "$GPU_BACKEND" = true ]; then
         echo "GPU: $GPU_TYPE (machine type $MACHINE_TYPE)"
         [ -n "$GPU_MODEL" ] && echo "GPU Ollama Model: $GPU_MODEL"
     fi
@@ -853,7 +862,7 @@ fi
 # and attach mechanism were resolved earlier from --gpu-type/--gpu-cpus: GPU_ACCELERATOR
 # is set for flexible-attach families (T4/N1) and empty for bundled families (L4/A100/
 # H100), which ship the GPU with the machine type and reject --accelerator.
-if [ "$AI_BACKEND" = "ollama-gpu" ]; then
+if [ "$GPU_BACKEND" = true ]; then
     GCLOUD_CMD+=(--maintenance-policy=TERMINATE)
     if [ -n "$GPU_ACCELERATOR" ]; then
         echo "ℹ GPU backend: ${GPU_TYPE} on '$MACHINE_TYPE' via --accelerator=${GPU_ACCELERATOR} (maintenance-policy=TERMINATE)"
@@ -870,7 +879,7 @@ fi
 # so a restart resumes the already-installed cluster rather than redeploying).
 if [ "$SPOT" = true ]; then
     GCLOUD_CMD+=(--provisioning-model=SPOT --instance-termination-action=STOP)
-    if [ "$AI_BACKEND" != "ollama-gpu" ]; then
+    if [ "$GPU_BACKEND" != true ]; then
         GCLOUD_CMD+=(--maintenance-policy=TERMINATE)
     fi
     echo "ℹ Spot VM: reclaimable by GCP at any time; ~60-91% cheaper than on-demand."

@@ -7,7 +7,8 @@
 - name: Compute AI inference facts
   set_fact:
     _ai_use_ollama: "{{ ai_backend in ['ollama-cpu', 'ollama-gpu'] }}"
-    _ai_use_gpu: "{{ ai_backend == 'ollama-gpu' }}"
+    _ai_use_vllm: "{{ ai_backend == 'vllm-gpu' }}"
+    _ai_use_gpu: "{{ ai_backend in ['ollama-gpu', 'vllm-gpu'] }}"
     _ollama_model: "{{ ollama_model_gpu if ai_backend == 'ollama-gpu' else ollama_model_cpu }}"
 
 - name: Display AI inference configuration
@@ -15,6 +16,7 @@
     msg: >-
       ChatGXY inference: backend={{ ai_backend }},
       {{ ('ollama model=' ~ _ollama_model) if _ai_use_ollama
+         else ('vllm model=' ~ vllm_model ~ ' tp=' ~ vllm_tensor_parallel_size) if _ai_use_vllm
          else ('vertex ' ~ vertex_model ~ ' @ ' ~ vertex_location) if ai_backend == 'vertex'
          else ('external ' ~ ai_external_provider ~ '/' ~ ai_external_model) }},
       Galaxy model={{ ai_model_name }} via LiteLLM in namespace {{ inference_namespace }}
@@ -49,6 +51,25 @@
   delay: 10
   when: _ai_use_gpu | bool
 
+# Use every GPU the node advertises (1 on a2-highgpu-1g, 2 on a2-highgpu-2g, ...) so
+# the engine spans all of them: Ollama layer-splits across them, vLLM tensor-parallels.
+# Overrides the ollama_gpu_count / vllm_tensor_parallel_size defaults; on a single-GPU
+# node it resolves to 1, unchanged from before.
+- name: Determine how many GPUs the node advertises
+  set_fact:
+    _gpu_count: >-
+      {{ (_gpu_nodes.resources | map(attribute='status.allocatable')
+          | selectattr('nvidia.com/gpu', 'defined')
+          | map(attribute='nvidia.com/gpu') | map('int') | list | first)
+         | default(1) }}
+  when: _ai_use_gpu | bool
+
+- name: Span the inference engine across all advertised GPUs
+  set_fact:
+    ollama_gpu_count: "{{ _gpu_count }}"
+    vllm_tensor_parallel_size: "{{ _gpu_count }}"
+  when: _ai_use_gpu | bool
+
 # ----------------------------------------------------------------------------
 # Ollama self-hosted engine (ollama-cpu / ollama-gpu)
 # ----------------------------------------------------------------------------
@@ -59,6 +80,34 @@
     state: present
     kubeconfig: "{{ kubeconfig_path }}"
   when: _ai_use_ollama | bool
+
+# ----------------------------------------------------------------------------
+# vLLM self-hosted engine (vllm-gpu) -- tensor-parallel serving for large models
+# ----------------------------------------------------------------------------
+- name: Deploy vLLM engine
+  kubernetes.core.k8s:
+    template:
+      path: templates/vllm.yaml.j2
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+  when: _ai_use_vllm | bool
+
+- name: Wait for vLLM to become available
+  # vLLM downloads (tens of GB on first run) and loads the model before it serves;
+  # give it up to 30 minutes to report an available replica.
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: vllm
+    namespace: "{{ inference_namespace }}"
+    kubeconfig: "{{ kubeconfig_path }}"
+  register: _vllm_deploy
+  until: >-
+    _vllm_deploy.resources | length > 0 and
+    (_vllm_deploy.resources[0].status.availableReplicas | default(0) | int) >= 1
+  retries: 90
+  delay: 20
+  when: _ai_use_vllm | bool
 
 # ----------------------------------------------------------------------------
 # LiteLLM front door (all backends)

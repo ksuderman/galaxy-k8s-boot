@@ -171,6 +171,8 @@ pulsar_api_key: ""
 #   none        - no inference server deployed; ChatGXY disabled (default)
 #   ollama-cpu  - self-hosted Ollama (CPU) behind LiteLLM
 #   ollama-gpu  - self-hosted Ollama (GPU) behind LiteLLM   [requires GPU node]
+#   vllm-gpu    - self-hosted vLLM (GPU, tensor-parallel) behind LiteLLM; for large
+#                 models on a multi-GPU node (e.g. a 70B on 2x A100 40GB) [requires GPU]
 #   external    - LiteLLM only, routing to an external provider (OpenAI/Anthropic)
 #   vertex      - LiteLLM only, routing to Google Vertex AI (Gemini); auth via the
 #                 VM service account (ADC), no API key needed
@@ -215,9 +217,37 @@ ollama_gpu_count: 1
 # at 16k is ~3GB on top of ~9GB weights -- comfortable on an L4's 24GB (raise for
 # larger context, but watch VRAM on smaller GPUs).
 ollama_context_length: 16384
-# NVIDIA device plugin (ollama-gpu only): advertises nvidia.com/gpu so the GPU
-# Ollama pod can be scheduled. Requires the host driver + toolkit (gpu_setup.yml).
+# NVIDIA device plugin (ollama-gpu / vllm-gpu): advertises nvidia.com/gpu so the GPU
+# inference pod can be scheduled. Requires the host driver + toolkit (gpu_setup.yml).
 nvidia_device_plugin_image: "nvcr.io/nvidia/k8s-device-plugin:v0.17.1"
+
+# vLLM (self-hosted engine for vllm-gpu). Serves an OpenAI-compatible API with true
+# tensor parallelism across GPUs -- the right engine for a large model on a multi-GPU
+# node (e.g. a 70B on 2x A100 40GB). The playbook sets vllm_tensor_parallel_size to the
+# number of GPUs the node advertises, so it spans every attached GPU automatically.
+vllm_image: "vllm/vllm-openai:latest"
+# HuggingFace repo id. Default is an AWQ 4-bit Qwen2.5-72B (~40GB) so it fits in the
+# 80GB aggregate VRAM of 2x A100 40GB; the full FP16 (~145GB) would not. Open weights,
+# no HF token required. Must match vllm_quantization.
+vllm_model: "Qwen/Qwen2.5-72B-Instruct-AWQ"
+vllm_quantization: "awq"
+# The model id LiteLLM routes to (openai/<served-name>); decoupled from the repo path.
+vllm_served_model_name: "qwen2.5-72b"
+# Overridden at deploy time to the node's GPU count; the literal here is the fallback.
+vllm_tensor_parallel_size: 2
+# Context window. KV cache grows with this and shares VRAM with the weights; 16384 is
+# a safe default for a 4-bit 72B on 2x 40GB. Raise only if you have KV headroom.
+vllm_max_model_len: 16384
+vllm_gpu_memory_utilization: "0.90"
+# Node-local model cache (same rationale as ollama_storage_class). Sized for a ~40GB
+# quantized 70B plus HuggingFace metadata.
+vllm_storage_class: "blockstorage"
+vllm_storage_size: "120Gi"
+vllm_memory_request: "16Gi"
+vllm_memory_limit: "48Gi"
+# Shared-memory (/dev/shm) size for NCCL tensor-parallel communication. The container
+# default (64MB) is far too small and NCCL will hang without a larger mount.
+vllm_shm_size: "8Gi"
 
 # External provider (only used when ai_backend=external)
 ai_external_provider: "openai"        # openai | anthropic

@@ -8,7 +8,7 @@
 
 - name: Include GPU host setup tasks (driver + container toolkit)
   ansible.builtin.include_tasks: gpu_setup.yml
-  when: ai_backend | default('none') == 'ollama-gpu'
+  when: ai_backend | default('none') in ['ollama-gpu', 'vllm-gpu']
 
 - name: Include RKE2 cluster setup tasks
   ansible.builtin.include_tasks: rke2_setup.yml
