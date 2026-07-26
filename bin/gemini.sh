@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 REPO=https://github.com/ksuderman/galaxy-k8s-boot
-BRANCH=chatgxy
+BRANCH=interactive-tools
 
 # The SERVER and CLOUD variables MUST BE set.
 CLOUD=gemini
@@ -40,6 +40,7 @@ ADDRESS=ks-vertex-ip-east4
 GALAXY_HOSTNAME=gemini.galaxy.useanvil.org
 ACME_EMAIL=suderman@jhu.edu
 EXPOSE_LITELLM=true
+ENABLE_INTERACTIVE_TOOLS=true
 
 # Modest storage: no Ollama model cache to hold, just Galaxy's own NFS PVC. A
 # small reserve keeps Galaxy from claiming the entire disk (RabbitMQ + overhead
