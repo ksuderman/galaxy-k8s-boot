@@ -51,6 +51,9 @@ ACME_EMAIL=${ACME_EMAIL:-""}
 # Publish LiteLLM's OpenAI-compatible API at https://<hostname>/llm/v1 (for Orbit).
 # Requires GALAXY_HOSTNAME. Set to "true" to enable.
 EXPOSE_LITELLM=${EXPOSE_LITELLM:-false}
+# Enable Galaxy Interactive Tools on the local cluster (Cloud DNS + wildcard TLS).
+# Requires GALAXY_HOSTNAME. Set to "true" to enable.
+ENABLE_INTERACTIVE_TOOLS=${ENABLE_INTERACTIVE_TOOLS:-false}
 # Provision the VM as a Spot (preemptible) instance (~60-91% cheaper, reclaimable
 # anytime). Set to "true" in the calling script to enable.
 SPOT=${SPOT:-false}
@@ -168,6 +171,9 @@ function start() {
 	fi
 	if [[ $EXPOSE_LITELLM == true ]] ; then
 	    LAUNCH_CMD+=(--expose-litellm)
+	fi
+	if [[ $ENABLE_INTERACTIVE_TOOLS == true ]] ; then
+	    LAUNCH_CMD+=(--interactive-tools)
 	fi
 	if [[ $SPOT == true ]] ; then
 	    LAUNCH_CMD+=(--spot)

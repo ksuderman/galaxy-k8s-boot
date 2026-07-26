@@ -62,6 +62,10 @@ ACME_EMAIL=""
 # Publish LiteLLM's OpenAI-compatible API under /llm on the HTTPS host (for Orbit and
 # other OpenAI-compatible clients). Requires --hostname. Off by default.
 EXPOSE_LITELLM=false
+# Enable Galaxy Interactive Tools on the local cluster: routes interactive_tool.* to
+# the KubernetesJobRunner and sets up the per-instance Cloud DNS zone + wildcard TLS.
+# Requires --hostname (the IT subdomain derives from it). Off by default.
+ENABLE_INTERACTIVE_TOOLS=false
 # Provision the VM as a Spot (preemptible) instance: ~60-91% cheaper, but GCP can
 # reclaim it at any time. Requires maintenance-policy=TERMINATE. Off by default.
 SPOT="${SPOT:-false}"
@@ -163,6 +167,10 @@ Options:
                                     https://<hostname>/llm/v1 (for Orbit and other
                                     OpenAI-compatible clients). Requires --hostname;
                                     the endpoint is protected by the LiteLLM key.
+  --interactive-tools               Enable Galaxy Interactive Tools on the local
+                                    cluster: route interactive_tool.* to Kubernetes
+                                    and set up the per-instance Cloud DNS zone +
+                                    wildcard TLS. Requires --hostname.
   -h, --help, help                  Show this help message
 
 Examples:
@@ -344,6 +352,10 @@ while [[ $# -gt 0 ]]; do
             EXPOSE_LITELLM=true
             shift
             ;;
+        --interactive-tools)
+            ENABLE_INTERACTIVE_TOOLS=true
+            shift
+            ;;
         -h|--help|help)
             usage
             exit 0
@@ -474,6 +486,13 @@ fi
 # HTTPS requires an ACME account email for the Let's Encrypt certificate.
 if [ -n "$GALAXY_HOSTNAME" ] && [ -z "$ACME_EMAIL" ]; then
     echo "Error: --hostname '$GALAXY_HOSTNAME' requires --acme-email (Let's Encrypt account email)"
+    usage
+    exit 1
+fi
+
+# Interactive Tools derive their subdomain from the hostname, so they require one.
+if [ "$ENABLE_INTERACTIVE_TOOLS" = true ] && [ -z "$GALAXY_HOSTNAME" ]; then
+    echo "Error: --interactive-tools requires --hostname (the IT subdomain derives from it)"
     usage
     exit 1
 fi
@@ -796,7 +815,7 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     echo "[`date`] - Galaxy Values Files: ${GALAXY_VALUES_FILES_JSON}"
     echo "[`date`] - Inventory file created at /tmp/ansible-inventory/localhost; running ansible-pull..."
 
-    ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/PLACEHOLDER_VM_USER/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "{\"enable_gcp_batch\": true, \"galaxy_chart\": \"${GALAXY_CHART}\", \"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_chart\": \"${GALAXY_DEPS_CHART}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}}" playbook.yml
+    ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/PLACEHOLDER_VM_USER/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "{\"enable_gcp_batch\": true, \"enable_interactive_tools\": ${ENABLE_INTERACTIVE_TOOLS}, \"galaxy_chart\": \"${GALAXY_CHART}\", \"galaxy_chart_version\": \"${GALAXY_CHART_VERSION}\", \"galaxy_deps_chart\": \"${GALAXY_DEPS_CHART}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}}" playbook.yml
 
     echo "[`date`] - User data script completed."
     '
