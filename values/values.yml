@@ -103,6 +103,12 @@ configs:
           runner: local
         gcp_batch:
           runner: gcp_batch
+        # Interactive Tools run as pods on THIS RKE2 cluster via the KubernetesJobRunner
+        # (the k8s runner + its k8s_interactivetools_* params come from the Galaxy Helm
+        # chart). ITs must never go to GCP Batch, so interactive_tool.* is routed here
+        # explicitly below rather than through the tpv_dispatcher default.
+        k8s:
+          runner: k8s
     destinations:
       - id: gcp_batch_default
         runner: gcp_batch
@@ -123,8 +129,8 @@ configs:
         id: __SET_METADATA__
       - environment: local
         id: __EXTRACT_DATASET__
-      # Route interactive tools to Kubernetes
-      - environment: local
+      # Route interactive tools to Kubernetes (local RKE2 cluster), never GCP Batch
+      - environment: k8s
         id: interactive_tool.*
       # Route data source tools to Kubernetes
       - environment: local

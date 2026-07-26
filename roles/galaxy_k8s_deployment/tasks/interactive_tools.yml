@@ -1,0 +1,152 @@
+---
+# Interactive Tools: per-instance Cloud DNS + wildcard TLS (Phase 0, items 2-3)
+# Creates the per-instance Cloud DNS managed zone for the IT subdomain, points a single
+# wildcard A record at the VM, and sets up cert-manager to issue the matching wildcard
+# cert via a DNS-01 (Cloud DNS) challenge. All GCP calls authenticate with the VM
+# service account via the metadata server (ADC) -- no static credentials. Gated by the
+# include in main.yml on enable_interactive_tools; requires galaxy_hostname (the IT
+# subdomain derives from it) and the VM SA to hold roles/dns.admin.
+
+- name: Fail early if interactive tools are enabled without a hostname
+  ansible.builtin.fail:
+    msg: "enable_interactive_tools requires galaxy_hostname (the IT subdomain derives from it)."
+  when: galaxy_hostname | default('') | length == 0
+
+# ---------------------------------------------------------------------------
+# Metadata-server facts: access token (ADC), project id, external IP
+# ---------------------------------------------------------------------------
+- name: Get a GCP access token from the metadata server (ADC)
+  ansible.builtin.uri:
+    url: http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token
+    headers:
+      Metadata-Flavor: Google
+    return_content: true
+  register: _it_token_raw
+
+- name: Detect the GCP project id and VM external IP
+  ansible.builtin.uri:
+    url: "http://metadata.google.internal/computeMetadata/v1/{{ item }}"
+    headers:
+      Metadata-Flavor: Google
+    return_content: true
+  loop:
+    - project/project-id
+    - instance/network-interfaces/0/access-configs/0/external-ip
+  register: _it_meta
+
+- name: Set Cloud DNS facts
+  set_fact:
+    _it_access_token: "{{ (_it_token_raw.content | from_json).access_token }}"
+    _gcp_project_id: "{{ _it_meta.results[0].content | trim }}"
+    _it_external_ip: "{{ _it_meta.results[1].content | trim }}"
+
+- name: Compose the Cloud DNS API base URL
+  set_fact:
+    _it_dns_api: "https://dns.googleapis.com/dns/v1/projects/{{ _gcp_project_id }}"
+
+# ---------------------------------------------------------------------------
+# Per-instance managed zone (create once; persists across redeploys so its
+# delegated nameservers stay stable)
+# ---------------------------------------------------------------------------
+- name: Check whether the IT Cloud DNS managed zone already exists
+  ansible.builtin.uri:
+    url: "{{ _it_dns_api }}/managedZones/{{ it_dns_zone_name }}"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ _it_access_token }}"
+    status_code: [200, 404]
+  register: _it_zone_get
+
+- name: Create the IT Cloud DNS managed zone
+  ansible.builtin.uri:
+    url: "{{ _it_dns_api }}/managedZones"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ _it_access_token }}"
+    body_format: json
+    body:
+      name: "{{ it_dns_zone_name }}"
+      dnsName: "{{ it_proxy_host }}."
+      description: "Interactive Tool subdomain for {{ galaxy_hostname }} (galaxy-k8s-boot)"
+      visibility: public
+    status_code: [200]
+  register: _it_zone_create
+  when: _it_zone_get.status == 404
+
+- name: Record the managed zone (created or pre-existing)
+  set_fact:
+    _it_zone: "{{ _it_zone_create.json if (_it_zone_get.status == 404) else _it_zone_get.json }}"
+
+- name: Show the nameservers to delegate from the parent zone (one-time, manual)
+  ansible.builtin.debug:
+    msg: >-
+      DELEGATION REQUIRED: in the parent DNS zone, add NS records for
+      '{{ it_proxy_host }}' pointing at: {{ _it_zone.nameServers | join(', ') }}
+
+# ---------------------------------------------------------------------------
+# Single wildcard A record -> VM external IP (covers every IT hostname)
+# ---------------------------------------------------------------------------
+- name: Look up the existing wildcard A record
+  ansible.builtin.uri:
+    url: "{{ _it_dns_api }}/managedZones/{{ it_dns_zone_name }}/rrsets?name={{ (it_wildcard_host ~ '.') | urlencode }}&type=A"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ _it_access_token }}"
+    status_code: [200]
+  register: _it_rrset_get
+
+- name: Capture the current wildcard rrset (if any)
+  set_fact:
+    _it_existing_a: "{{ (_it_rrset_get.json.rrsets | default([]))[0] | default({}) }}"
+
+# The Cloud DNS 'changes' endpoint is transactional: replace = delete the old rrset in
+# the same change that adds the new one. ttl is sent as a string, which the DNS API
+# (proto3 JSON) accepts for its int32 field. Skipped entirely when already correct.
+- name: Upsert the wildcard A record to the VM external IP
+  ansible.builtin.uri:
+    url: "{{ _it_dns_api }}/managedZones/{{ it_dns_zone_name }}/changes"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ _it_access_token }}"
+    body_format: json
+    body:
+      deletions: "{{ [_it_existing_a] if (_it_existing_a | length > 0) else [] }}"
+      additions:
+        - name: "{{ it_wildcard_host }}."
+          type: A
+          ttl: "{{ it_dns_ttl }}"
+          rrdatas:
+            - "{{ _it_external_ip }}"
+    status_code: [200]
+  when: >-
+    (_it_existing_a | length == 0) or
+    (_it_existing_a.rrdatas | default([]) != [_it_external_ip]) or
+    (_it_existing_a.ttl | default(0) | int != it_dns_ttl | int)
+
+# ---------------------------------------------------------------------------
+# cert-manager: DNS-01 ClusterIssuer (Cloud DNS, ADC) + wildcard Certificate
+# ---------------------------------------------------------------------------
+- name: Create the DNS-01 ClusterIssuer for IT wildcard TLS
+  kubernetes.core.k8s:
+    template:
+      path: templates/letsencrypt_dns01_clusterissuer.yaml.j2
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+  register: _it_dns01_issuer
+  until: _it_dns01_issuer is succeeded
+  retries: 10
+  delay: 15
+
+- name: Ensure the galaxy namespace exists for the wildcard cert
+  kubernetes.core.k8s:
+    kind: Namespace
+    name: galaxy
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+
+- name: Create the wildcard Certificate for Interactive Tools
+  kubernetes.core.k8s:
+    template:
+      path: templates/galaxy_it_wildcard_cert.yaml.j2
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"

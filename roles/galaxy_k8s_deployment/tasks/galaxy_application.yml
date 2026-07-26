@@ -313,7 +313,7 @@
     update_repo_cache: true
     timeout: "20m0s"
     values_files: "{{ lookup('sequence', 'start=0 end=' ~ (_galaxy_values_files|length - 1) ~ ' format=/tmp/galaxy_values_%d.yml', wantlist=True) }}"
-    values: "{{ _helm_values_base | combine(_helm_values_gcp_batch if (enable_gcp_batch | default(false) | bool) else {}, recursive=True) | combine(_helm_values_cnpg_plugin if (restore_galaxy and detected_galaxy_pvc_uuid | default('') != '') else {}, recursive=True) | combine(_helm_values_ai if (ai_backend | default('none') != 'none') else {}, recursive=True) | combine(_helm_values_tls if (galaxy_hostname | default('') | length > 0) else {}, recursive=True) }}"
+    values: "{{ _helm_values_base | combine(_helm_values_gcp_batch if (enable_gcp_batch | default(false) | bool) else {}, recursive=True) | combine(_helm_values_cnpg_plugin if (restore_galaxy and detected_galaxy_pvc_uuid | default('') != '') else {}, recursive=True) | combine(_helm_values_ai if (ai_backend | default('none') != 'none') else {}, recursive=True) | combine(_helm_values_tls if (galaxy_hostname | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_it if (enable_interactive_tools | default(false) | bool) else {}, recursive=True) }}"
     set_values: "{{ galaxy_helm_extra_sets | default([]) + _helm_prefix_sets }}"
   register: _galaxy_helm_install
   # The cloudve galaxy chart is fetched from raw.githubusercontent.com, which
@@ -389,6 +389,34 @@
         galaxy.yml:
           galaxy:
             galaxy_infrastructure_url: "https://{{ galaxy_hostname }}"
+    # Interactive Tools: per-instance enablement. Routing (interactive_tool.* -> the
+    # k8s environment) is static in values.yml; this carries the per-instance,
+    # hostname-derived bits and points every IT ingress at the wildcard cert.
+    _helm_values_it:
+      configs:
+        galaxy.yml:
+          galaxy:
+            interactivetools_enable: true
+            # Override the chart default (which uses the main Galaxy host) so ITs live
+            # under the per-instance interactivetool.<host> subdomain covered by the
+            # wildcard cert + Cloud DNS zone.
+            interactivetools_proxy_host: "{{ it_proxy_host }}"
+            interactivetools_prefix: "{{ it_prefix }}"
+        job_conf.yml:
+          runners:
+            k8s:
+              # Every IT ingress reuses the one pre-provisioned wildcard cert instead of
+              # the per-hostname secret the runner would otherwise expect.
+              k8s_interactivetools_use_ssl: true
+              k8s_interactivetools_tls_secret: "{{ it_tls_secret_name }}"
+              k8s_interactivetools_ingress_class: nginx
+              # WebSocket-friendly, and deliberately WITHOUT a cert-manager cluster-issuer
+              # annotation: the wildcard cert is managed by our own Certificate, so the IT
+              # ingress must not trigger per-IT (HTTP-01) issuance into that secret.
+              k8s_interactivetools_ingress_annotations: |
+                nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+                nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+                nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
     _helm_values_cnpg_plugin:
       postgresql:
         cluster:

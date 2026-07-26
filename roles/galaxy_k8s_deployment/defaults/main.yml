@@ -94,6 +94,35 @@ letsencrypt_issuer_name: "letsencrypt-prod"
 letsencrypt_server: "https://acme-v02.api.letsencrypt.org/directory"
 tls_secret_name: "galaxy-tls"
 
+# Interactive Tools (e.g. the Orbit AI shell) -- DNS + wildcard TLS
+# ---------------------------------------------------------------------------
+# Galaxy's KubernetesJobRunner serves each IT at its own hostname of the form
+#   <id>-<token>.<class_id>.<prefix>.<it_proxy_host>
+# where class_id is the constant "ep" and prefix is interactivetools_prefix. Only the
+# leftmost label varies per launch, so a SINGLE wildcard -- *.ep.its.<it_proxy_host> --
+# covers every IT for both DNS and TLS. The IT subdomain is per-instance (it derives
+# from the per-instance galaxy_hostname) and is served from its own Cloud DNS managed
+# zone, delegated once from the parent zone. cert-manager issues the wildcard cert via
+# a DNS-01 (Cloud DNS) challenge using the VM service account (ADC) -- no static creds,
+# matching the Vertex backend. Requires the VM SA to hold roles/dns.admin.
+enable_interactive_tools: false
+# Galaxy constants that shape the IT hostname (kept as vars for clarity/wildcard build).
+it_prefix: "its"
+it_class_id: "ep"
+# Per-instance IT subdomain, e.g. interactivetool.a100.galaxy.useanvil.org.
+it_proxy_host: "interactivetool.{{ galaxy_hostname }}"
+# The single wildcard that matches every IT hostname under it_proxy_host. Quoted
+# because a bare leading '*' is a YAML alias.
+it_wildcard_host: "*.{{ it_class_id }}.{{ it_prefix }}.{{ it_proxy_host }}"
+# Cloud DNS managed-zone NAME (a GCP resource id: lowercase RFC1035). Derived from the
+# hostname; the zone's dnsName is it_proxy_host itself.
+it_dns_zone_name: "it-{{ galaxy_hostname | lower | regex_replace('[^a-z0-9]+', '-') | regex_replace('(^-+|-+$)', '') }}"
+it_dns_ttl: 300
+# cert-manager DNS-01 ClusterIssuer (Cloud DNS solver via ADC) and the wildcard cert
+# secret the IT ingresses consume. Reuses acme_email / letsencrypt_server from above.
+it_dns01_issuer_name: "letsencrypt-dns01"
+it_tls_secret_name: "galaxy-it-tls"
+
 # CNPG Skip-Initdb Plugin Configuration
 # Enable this to allow PostgreSQL to reuse existing data directories
 # Requires: cert-manager installed in the cluster

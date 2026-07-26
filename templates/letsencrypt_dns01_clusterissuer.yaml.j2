@@ -1,0 +1,24 @@
+# Let's Encrypt DNS-01 ClusterIssuer for the Interactive Tools WILDCARD cert.
+# HTTP-01 (the letsencrypt_clusterissuer.yaml.j2 issuer used for the main Galaxy host)
+# cannot issue wildcards, so IT TLS uses a DNS-01 challenge solved in Google Cloud DNS.
+# cert-manager authenticates with the VM's service account via ambient credentials
+# (ADC) -- no serviceAccountSecretRef -- which requires the VM SA to hold
+# roles/dns.admin. This mirrors how the Vertex AI backend authenticates without a key.
+# project is the GCP project id detected from the metadata server at deploy time.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ it_dns01_issuer_name }}
+spec:
+  acme:
+    server: {{ letsencrypt_server }}
+    email: {{ acme_email }}
+    privateKeySecretRef:
+      name: {{ it_dns01_issuer_name }}-account-key
+    solvers:
+      - dns01:
+          cloudDNS:
+            project: {{ _gcp_project_id }}
+        selector:
+          dnsZones:
+            - "{{ it_proxy_host }}"

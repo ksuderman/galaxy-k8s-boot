@@ -40,6 +40,12 @@
   ansible.builtin.include_tasks: galaxy_application.yml
   when: deploy_galaxy | default(false)
 
+- name: Include Interactive Tools DNS + wildcard TLS setup tasks
+  ansible.builtin.include_tasks: interactive_tools.yml
+  when:
+    - deploy_galaxy | default(false)
+    - enable_interactive_tools | default(false) | bool
+
 - name: Include Pulsar application setup tasks
   ansible.builtin.include_tasks: pulsar_application.yml
   when: deploy_pulsar | default(false)
