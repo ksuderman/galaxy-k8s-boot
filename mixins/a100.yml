@@ -29,10 +29,13 @@ configs:
       brand: Ollama-A100
       inference_services:
         default:
-          # Fail fast on the rare doomed request rather than burning the full retry
-          # budget; structured output normally succeeds first try on the 32b.
-          retries: 1
-
+          structured_output_override: false
+          retries: 3
+        custom_tool:
+          # The custom-tool agent (code generation + its own reflection loop) is
+          # the most expensive; disable it to cut per-question fan-out.
+          enabled: false
+          
 extraFileMappings:
   /galaxy/server/static/welcome.html:
     applyToWeb: true
