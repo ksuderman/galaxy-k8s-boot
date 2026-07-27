@@ -19,7 +19,7 @@ configs:
   galaxy.yml:
     galaxy:
       logo_url: null
-      brand: Gemini
+      brand: Interactive Tools
       inference_services:
         default:
           # Parse plain-text responses instead of demanding structured/tool-call
@@ -60,7 +60,8 @@ extraFileMappings:
                               <p>
                                 This Galaxy instance has been configured to route
                                 GalaxyAI to Gemini for Government (Vertex AI, in an
-                                Assured Workloads project) via the LiteLLM front door.
+                                Assured Workloads project) via the LiteLLM front door. 
+                                Domain based Interactive Tools have also been configured on this server.
                               </p>
                           </div>
                       </div>
