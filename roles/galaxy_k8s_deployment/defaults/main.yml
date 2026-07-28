@@ -123,6 +123,26 @@ it_dns_ttl: 300
 it_dns01_issuer_name: "letsencrypt-dns01"
 it_tls_secret_name: "galaxy-it-tls"
 
+# TLS certificate reuse across redeploys (ON by default). These instances have fixed
+# hostnames and static IPs, so the cert from the previous deploy is still valid -- but a
+# fresh cluster makes cert-manager request a brand-new one, burning Let's Encrypt's
+# per-hostname rate limit (~5/week). The playbook restores the previously-issued cert
+# Secret(s) from a GCS bucket before cert-manager runs (it adopts the valid cert instead
+# of reissuing) and re-saves them after issuance/renewal. Only PRODUCTION certs are saved
+# (skipped when letsencrypt_server is staging) so the store never serves an untrusted cert.
+# Auth is via the VM service account (ADC); that SA needs roles/storage.objectAdmin on
+# cert_store_bucket. Restore/save degrade gracefully (a 403/absent object just falls back
+# to normal issuance), so leaving this on is safe even where the bucket isn't reachable.
+# Override cert_store_bucket (or set persist_certs=false) per deploy as needed.
+# See tasks/cert_persist.yml.
+persist_certs: true
+cert_store_bucket: "anvil-and-terra-development-galaxy-cert-store"
+cert_store_prefix: "certs"
+# Which Secrets to persist: the main-host cert (HTTP-01) and the IT wildcard (DNS-01).
+persist_cert_secrets:
+  - "{{ tls_secret_name }}"
+  - "{{ it_tls_secret_name }}"
+
 # CNPG Skip-Initdb Plugin Configuration
 # Enable this to allow PostgreSQL to reuse existing data directories
 # Requires: cert-manager installed in the cluster

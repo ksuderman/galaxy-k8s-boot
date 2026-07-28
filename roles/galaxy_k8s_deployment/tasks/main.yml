@@ -30,6 +30,15 @@
   ansible.builtin.include_tasks: ingress_setup.yml
   when: setup_ingress | default(true)
 
+- name: Restore TLS certificates from the GCS cert store (before cert-manager issues)
+  ansible.builtin.include_tasks: cert_persist.yml
+  vars:
+    cert_persist_mode: restore
+  when:
+    - persist_certs | default(false) | bool
+    - cert_store_bucket | default('') | length > 0
+    - galaxy_hostname | default('') | length > 0
+
 - name: Include AI inference server (ChatGXY) setup tasks
   ansible.builtin.include_tasks: inference_server.yml
   when:
@@ -45,6 +54,15 @@
   when:
     - deploy_galaxy | default(false)
     - enable_interactive_tools | default(false) | bool
+
+- name: Save TLS certificates to the GCS cert store (after issuance/renewal)
+  ansible.builtin.include_tasks: cert_persist.yml
+  vars:
+    cert_persist_mode: save
+  when:
+    - persist_certs | default(false) | bool
+    - cert_store_bucket | default('') | length > 0
+    - galaxy_hostname | default('') | length > 0
 
 - name: Include Pulsar application setup tasks
   ansible.builtin.include_tasks: pulsar_application.yml

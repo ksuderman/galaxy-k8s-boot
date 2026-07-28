@@ -104,9 +104,12 @@ configs:
         gcp_batch:
           runner: gcp_batch
         # Interactive Tools run as pods on THIS RKE2 cluster via the KubernetesJobRunner
-        # (the k8s runner + its k8s_interactivetools_* params come from the Galaxy Helm
-        # chart). ITs must never go to GCP Batch, so interactive_tool.* is routed here
-        # explicitly below rather than through the tpv_dispatcher default.
+        # (the k8s runner + its k8s_interactivetools_* ingress params come from the Galaxy
+        # Helm chart). ITs must never go to GCP Batch. NOTE: in this deployment TPV (the
+        # tpv_dispatcher default) actually resolves IT destinations to its own `k8s`
+        # destination -- the static interactive_tool.* -> k8s mapping below is documented
+        # intent, and the IT-specific run-as-user override lives in the TPV rules (see the
+        # interactive_tool_.* rule in tpv_rules_local.yml).
         k8s:
           runner: k8s
     destinations:
@@ -129,7 +132,7 @@ configs:
         id: __SET_METADATA__
       - environment: local
         id: __EXTRACT_DATASET__
-      # Route interactive tools to Kubernetes (local RKE2 cluster), never GCP Batch
+      # Route interactive tools to Kubernetes (local RKE2 cluster), never GCP Batch.
       - environment: k8s
         id: interactive_tool.*
       # Route data source tools to Kubernetes
@@ -189,6 +192,19 @@ jobs:
                 tool.id in GALAXY_LIB_TOOLS_UNVERSIONED or "CONVERTER_" == tool.id[:10] or tool.is_datatype_converter
               params:
                 docker_container_id_override: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        # Interactive Tools run foreign images (e.g. Jupyter's `jovyan`, uid 1000, with a
+        # writable /home/jovyan), not Galaxy's uid-10001 job image. TPV -- not the static
+        # tools: map in job_conf -- resolves IT destinations (to the k8s destination), so
+        # the run-as-user override must live here. Clearing these params makes the k8s
+        # runner omit the pod securityContext, so each IT image runs as its own Dockerfile
+        # USER (empty string -> runner resolves to None -> runAsUser/fsGroup/etc omitted).
+        # Without this, IT pods run as uid 10001 and fail to write their own home dir.
+        interactive_tool_.*:
+          params:
+            k8s_run_as_user_id: ''
+            k8s_run_as_group_id: ''
+            k8s_supplemental_group_id: ''
+            k8s_fs_group_id: ''
 
 extraVolumes:
   - name: static-images

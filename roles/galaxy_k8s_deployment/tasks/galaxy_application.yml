@@ -397,6 +397,14 @@
         galaxy.yml:
           galaxy:
             interactivetools_enable: true
+            # The KubernetesJobRunner creates a real per-IT nginx Ingress (with TLS), so
+            # there is no separate upstream proxy in front of ITs. upstream_proxy defaults
+            # to TRUE, which makes Galaxy build the user-facing IT URL from the request host
+            # (the main Galaxy host) instead of interactivetools_proxy_host -- while the
+            # ingress it creates uses interactivetools_proxy_host. That split yields URLs on
+            # <host> that have no DNS/cert. Set false so the URL matches the ingress (and the
+            # wildcard cert + Cloud DNS zone) -- users go directly to the per-IT ingress.
+            interactivetools_upstream_proxy: false
             # Override the chart default (which uses the main Galaxy host) so ITs live
             # under the per-instance interactivetool.<host> subdomain covered by the
             # wildcard cert + Cloud DNS zone.
