@@ -49,7 +49,10 @@
 
     - name: Download saved Secret objects (404 = not stored yet, 403 = no bucket access -> first issuance)
       ansible.builtin.uri:
-        url: "{{ _cert_gcs_obj }}/{{ (cert_store_prefix ~ '/' ~ galaxy_hostname ~ '/' ~ item ~ '.yaml') | urlencode }}?alt=media"
+        # GCS's /o/{object} path segment needs the object name fully encoded -- slashes as
+        # %2F. Ansible's urlencode leaves '/' intact (safe='/'), which yields a 404, so
+        # force-encode the separators after urlencode.
+        url: "{{ _cert_gcs_obj }}/{{ (cert_store_prefix ~ '/' ~ galaxy_hostname ~ '/' ~ item ~ '.yaml') | urlencode | regex_replace('/', '%2F') }}?alt=media"
         method: GET
         headers:
           Authorization: "Bearer {{ _cert_gcs_token }}"
@@ -108,7 +111,9 @@
 
     - name: Upload each populated Secret to GCS
       ansible.builtin.uri:
-        url: "{{ _cert_gcs_upload }}?uploadType=media&name={{ (cert_store_prefix ~ '/' ~ galaxy_hostname ~ '/' ~ item.item ~ '.yaml') | urlencode }}"
+        # Match the restore path exactly (slashes as %2F). GCS tolerates literal slashes in
+        # the upload `name` query param, but keeping both sides identical avoids drift.
+        url: "{{ _cert_gcs_upload }}?uploadType=media&name={{ (cert_store_prefix ~ '/' ~ galaxy_hostname ~ '/' ~ item.item ~ '.yaml') | urlencode | regex_replace('/', '%2F') }}"
         method: POST
         headers:
           Authorization: "Bearer {{ _cert_gcs_token }}"
