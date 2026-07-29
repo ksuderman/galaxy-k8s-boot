@@ -118,12 +118,19 @@
         headers:
           Authorization: "Bearer {{ _cert_gcs_token }}"
           Content-Type: application/yaml
+        # Preserve the cert-manager issuer annotations (issuer-name/kind/group, plus
+        # certificate-name and the SAN annotations). Without them cert-manager reads the
+        # restored Secret as "issued by Issuer/''", which mismatches the Certificate's
+        # issuerRef (ClusterIssuer/letsencrypt-prod) and triggers a reissue (reason
+        # IncorrectIssuer) -- defeating the whole point. Rendered as an inline JSON flow map
+        # so the long base64 tls.crt/tls.key stay on single (unwrapped) lines.
         body: |
           apiVersion: v1
           kind: Secret
           metadata:
             name: {{ item.item }}
             namespace: galaxy
+            annotations: {{ item.resources[0].metadata.annotations | default({}) | dict2items | selectattr('key', 'match', '^cert-manager\.io/') | list | items2dict | to_json }}
           type: kubernetes.io/tls
           data:
             tls.crt: {{ item.resources[0].data['tls.crt'] }}

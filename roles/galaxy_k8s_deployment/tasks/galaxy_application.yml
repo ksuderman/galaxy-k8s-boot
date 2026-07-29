@@ -405,6 +405,9 @@
             # <host> that have no DNS/cert. Set false so the URL matches the ingress (and the
             # wildcard cert + Cloud DNS zone) -- users go directly to the per-IT ingress.
             interactivetools_upstream_proxy: false
+            # Shared NFS path (chart default is relative -> pod-local, so IT stop 500s with
+            # "no such table: gxitproxy" because web/job handlers get separate map files).
+            interactivetools_map: /galaxy/server/database/interactivetools_map.sqlite
             # Override the chart default (which uses the main Galaxy host) so ITs live
             # under the per-instance interactivetool.<host> subdomain covered by the
             # wildcard cert + Cloud DNS zone.
