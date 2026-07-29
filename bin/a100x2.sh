@@ -22,7 +22,7 @@ GPU_CPUS=24
 # true tensor parallelism (better throughput, newer path here). The playbook sets the
 # GPU count (ollama_gpu_count / vllm_tensor_parallel_size) from the node automatically.
 # --------------------------------------------------------------------------------
-ENGINE="${ENGINE:-ollama}"
+ENGINE="${ENGINE:-vllm}"
 ARGS=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
