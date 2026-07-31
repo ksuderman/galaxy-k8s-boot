@@ -180,7 +180,7 @@
 
 - name: Get node internal IP for NFS access
   set_fact:
-    nfs_server: "{{ ansible_default_ipv4.address }}"
+    nfs_server: "{{ ansible_facts['default_ipv4']['address'] }}"
   when: enable_gcp_batch | default(false) | bool
 
 - name: Verify NFS service exists
@@ -237,10 +237,6 @@
         galaxy-project-logo-white-square.png: "{{ lookup('file', 'files/galaxy-project-logo-white-square.png') | b64encode }}"
         anvil-project-logo-white.png: "{{ lookup('file', 'files/anvil-project-logo-white.png') | b64encode }}"
 
-# The postInstallJob.galaxyUser is taken from the profile/mixin (e.g. postinstall-ks.yml).
-# The task below, which overrode it with the playbook-wide `galaxy_user`, is disabled so a
-# mixin's own galaxyUser wins. To restore the override, uncomment this task and re-append
-# `+ user_file` in the "Prepare Galaxy values files list" task below.
 # - name: Write Galaxy post-install user values
 #   ansible.builtin.copy:
 #     dest: /tmp/galaxy-postinstall-user.yaml
@@ -251,16 +247,20 @@
 #   delegate_to: localhost
 #   become: false
 #   when: galaxy_user | default('') | length > 0
+#
+# To also wire the file written above into the Helm values, uncomment the
+# `user_file` set line below and insert `user_file` between `profile` and `base`
+# in the returned list. It overrides the profile's galaxyUser, while user-defined
+# mixins (base) come last and still take precedence:
+#   {%- set user_file = ['/tmp/galaxy-postinstall-user.yaml'] if (galaxy_user | default('') | length > 0) else [] -%}
+#   {{ profile + user_file + base }}
 
 - name: Prepare Galaxy values files list
   set_fact:
     _galaxy_values_files: >-
       {%- set base = galaxy_values_files if (galaxy_values_files is defined and galaxy_values_files | length > 0) else ['values/values.yml'] -%}
       {%- set profile = galaxy_import_profile | default([]) -%}
-      {%- if galaxy_import_profile_file is defined and galaxy_import_profile_file != '__use_role_default__' -%}
-      {%- set profile = [galaxy_import_profile_file] if (galaxy_import_profile_file | length > 0) else [] -%}
-      {%- endif -%}
-      {{ base + profile }}
+      {{ profile + base }}
 
 - name: Display Galaxy values files being used
   debug:
@@ -275,45 +275,76 @@
   loop_control:
     index_var: idx
 
+- name: Copy packaged local Galaxy chart to the remote host
+  ansible.builtin.copy:
+    src: "galaxy-{{ galaxy_chart_version }}.tgz"
+    dest: "/tmp/galaxy-chart.tgz"
+    mode: '0644'
+  when: use_local_chart | default(false) | bool
+
 # Derive the GCP Batch region from the VM's own zone so Batch jobs run in-region
-# with the cluster's NFS server instead of the us-east4 default in values.yml. The
-# metadata server reports the true zone (e.g. projects/NUM/zones/us-central1-f)
-# regardless of how the VM was launched; strip the trailing "-<letter>" to get the
-# region. Falls back to the gcp_batch_region default (defaults/main.yml) on failure.
+# with the cluster's NFS server. The metadata server reports the true zone
+# (e.g. projects/NUM/zones/us-central1-f) regardless of how the VM was launched;
+# strip the trailing "-<letter>" to get the region. An explicitly set
+# gcp_batch_region always wins, and when neither is available the region in the
+# Helm values files is left untouched (see the _helm_values_gcp_batch merge below).
 - name: Detect GCP zone from the metadata server
   ansible.builtin.uri:
     url: http://metadata.google.internal/computeMetadata/v1/instance/zone
     headers:
       Metadata-Flavor: Google
     return_content: true
+    timeout: 5
   register: gcp_zone_meta
   failed_when: false
-  when: enable_gcp_batch | default(false) | bool
+  when:
+    - enable_gcp_batch | default(false) | bool
+    - gcp_batch_region | default('') | length == 0
 
 - name: Derive gcp_batch_region from the detected zone
   set_fact:
-    gcp_batch_region: "{{ gcp_zone_meta.content | regex_replace('.*/', '') | regex_replace('-[a-z]$', '') }}"
+    gcp_batch_region: "{{ _detected_region }}"
+    _gcp_batch_region_source: "zone {{ _detected_zone }} reported by the metadata server"
+  vars:
+    _detected_zone: "{{ gcp_zone_meta.content | default('') | trim | regex_replace('.*/', '') }}"
+    _detected_region: "{{ _detected_zone | regex_replace('-[a-z]$', '') }}"
   when:
     - enable_gcp_batch | default(false) | bool
+    - gcp_batch_region | default('') | length == 0
     - gcp_zone_meta.status | default(0) == 200
-    - gcp_zone_meta.content | default('') | length > 0
+    - _detected_region is match('^[a-z]+-[a-z]+[0-9]+$')
 
 - name: Display GCP Batch region in use
   debug:
-    msg: "GCP Batch region: {{ gcp_batch_region }} (from zone {{ gcp_zone_meta.content | default('n/a') | regex_replace('.*/', '') }})"
-  when: enable_gcp_batch | default(false) | bool
+    msg: "GCP Batch region: {{ gcp_batch_region }} (from {{ _gcp_batch_region_source | default('the gcp_batch_region variable', true) }})"
+  when:
+    - enable_gcp_batch | default(false) | bool
+    - gcp_batch_region | default('') | length > 0
+
+- name: Warn that the GCP Batch region could not be determined
+  debug:
+    msg: >-
+      WARNING: could not derive the GCP Batch region from the metadata server
+      (HTTP status {{ gcp_zone_meta.status | default('n/a') }}, content
+      '{{ gcp_zone_meta.content | default('') | trim }}'). Batch jobs will use the
+      region set in the Helm values files, which breaks job I/O against the
+      cluster's NFS server if that region is not this VM's region. Set
+      gcp_batch_region explicitly to silence this warning.
+  when:
+    - enable_gcp_batch | default(false) | bool
+    - gcp_batch_region | default('') | length == 0
 
 - name: Helm install Galaxy
   kubernetes.core.helm:
     name: galaxy
     namespace: galaxy
-    chart_ref: "{{ galaxy_chart }}"
-    chart_version: "{{ galaxy_chart_version }}"
+    chart_ref: "{{ '/tmp/galaxy-chart.tgz' if (use_local_chart | default(false) | bool) else galaxy_chart }}"
+    chart_version: "{{ omit if (use_local_chart | default(false) | bool) else galaxy_chart_version }}"
     kubeconfig: "{{ kubeconfig_path }}"
-    update_repo_cache: true
+    update_repo_cache: "{{ not (use_local_chart | default(false) | bool) }}"
     timeout: "20m0s"
     values_files: "{{ lookup('sequence', 'start=0 end=' ~ (_galaxy_values_files|length - 1) ~ ' format=/tmp/galaxy_values_%d.yml', wantlist=True) }}"
-    values: "{{ _helm_values_base | combine(_helm_values_gcp_batch if (enable_gcp_batch | default(false) | bool) else {}, recursive=True) | combine(_helm_values_cnpg_plugin if (restore_galaxy and detected_galaxy_pvc_uuid | default('') != '') else {}, recursive=True) | combine(_helm_values_ai if (ai_backend | default('none') != 'none') else {}, recursive=True) | combine(_helm_values_tls if (galaxy_hostname | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_it if (enable_interactive_tools | default(false) | bool) else {}, recursive=True) }}"
+    values: "{{ _helm_values_base | combine(_helm_values_gcp_batch if (enable_gcp_batch | default(false) | bool and gcp_batch_region | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_cnpg_plugin if (restore_galaxy and detected_galaxy_pvc_uuid | default('') != '') else {}, recursive=True) | combine(_helm_values_ai if (ai_backend | default('none') != 'none') else {}, recursive=True) | combine(_helm_values_tls if (galaxy_hostname | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_it if (enable_interactive_tools | default(false) | bool) else {}, recursive=True) }}"
     set_values: "{{ galaxy_helm_extra_sets | default([]) + _helm_prefix_sets }}"
   register: _galaxy_helm_install
   # The cloudve galaxy chart is fetched from raw.githubusercontent.com, which
@@ -334,6 +365,12 @@
         size: "{{ galaxy_persistence_size }}"
       postgresql:
         galaxyDatabasePassword: "{{ galaxy_db_password }}"
+      terra:
+        launch:
+          workspace: "{{ terra_workspace | default('') }}"
+          namespace: "{{ terra_namespace | default('') }}"
+          drsURL: "{{ terra_drs_url | default('') }}"
+          apiURL: "{{ terra_api_url | default('') }}"
       configs:
         galaxy.yml:
           galaxy:
@@ -351,9 +388,10 @@
               gcp_batch:
                 params:
                   job_id_prefix: "{{ gcp_batch_job_id_prefix }}"
-    # Override only the gcp_batch runner region (derived from the VM zone above);
-    # deep-merges over the runner block in values/values.yml, preserving every
-    # other setting. Merged into the Helm values only when enable_gcp_batch is set.
+    # Overrides only the gcp_batch runner region; deep-merges over the runner block
+    # in the values files, preserving every other setting. Merged in only when
+    # enable_gcp_batch is set and a region is known, so a region in a user-supplied
+    # values file survives when detection fails.
     _helm_values_gcp_batch:
       configs:
         job_conf.yml:
@@ -515,59 +553,70 @@
     - nfs_export_path is defined
 
 # job_conf.yml is mounted with subPath, and Kubernetes never propagates ConfigMap
-# updates into subPath mounts. Every deployment that mounts it keeps the config it
-# started with until it is restarted -- if the job handler is missed, the gcp_batch
-# runner sees no gcp_batch_volumes and silently falls back to an NFS server of
-# 127.0.0.1, so every Batch job dies with "mount.nfs4: Connection refused".
-- name: Find Galaxy deployments that mount job_conf.yml
-  shell: |
-    kubectl get deployment -n galaxy -o name \
-      | sed 's|^deployment.apps/||' \
-      | grep -E '^galaxy-(web|workflow|celery|celery-beat|job-[0-9]+)$' || true
-  environment:
-    KUBECONFIG: "{{ kubeconfig_path }}"
-  register: job_conf_deployments
-  changed_when: false
+# updates into subPath mounts; every deployment that mounts it keeps the config it
+# started with until it is restarted.
+# Only job handlers need the new config: gcp_batch_volumes is a runner-plugin
+# setting, and Galaxy instantiates runner plugins solely in processes where
+# app.is_job_handler is true (galaxy.jobs.manager.JobManager.start). The web and
+# workflow-scheduler pods attach to no handler pool, so their copy of job_conf.yml
+# is never read by a runner and restarting them only lengthens the deployment.
+- name: Restart Galaxy job handlers and wait for them to pick up configuration changes
+  vars:
+    galaxy_job_handler_pattern: '^galaxy-job-[0-9]+$'
+    galaxy_job_handler_deployments: >-
+      {{ galaxy_deployments.resources | default([]) | map(attribute='metadata.name')
+         | select('match', galaxy_job_handler_pattern) | list }}
   when:
     - enable_gcp_batch | default(false) | bool
     - nfs_export_path is defined
+  block:
+    - name: List Galaxy deployments
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: galaxy
+        kubeconfig: "{{ kubeconfig_path }}"
+      register: galaxy_deployments
 
-- name: Restart Galaxy deployments to pick up configuration changes
-  shell: kubectl rollout restart deployment {{ item }} -n galaxy
-  environment:
-    KUBECONFIG: "{{ kubeconfig_path }}"
-  loop: "{{ job_conf_deployments.stdout_lines | default([]) }}"
-  when:
-    - enable_gcp_batch | default(false) | bool
-    - nfs_export_path is defined
+    # Matching nothing would silently skip the restart and leave every handler on a
+    # job_conf.yml without gcp_batch_volumes, failing every Batch job. Fail instead,
+    # so a chart that renames its handler deployments is caught here.
+    - name: Fail if no job handler deployments were found
+      fail:
+        msg: >-
+          No deployment in the galaxy namespace matches
+          {{ galaxy_job_handler_pattern }}. Found:
+          {{ galaxy_deployments.resources | map(attribute='metadata.name') | join(', ') }}.
+          Update galaxy_job_handler_pattern to match the chart's job handler
+          deployments, otherwise they keep a stale job_conf.yml and every GCP Batch
+          job they dispatch would fail.
+      when: galaxy_job_handler_deployments | length == 0
 
-- name: Wait for restarted deployments to finish rolling out
-  # Allow 30 minutes for long running postInstallJobs
-  shell: kubectl rollout status deployment {{ item }} -n galaxy --timeout=1800s
-  environment:
-    KUBECONFIG: "{{ kubeconfig_path }}"
-  loop: "{{ job_conf_deployments.stdout_lines | default([]) }}"
-  changed_when: false
-  when:
-    - enable_gcp_batch | default(false) | bool
-    - nfs_export_path is defined
+    - name: Restart Galaxy job handlers to pick up configuration changes
+      shell: kubectl rollout restart deployment {{ item }} -n galaxy
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      loop: "{{ galaxy_job_handler_deployments }}"
 
-# Fail loudly rather than leaving a cluster that looks healthy but errors every
-# Batch job. The handler is the deployment that actually dispatches to GCP Batch.
-- name: Verify the job handler picked up gcp_batch_volumes
-  shell: |
-    set -o pipefail
-    pod=$(kubectl get pod -n galaxy -o name \
-      | sed 's|^pod/||' | grep -m1 '^galaxy-job-0-')
-    kubectl exec -n galaxy "$pod" -c galaxy-job-0 -- \
-      grep -q 'gcp_batch_volumes' /galaxy/server/config/job_conf.yml
-  args:
-    executable: /bin/bash
-  environment:
-    KUBECONFIG: "{{ kubeconfig_path }}"
-  register: gcp_batch_volumes_check
-  changed_when: false
-  failed_when: gcp_batch_volumes_check.rc != 0
-  when:
-    - enable_gcp_batch | default(false) | bool
-    - nfs_export_path is defined
+    - name: Wait for restarted job handlers to finish rolling out
+      # 30 minutes per deployment; first-boot rollouts are slow while Galaxy builds
+      # the tool panel and the CVMFS caches warm up.
+      shell: kubectl rollout status deployment {{ item }} -n galaxy --timeout=1800s
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      loop: "{{ galaxy_job_handler_deployments }}"
+      changed_when: false
+
+    # Fail loudly rather than leaving a cluster that looks healthy but errors every
+    # Batch job. Addressing deployment/<name> lets kubectl pick a pod from the
+    # current ReplicaSet; matching on pod name could select one still terminating
+    # from the previous ReplicaSet and read its pre-restart config.
+    - name: Verify job handlers picked up gcp_batch_volumes
+      shell: >
+        kubectl exec -n galaxy deployment/{{ item }} -c {{ item }} --
+        grep -q '{{ nfs_server }}:{{ nfs_export_path }}:/galaxy/server/database'
+        /galaxy/server/config/job_conf.yml
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      loop: "{{ galaxy_job_handler_deployments }}"
+      changed_when: false

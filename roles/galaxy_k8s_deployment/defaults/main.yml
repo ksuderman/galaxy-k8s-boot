@@ -20,8 +20,8 @@ cvmfs_quota_limit: 4000
 cvmfs_http_proxies: ["DIRECT"]
 
 # System Setup (used only if setup_system is true)
-rke2_version: v1.35.1+rke2r1  # https://github.com/rancher/rke2/tags
-helm_version: v3.19.0         # https://github.com/helm/helm/tags
+rke2_version: v1.36.2+rke2r1  # https://github.com/rancher/rke2/tags
+helm_version: v4.2.2          # https://github.com/helm/helm/tags
 system_packages:
   - python3
   - python3-pip
@@ -160,9 +160,10 @@ restore_galaxy: false
 ingress_version: "4.13.2"  # https://github.com/kubernetes/ingress-nginx?tab=readme-ov-file#supported-versions-table
 
 # Galaxy Application Configuration
-galaxy_prefix: "/"
+use_local_chart: false
+galaxy_prefix: "/galaxy"
 galaxy_chart: cloudve/galaxy
-galaxy_chart_version: "6.8.0"
+galaxy_chart_version: "6.8.2"
 galaxy_deps_chart: cloudve/galaxy-deps
 galaxy_deps_version: "1.1.1"
 
@@ -176,7 +177,7 @@ galaxy_values_files:
 # Size requested by Galaxy's `galaxy-pvc` claim.
 # Keep it less than or equal to the usable space behind `nfs_size`, and
 # leave headroom if other PVCs also use the `nfs` storage class.
-galaxy_persistence_size: "128Gi"
+galaxy_persistence_size: "115Gi"
 galaxy_db_password: "galaxydbpassword"
 galaxy_user: "default-user@galaxyproject.org"
 galaxy_bootstrap_api_key: "galaxypassword"
@@ -192,11 +193,15 @@ galaxy_job_max_mem: 4
 # This will:
 #   - Detect and configure NFS LoadBalancer IP
 #   - Auto-detect NFS export path for Galaxy PVC
+#   - Derive the Batch region from the VM's zone (unless gcp_batch_region is set)
 #   - Update job_conf.yml with GCP Batch runner configuration
 #   - Restart Galaxy deployments to apply changes
 enable_gcp_batch: true
 gcp_batch_service_account_email: ""
-gcp_batch_region: "us-east4"
+# Leave empty to derive the region from the VM's own zone via the metadata server.
+# An explicit value is never overridden by detection. When this is empty and
+# detection fails, the region in the Helm values files is used unchanged.
+gcp_batch_region: ""
 # Prefix for GCP Batch job names so Batch jobs are identifiable per cluster. The
 # runner builds the job name as "<prefix>-<id>", so keep it short and valid for a
 # Batch job name: ^[a-z]([a-z0-9-]*[a-z0-9])?$ (lowercase letters, digits, hyphens;
@@ -204,6 +209,13 @@ gcp_batch_region: "us-east4"
 # --job-id-prefix, else the sanitized instance name). Never leave empty -- an unset
 # prefix surfaces as a literal "None" in the Batch job name and is rejected (400).
 gcp_batch_job_id_prefix: "galaxy-batch"
+
+# Terra / AnVIL launch context
+# Supplied at VM launch time by the orchestrating service (e.g. Leonardo).
+terra_workspace: ""
+terra_namespace: ""
+terra_drs_url: ""
+terra_api_url: ""
 
 # Pulsar Application Configuration
 pulsar_chart: cloudve/pulsar
