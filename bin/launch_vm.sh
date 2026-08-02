@@ -66,6 +66,11 @@ EXPOSE_LITELLM=false
 # the KubernetesJobRunner and sets up the per-instance Cloud DNS zone + wildcard TLS.
 # Requires --hostname (the IT subdomain derives from it). Off by default.
 ENABLE_INTERACTIVE_TOOLS=false
+# Reuse TLS certs across redeploys via a GCS cert store (avoids Let's Encrypt rate
+# limits on fixed hostnames). Env-driven (set by the launcher scripts); the VM SA needs
+# roles/storage.objectAdmin on the bucket. Off / empty by default.
+PERSIST_CERTS="${PERSIST_CERTS:-}"
+CERT_STORE_BUCKET="${CERT_STORE_BUCKET:-}"
 # Provision the VM as a Spot (preemptible) instance: ~60-91% cheaper, but GCP can
 # reclaim it at any time. Requires maintenance-policy=TERMINATE. Off by default.
 SPOT="${SPOT:-false}"
@@ -760,6 +765,8 @@ cat >> "$TEMP_USER_DATA" << EOF
     GALAXY_HOSTNAME="${GALAXY_HOSTNAME}"
     ACME_EMAIL="${ACME_EMAIL}"
     EXPOSE_LITELLM="${EXPOSE_LITELLM}"
+    PERSIST_CERTS="${PERSIST_CERTS}"
+    CERT_STORE_BUCKET="${CERT_STORE_BUCKET}"
 EOF
 
 cat >> "$TEMP_USER_DATA" << 'EOF'
@@ -811,6 +818,18 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     if [ -n "${GCP_BATCH_JOB_ID_PREFIX}" ]; then
       echo "    gcp_batch_job_id_prefix=\"${GCP_BATCH_JOB_ID_PREFIX}\"" >> /tmp/ansible-inventory/localhost
       echo "[`date`] - GCP Batch job-id prefix: ${GCP_BATCH_JOB_ID_PREFIX}"
+    fi
+
+    # TLS cert reuse across redeploys (restore/save cert Secrets to a GCS bucket). ON by
+    # default via role defaults; these lines only pass through explicit overrides, so an
+    # empty value leaves the role default (persist_certs=true, default bucket) untouched.
+    if [ -n "${PERSIST_CERTS}" ]; then
+      echo "    persist_certs=${PERSIST_CERTS}" >> /tmp/ansible-inventory/localhost
+      echo "[`date`] - TLS cert persistence override: ${PERSIST_CERTS}"
+    fi
+    if [ -n "${CERT_STORE_BUCKET}" ]; then
+      echo "    cert_store_bucket=\"${CERT_STORE_BUCKET}\"" >> /tmp/ansible-inventory/localhost
+      echo "[`date`] - TLS cert store bucket override: ${CERT_STORE_BUCKET}"
     fi
 
     echo "[`date`] - NFS storage size for Galaxy: ${PV_SIZE}"

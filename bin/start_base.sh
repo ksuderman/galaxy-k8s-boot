@@ -54,6 +54,14 @@ EXPOSE_LITELLM=${EXPOSE_LITELLM:-false}
 # Enable Galaxy Interactive Tools on the local cluster (Cloud DNS + wildcard TLS).
 # Requires GALAXY_HOSTNAME. Set to "true" to enable.
 ENABLE_INTERACTIVE_TOOLS=${ENABLE_INTERACTIVE_TOOLS:-false}
+# Reuse TLS certs across redeploys via a GCS cert store (avoids Let's Encrypt rate limits
+# on fixed hostnames). This is ON by default in the role (default bucket + save gated to
+# production certs). These are OVERRIDES only: leave empty to use the role defaults, set
+# PERSIST_CERTS=false to disable, or CERT_STORE_BUCKET=<bucket> to point at a different
+# bucket (the VM SA needs roles/storage.objectAdmin on it). Exported so launch_vm.sh (a
+# subprocess) can read them.
+export PERSIST_CERTS=${PERSIST_CERTS:-}
+export CERT_STORE_BUCKET=${CERT_STORE_BUCKET:-}
 # Provision the VM as a Spot (preemptible) instance (~60-91% cheaper, reclaimable
 # anytime). Set to "true" in the calling script to enable.
 SPOT=${SPOT:-false}

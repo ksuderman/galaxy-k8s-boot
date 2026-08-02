@@ -9,7 +9,8 @@ SERVER=ks-${CLOUD}-test
 
 # Vertex/Gemini runs no local model engine, so a standard machine is plenty
 # (there is no Ollama pod competing for node memory).
-MACHINE_TYPE="e2-custom-6-12288"
+#MACHINE_TYPE="e2-custom-6-12288"
+MACHINE_TYPE=n2-standard-8
 
 # ChatGXY/GalaxyAI is only in the Galaxy dev image; the `ai` mixin supplies that
 # image plus the GalaxyAI branding. Its inference_services CPU tuning
