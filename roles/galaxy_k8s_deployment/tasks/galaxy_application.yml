@@ -426,7 +426,10 @@
       configs:
         galaxy.yml:
           galaxy:
-            galaxy_infrastructure_url: "https://{{ galaxy_hostname }}"
+            # Include the app prefix so absolute links (and $__galaxy_url__ / the IT
+            # api_key flow / Orbit's GALAXY_URL) resolve under the served path. A lone
+            # "/" prefix contributes nothing (root serve).
+            galaxy_infrastructure_url: "https://{{ galaxy_hostname }}{{ galaxy_prefix if galaxy_prefix != '/' else '' }}"
     # Interactive Tools: per-instance enablement. Routing (interactive_tool.* -> the
     # k8s environment) is static in values.yml; this carries the per-instance,
     # hostname-derived bits and points every IT ingress at the wildcard cert.
