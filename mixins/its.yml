@@ -20,6 +20,12 @@ configs:
     galaxy:
       logo_url: null
       brand: Interactive Tools
+      # Pin id_secret so galaxysession cookies survive redeploys. Unset (the chart
+      # default) makes Galaxy generate a new secret each deploy, so a browser holding
+      # a cookie from a prior deploy 400s with "Wrong guid ... unable to decode" and
+      # the UI renders blank. Throwaway for this test box; use a real secret for
+      # anything sensitive.
+      id_secret: "its-test-fixed-id-secret-do-not-use-in-prod-0001"
       inference_services:
         default:
           # Parse plain-text responses instead of demanding structured/tool-call
@@ -59,8 +65,7 @@ extraFileMappings:
                               <h2>GalaxyAI</h2>
                               <p>
                                 This Galaxy instance has been configured to route
-                                GalaxyAI to Gemini for Government (Vertex AI, in an
-                                Assured Workloads project) via the LiteLLM front door. 
+                                GalaxyAI to Gemini (Vertex AI) via the LiteLLM front door. 
                                 Domain based Interactive Tools have also been configured on this server.
                               </p>
                           </div>
