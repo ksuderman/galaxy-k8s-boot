@@ -12,9 +12,10 @@
 # use `{{ .Values.x }}` for anything dynamic.
 
 extraFileMappings:
-  # The Orbit interactive-tool definition. Placed alongside the bundled ITs in the tool
-  # path so the tool_conf below can reference it as interactive/orbit.xml.
-  /galaxy/server/tools/interactive/orbit.xml:
+  # The Orbit interactive-tool definition. Placed in the Galaxy tool_path
+  # (/galaxy/server/database/tools) alongside the bundled ITs, so the tool_conf below
+  # resolves it as interactive/orbit.xml (Galaxy resolves <tool file=...> against tool_path).
+  /galaxy/server/database/tools/interactive/orbit.xml:
     applyToJob: true       # the handler that dispatches the IT pod loads the toolbox
     applyToWeb: true       # the web handler renders/serves the tool panel
     applyToWorkflow: true  # keep every toolbox-loading pod consistent
@@ -25,7 +26,7 @@ extraFileMappings:
     content: |
       <tool id="interactive_tool_orbit" tool_type="interactive" name="Orbit AI Shell" version="0.1.0" profile="24.0">
           <requirements>
-              <container type="docker">docker.io/ksuderman/orbit:19657eb</container>
+              <container type="docker">docker.io/ksuderman/orbit:b218555</container>
           </requirements>
           <entry_points>
               <entry_point name="Orbit" requires_domain="True">
