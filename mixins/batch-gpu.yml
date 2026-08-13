@@ -1,0 +1,4 @@
+# The latest development build
+image:
+  repository: ksuderman/galaxy-gpu
+  tag: "26.2.dev0"
