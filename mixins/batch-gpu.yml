@@ -2,3 +2,12 @@
 image:
   repository: ksuderman/galaxy-gpu
   tag: "26.2.dev0"
+
+jobs:
+  rules:
+    tpv_rules_local.yml:
+      tools:
+        toolshed.g2.bx.psu.edu/repos/goeckslab/image_learner/image_learner/.*:
+          gpus: 1
+          cores: 32
+          mem: 116
