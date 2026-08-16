@@ -11,13 +11,13 @@ DISK_SIZE="150GB"
 POSTGRES_DISK_SIZE="10GB"
 DISK_TYPE="pd-balanced"
 GALAXY_CHART="cloudve/galaxy"
-GALAXY_CHART_VERSION="6.8.1"
+GALAXY_CHART_VERSION="6.8.2"
 GALAXY_DEPS_CHART="cloudve/galaxy-deps"
 GALAXY_DEPS_VERSION="1.1.1"
 GIT_BRANCH="anvil"
 GIT_REPO="https://github.com/galaxyproject/galaxy-k8s-boot.git"
 MACHINE_IMAGE="galaxy-k8s-boot-v2026-06-30"
-MACHINE_TYPE="e2-standard-4"
+MACHINE_TYPE="t2d-standard-4"
 PROJECT="anvil-and-terra-development"
 VM_USER="debian"
 ZONE="us-east4-c"
@@ -495,7 +495,7 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
         EXTRA_VARS="${EXTRA_VARS}, \"galaxy_import_profile\": ${GALAXY_IMPORT_PROFILE_JSON}"
     fi
     # Only pass gcp_project_id when --gcp-project-id was supplied; empty lets the
-    # playbook auto-detect the project from the VM's metadata.
+    # playbook auto-detect the project from instance metadata.
     if [ -n "${GCP_PROJECT_ID}" ]; then
         EXTRA_VARS="${EXTRA_VARS}, \"gcp_project_id\": \"${GCP_PROJECT_ID}\""
     fi
