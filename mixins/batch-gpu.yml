@@ -6,6 +6,10 @@ image:
 jobs:
   rules:
     tpv_rules_local.yml:
+      destinations:
+        gcp_batch:
+          params:
+            job_id_prefix: galaxy-gpu
       tools:
         toolshed.g2.bx.psu.edu/repos/goeckslab/image_learner/image_learner/.*:
           gpus: 1
