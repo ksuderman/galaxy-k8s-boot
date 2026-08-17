@@ -1,7 +1,7 @@
 # The latest development build
 image:
   repository: ksuderman/galaxy-gpu
-  tag: "26.2.dev0"
+  tag: "e7452ef"
 
 jobs:
   rules:
@@ -10,7 +10,10 @@ jobs:
         gcp_batch:
           params:
             job_id_prefix: galaxy-gpu
+            gpus: "{gpus}"
       tools:
+        default:
+          gpus: 0
         toolshed.g2.bx.psu.edu/repos/goeckslab/image_learner/image_learner/.*:
           gpus: 1
           cores: 32
