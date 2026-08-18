@@ -11,6 +11,19 @@ jobs:
           params:
             job_id_prefix: galaxy-gpu
             gpus: "{gpus}"
+          rules:
+            # GPU jobs boot from the GPU image (NVIDIA driver + container toolkit
+            # baked in) so the host Docker daemon can satisfy --gpus all. The stock
+            # CPU image has no NVIDIA Container Toolkit: Batch's boot-time driver
+            # install only covers the host (nvidia-smi works), and docker run fails
+            # with "failed to discover GPU vendor from CDI". install_gpu_drivers
+            # must be an UNQUOTED bool: destination params bypass the runner's
+            # map=bool spec and a quoted "false" is truthy.
+            - id: gpu_boot_image
+              if: gpus > 0
+              params:
+                custom_vm_image: projects/anvil-and-terra-development/global/images/galaxy-k8s-boot-gpu-debian12-v2026-07-09
+                install_gpu_drivers: false
       tools:
         default:
           gpus: 0
