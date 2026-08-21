@@ -1,5 +1,6 @@
 postInstallJob:
   enabled: true
+  image: quay.io/galaxyproject/abm:2.14.0
   galaxyUser: "default-user@galaxyproject.org"
   bootstrapConfig: |
     workflows:
