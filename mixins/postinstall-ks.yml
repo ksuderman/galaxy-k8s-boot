@@ -1,9 +1,7 @@
 postInstallJob:
   enabled: true
-  image: ksuderman/gxabm:2.14.0-dev0
-  galaxyUser: "suderman@jhu.edu"
+  galaxyUser: "default-user@galaxyproject.org"
   bootstrapConfig: |
-    version: 1
     workflows:
       - "https://benchmarking-inputs.s3.amazonaws.com/Variant/Galaxy-Workflow-Variant_analysis_on_WGS_PE_data.ga"
       - "https://benchmarking-inputs.s3.us-east-1.amazonaws.com/ILLung/Galaxy-Workflow-IL_Lung.ga"
