@@ -1,0 +1,124 @@
+# vLLM self-hosted inference engine (OpenAI-compatible via the LiteLLM front door).
+# Deployed only for ai_backend == 'vllm-gpu'. Unlike Ollama (single-GPU, layer split),
+# vLLM does true tensor parallelism across {{ vllm_tensor_parallel_size }} GPU(s), which
+# is why it is the better engine for a 70B on a multi-GPU node (e.g. 2x A100 40GB). The
+# model is served quantized ({{ vllm_quantization }}) so it fits in the aggregate VRAM.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vllm-cache
+  namespace: {{ inference_namespace }}
+  labels:
+    app: vllm
+    app.kubernetes.io/part-of: chatgxy
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ vllm_storage_class }}
+  resources:
+    requests:
+      storage: {{ vllm_storage_size }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  namespace: {{ inference_namespace }}
+  labels:
+    app: vllm
+    app.kubernetes.io/part-of: chatgxy
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: vllm
+  template:
+    metadata:
+      labels:
+        app: vllm
+        app.kubernetes.io/part-of: chatgxy
+    spec:
+      runtimeClassName: nvidia
+      containers:
+        - name: vllm
+          image: {{ vllm_image }}
+          imagePullPolicy: IfNotPresent
+          # The vllm/vllm-openai image entrypoint is the OpenAI API server; these are
+          # its flags. --served-model-name is the id LiteLLM routes to (openai/<name>).
+          args:
+            - "--model"
+            - "{{ vllm_model }}"
+            - "--served-model-name"
+            - "{{ vllm_served_model_name }}"
+            - "--tensor-parallel-size"
+            - "{{ vllm_tensor_parallel_size | int }}"
+            - "--quantization"
+            - "{{ vllm_quantization }}"
+            - "--max-model-len"
+            - "{{ vllm_max_model_len | int }}"
+            - "--gpu-memory-utilization"
+            - "{{ vllm_gpu_memory_utilization }}"
+            - "--host"
+            - "0.0.0.0"
+            - "--port"
+            - "8000"
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            # Cache downloaded weights on the PVC so a pod restart does not re-pull.
+            - name: HF_HOME
+              value: /root/.cache/huggingface
+          volumeMounts:
+            - name: cache
+              mountPath: /root/.cache/huggingface
+            # Tensor parallelism uses NCCL over shared memory; the default 64MB /dev/shm
+            # is far too small and NCCL will hang/crash without this.
+            - name: dshm
+              mountPath: /dev/shm
+          resources:
+            requests:
+              memory: {{ vllm_memory_request }}
+            limits:
+              memory: {{ vllm_memory_limit }}
+              nvidia.com/gpu: {{ vllm_tensor_parallel_size | int }}
+          # Weights are large (tens of GB) and load slowly; give the server ample time
+          # to become ready before the readiness probe starts failing it.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 15
+            failureThreshold: 120
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 10
+      volumes:
+        - name: cache
+          persistentVolumeClaim:
+            claimName: vllm-cache
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ vllm_shm_size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm
+  namespace: {{ inference_namespace }}
+  labels:
+    app: vllm
+    app.kubernetes.io/part-of: chatgxy
+spec:
+  type: ClusterIP
+  selector:
+    app: vllm
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000

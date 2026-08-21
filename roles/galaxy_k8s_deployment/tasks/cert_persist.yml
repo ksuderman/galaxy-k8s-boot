@@ -1,0 +1,148 @@
+---
+# TLS certificate persistence (opt-in): reuse certs across redeploys by backing them up
+# to / restoring them from a GCS bucket, so cert-manager ADOPTS a still-valid Secret
+# instead of asking Let's Encrypt for a new cert. That avoids LE's "certificates per
+# exact set of identifiers" rate limit on instances with fixed hostnames (a100, gemini,
+# its, ...), which otherwise trips after ~5 redeploys of the same host in a week.
+#
+# Auth is via the VM service account (ADC) -- no static key. The SA needs
+# roles/storage.objectAdmin on cert_store_bucket (like it already needs roles/dns.admin
+# for the DNS-01 wildcard). cert-manager still auto-renews near expiry; the renewed
+# Secret is captured on the next save.
+#
+# Included TWICE from main.yml:
+#   cert_persist_mode: restore   -- after ingress_setup, BEFORE galaxy_application creates
+#                                   the galaxy-tls ingress and interactive_tools the
+#                                   galaxy-it-tls Certificate (so cert-manager finds the
+#                                   restored Secret already present and skips issuance).
+#   cert_persist_mode: save      -- after the certs are Ready (end of the app layer).
+#
+# Objects are stored at gs://<cert_store_bucket>/<cert_store_prefix>/<galaxy_hostname>/<secret>.yaml
+
+- name: Get a GCP access token for GCS (ADC)
+  ansible.builtin.uri:
+    url: http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token
+    headers:
+      Metadata-Flavor: Google
+    return_content: true
+  register: _cert_token
+  no_log: true
+
+- name: Compose cert-store facts
+  set_fact:
+    _cert_gcs_token: "{{ (_cert_token.content | from_json).access_token }}"
+    _cert_gcs_obj: "https://storage.googleapis.com/storage/v1/b/{{ cert_store_bucket }}/o"
+    _cert_gcs_upload: "https://storage.googleapis.com/upload/storage/v1/b/{{ cert_store_bucket }}/o"
+
+# ---------------------------------------------------------------------------
+# RESTORE: pull each saved Secret from GCS and apply it before cert-manager runs
+# ---------------------------------------------------------------------------
+- name: Restore TLS Secrets from the GCS cert store
+  when: cert_persist_mode == 'restore'
+  block:
+    - name: Ensure the galaxy namespace exists (target for restored Secrets)
+      kubernetes.core.k8s:
+        kind: Namespace
+        name: galaxy
+        state: present
+        kubeconfig: "{{ kubeconfig_path }}"
+
+    - name: Download saved Secret objects (404 = not stored yet, 403 = no bucket access -> first issuance)
+      ansible.builtin.uri:
+        # GCS's /o/{object} path segment needs the object name fully encoded -- slashes as
+        # %2F. Ansible's urlencode leaves '/' intact (safe='/'), which yields a 404, so
+        # force-encode the separators after urlencode.
+        url: "{{ _cert_gcs_obj }}/{{ (cert_store_prefix ~ '/' ~ galaxy_hostname ~ '/' ~ item ~ '.yaml') | urlencode | regex_replace('/', '%2F') }}?alt=media"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ _cert_gcs_token }}"
+        return_content: true
+        status_code: [200, 403, 404]
+      loop: "{{ persist_cert_secrets }}"
+      register: _cert_dl
+      no_log: true
+
+    - name: Apply the restored Secrets (cert-manager will adopt valid ones, not reissue)
+      kubernetes.core.k8s:
+        state: present
+        kubeconfig: "{{ kubeconfig_path }}"
+        definition: "{{ item.content | from_yaml }}"
+      loop: "{{ _cert_dl.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when: item.status == 200
+      no_log: true
+
+# ---------------------------------------------------------------------------
+# SAVE: read each Ready Secret and upload a minimal copy (no runtime metadata) to GCS.
+# Only PRODUCTION certs are saved -- a staging ACME server issues untrusted certs, and the
+# store is keyed by hostname only, so saving a staging cert would let a later production
+# deploy restore (and serve) it. Skip the whole save block on staging.
+# ---------------------------------------------------------------------------
+- name: Skip cert save on staging ACME server
+  ansible.builtin.debug:
+    msg: >-
+      cert_persist(save): letsencrypt_server is staging, so these certs are NOT saved to
+      the GCS store (staging certs are untrusted and must not be restored by a prod deploy).
+  when:
+    - cert_persist_mode == 'save'
+    - "'staging' in (letsencrypt_server | default(''))"
+
+- name: Save TLS Secrets to the GCS cert store
+  when:
+    - cert_persist_mode == 'save'
+    - "'staging' not in (letsencrypt_server | default(''))"
+  block:
+    - name: Wait for each cert Secret to be populated (issued/renewed)
+      kubernetes.core.k8s_info:
+        kind: Secret
+        namespace: galaxy
+        name: "{{ item }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+      loop: "{{ persist_cert_secrets }}"
+      register: _cert_secrets
+      until: >-
+        _cert_secrets.resources | length > 0 and
+        (_cert_secrets.resources[0].data['tls.crt'] | default('')) | length > 0
+      retries: 40
+      delay: 15
+      # Don't fail the whole play if one cert never issues; just skip saving it below.
+      failed_when: false
+
+    - name: Upload each populated Secret to GCS
+      ansible.builtin.uri:
+        # Match the restore path exactly (slashes as %2F). GCS tolerates literal slashes in
+        # the upload `name` query param, but keeping both sides identical avoids drift.
+        url: "{{ _cert_gcs_upload }}?uploadType=media&name={{ (cert_store_prefix ~ '/' ~ galaxy_hostname ~ '/' ~ item.item ~ '.yaml') | urlencode | regex_replace('/', '%2F') }}"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ _cert_gcs_token }}"
+          Content-Type: application/yaml
+        # Preserve the cert-manager issuer annotations (issuer-name/kind/group, plus
+        # certificate-name and the SAN annotations). Without them cert-manager reads the
+        # restored Secret as "issued by Issuer/''", which mismatches the Certificate's
+        # issuerRef (ClusterIssuer/letsencrypt-prod) and triggers a reissue (reason
+        # IncorrectIssuer) -- defeating the whole point. Rendered as an inline JSON flow map
+        # so the long base64 tls.crt/tls.key stay on single (unwrapped) lines.
+        body: |
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: {{ item.item }}
+            namespace: galaxy
+            annotations: {{ item.resources[0].metadata.annotations | default({}) | dict2items | selectattr('key', 'match', '^cert-manager\.io/') | list | items2dict | to_json }}
+          type: kubernetes.io/tls
+          data:
+            tls.crt: {{ item.resources[0].data['tls.crt'] }}
+            tls.key: {{ item.resources[0].data['tls.key'] }}
+        status_code: [200]
+      loop: "{{ _cert_secrets.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when:
+        - item.resources | default([]) | length > 0
+        - (item.resources[0].data['tls.crt'] | default('')) | length > 0
+      # Never abort a deploy over cert caching: a bucket-access gap (403) or transient GCS
+      # error just means this deploy's cert isn't cached -- it will be retried next redeploy.
+      failed_when: false
+      no_log: true

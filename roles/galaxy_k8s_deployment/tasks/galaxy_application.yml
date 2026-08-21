@@ -460,8 +460,18 @@
     update_repo_cache: "{{ not (use_local_chart | default(false) | bool) }}"
     timeout: "20m0s"
     values_files: "{{ lookup('sequence', 'start=0 end=' ~ (_galaxy_values_files|length - 1) ~ ' format=/tmp/galaxy_values_%d.yml', wantlist=True) }}"
-    values: "{{ _helm_values_base | combine(_helm_values_gcp_project if (enable_gcp_batch | default(false) | bool and gcp_project_id | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_gcp_batch if (enable_gcp_batch | default(false) | bool and gcp_batch_region | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_gcp_network if (enable_gcp_batch | default(false) | bool and gcp_batch_network | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_gcp_subnet if (enable_gcp_batch | default(false) | bool and gcp_batch_subnet | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_cnpg_plugin if (restore_galaxy and detected_galaxy_pvc_uuid | default('') != '') else {}, recursive=True) }}"
+    values: "{{ _helm_values_base | combine(_helm_values_gcp_project if (enable_gcp_batch | default(false) | bool and gcp_project_id | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_gcp_batch if (enable_gcp_batch | default(false) | bool and gcp_batch_region | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_gcp_network if (enable_gcp_batch | default(false) | bool and gcp_batch_network | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_gcp_subnet if (enable_gcp_batch | default(false) | bool and gcp_batch_subnet | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_cnpg_plugin if (restore_galaxy and detected_galaxy_pvc_uuid | default('') != '') else {}, recursive=True) | combine(_helm_values_ai if (ai_backend | default('none') != 'none') else {}, recursive=True) | combine(_helm_values_tls if (galaxy_hostname | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_it if (enable_interactive_tools | default(false) | bool) else {}, recursive=True) }}"
     set_values: "{{ galaxy_helm_extra_sets | default([]) + _helm_prefix_sets }}"
+  register: _galaxy_helm_install
+  # The cloudve galaxy chart is fetched from raw.githubusercontent.com, which
+  # frequently returns HTTP 429 (rate limit) on fresh deploys and aborts the
+  # install. Retry transient failures (429/rate-limit/timeout); on any other
+  # failure the condition is already true, so the task fails fast without waiting.
+  until: >-
+    _galaxy_helm_install is succeeded
+    or not (_galaxy_helm_install.msg | default('') | regex_search('429|Too Many Requests|rate limit|timeout|timed out|connection reset'))
+  retries: 6
+  delay: 30
   vars:
     _helm_prefix_sets:
       - value: "ingress.path={{ galaxy_prefix }}"
@@ -493,6 +503,12 @@
               k8s:
                 max_cores: "{{ galaxy_job_max_cores }}"
                 max_mem: "{{ galaxy_job_max_mem }}"
+              # Per-cluster GCP Batch job-name prefix. Deep-merges over the
+              # gcp_batch destination in values/values.yml, overriding only
+              # job_id_prefix (docker_enabled/cores/mem there are preserved).
+              gcp_batch:
+                params:
+                  job_id_prefix: "{{ gcp_batch_job_id_prefix }}"
     # Overrides only the gcp_batch runner region; deep-merges over the runner block
     # in the values files, preserving every other setting. Merged in only when
     # enable_gcp_batch is set and a region is known, so a region in a user-supplied
@@ -533,6 +549,77 @@
           runners:
             gcp_batch:
               subnet: "{{ gcp_batch_subnet }}"
+    _helm_values_ai:
+      configs:
+        galaxy.yml:
+          galaxy:
+            # ChatGXY points at the in-cluster LiteLLM front door. Backend swaps
+            # happen in LiteLLM's routing, so these three values stay constant.
+            ai_api_base_url: "http://litellm.{{ inference_namespace }}.svc.cluster.local:{{ litellm_port }}/v1"
+            ai_model: "{{ ai_model_name }}"
+            ai_api_key: "{{ litellm_master_key }}"
+    # HTTPS at galaxy_hostname: point the Galaxy ingress at the FQDN with a TLS
+    # block (cert-manager fills tls_secret_name via the letsencrypt ClusterIssuer),
+    # and tell Galaxy its public https URL so it builds correct absolute links.
+    _helm_values_tls:
+      ingress:
+        ingressClassName: nginx
+        annotations:
+          cert-manager.io/cluster-issuer: "{{ letsencrypt_issuer_name }}"
+        hosts:
+          - host: "{{ galaxy_hostname }}"
+            paths:
+              - path: "{{ galaxy_prefix }}"
+        tls:
+          - hosts:
+              - "{{ galaxy_hostname }}"
+            secretName: "{{ tls_secret_name }}"
+      configs:
+        galaxy.yml:
+          galaxy:
+            # Include the app prefix so absolute links (and $__galaxy_url__ / the IT
+            # api_key flow / Orbit's GALAXY_URL) resolve under the served path. A lone
+            # "/" prefix contributes nothing (root serve).
+            galaxy_infrastructure_url: "https://{{ galaxy_hostname }}{{ galaxy_prefix if galaxy_prefix != '/' else '' }}"
+    # Interactive Tools: per-instance enablement. Routing (interactive_tool.* -> the
+    # k8s environment) is static in values.yml; this carries the per-instance,
+    # hostname-derived bits and points every IT ingress at the wildcard cert.
+    _helm_values_it:
+      configs:
+        galaxy.yml:
+          galaxy:
+            interactivetools_enable: true
+            # The KubernetesJobRunner creates a real per-IT nginx Ingress (with TLS), so
+            # there is no separate upstream proxy in front of ITs. upstream_proxy defaults
+            # to TRUE, which makes Galaxy build the user-facing IT URL from the request host
+            # (the main Galaxy host) instead of interactivetools_proxy_host -- while the
+            # ingress it creates uses interactivetools_proxy_host. That split yields URLs on
+            # <host> that have no DNS/cert. Set false so the URL matches the ingress (and the
+            # wildcard cert + Cloud DNS zone) -- users go directly to the per-IT ingress.
+            interactivetools_upstream_proxy: false
+            # Shared NFS path (chart default is relative -> pod-local, so IT stop 500s with
+            # "no such table: gxitproxy" because web/job handlers get separate map files).
+            interactivetools_map: /galaxy/server/database/interactivetools_map.sqlite
+            # Override the chart default (which uses the main Galaxy host) so ITs live
+            # under the per-instance interactivetool.<host> subdomain covered by the
+            # wildcard cert + Cloud DNS zone.
+            interactivetools_proxy_host: "{{ it_proxy_host }}"
+            interactivetools_prefix: "{{ it_prefix }}"
+        job_conf.yml:
+          runners:
+            k8s:
+              # Every IT ingress reuses the one pre-provisioned wildcard cert instead of
+              # the per-hostname secret the runner would otherwise expect.
+              k8s_interactivetools_use_ssl: true
+              k8s_interactivetools_tls_secret: "{{ it_tls_secret_name }}"
+              k8s_interactivetools_ingress_class: nginx
+              # WebSocket-friendly, and deliberately WITHOUT a cert-manager cluster-issuer
+              # annotation: the wildcard cert is managed by our own Certificate, so the IT
+              # ingress must not trigger per-IT (HTTP-01) issuance into that secret.
+              k8s_interactivetools_ingress_annotations: |
+                nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+                nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+                nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
     _helm_values_cnpg_plugin:
       postgresql:
         cluster:

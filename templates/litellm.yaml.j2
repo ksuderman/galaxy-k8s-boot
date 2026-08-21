@@ -1,0 +1,125 @@
+# LiteLLM proxy: the stable OpenAI-compatible front door ChatGXY points at.
+# Galaxy always uses model "{{ ai_model_name }}" at this Service with the master
+# key; the routing below decides which real backend serves it, so switching
+# CPU/GPU/external never touches galaxy.yml.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: litellm-secret
+  namespace: {{ inference_namespace }}
+  labels:
+    app: litellm
+    app.kubernetes.io/part-of: chatgxy
+type: Opaque
+stringData:
+  LITELLM_MASTER_KEY: "{{ litellm_master_key }}"
+{% if ai_backend == 'external' %}
+  AI_EXTERNAL_API_KEY: "{{ ai_external_api_key }}"
+{% endif %}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litellm-config
+  namespace: {{ inference_namespace }}
+  labels:
+    app: litellm
+    app.kubernetes.io/part-of: chatgxy
+data:
+  config.yaml: |
+    model_list:
+      - model_name: {{ ai_model_name }}
+        litellm_params:
+{% if ai_backend == 'vertex' %}
+          model: vertex_ai/{{ vertex_model }}
+          vertex_location: {{ vertex_location }}
+{% if vertex_project %}
+          vertex_project: {{ vertex_project }}
+{% endif %}
+{% if vertex_reasoning_effort %}
+          reasoning_effort: {{ vertex_reasoning_effort }}
+{% endif %}
+{% elif _ai_use_ollama %}
+          model: ollama_chat/{{ _ollama_model }}
+          api_base: http://ollama.{{ inference_namespace }}.svc.cluster.local:11434
+{% elif _ai_use_vllm %}
+          # vLLM is OpenAI-compatible; route by its --served-model-name. vLLM does not
+          # require an API key by default, but the openai provider needs some value.
+          model: openai/{{ vllm_served_model_name }}
+          api_base: http://vllm.{{ inference_namespace }}.svc.cluster.local:8000/v1
+          api_key: "sk-vllm-no-auth"
+{% elif ai_backend == 'external' and ai_external_provider == 'anthropic' %}
+          model: anthropic/{{ ai_external_model }}
+          api_key: os.environ/AI_EXTERNAL_API_KEY
+{% else %}
+          model: openai/{{ ai_external_model }}
+          api_key: os.environ/AI_EXTERNAL_API_KEY
+{% endif %}
+    general_settings:
+      master_key: os.environ/LITELLM_MASTER_KEY
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm
+  namespace: {{ inference_namespace }}
+  labels:
+    app: litellm
+    app.kubernetes.io/part-of: chatgxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: litellm
+  template:
+    metadata:
+      labels:
+        app: litellm
+        app.kubernetes.io/part-of: chatgxy
+    spec:
+      containers:
+        - name: litellm
+          image: {{ litellm_image }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--config"
+            - "/etc/litellm/config.yaml"
+            - "--port"
+            - "{{ litellm_port }}"
+          ports:
+            - containerPort: {{ litellm_port }}
+              name: http
+          envFrom:
+            - secretRef:
+                name: litellm-secret
+          volumeMounts:
+            - name: config
+              mountPath: /etc/litellm
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /health/liveliness
+              port: {{ litellm_port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: litellm-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm
+  namespace: {{ inference_namespace }}
+  labels:
+    app: litellm
+    app.kubernetes.io/part-of: chatgxy
+spec:
+  type: ClusterIP
+  selector:
+    app: litellm
+  ports:
+    - name: http
+      port: {{ litellm_port }}
+      targetPort: {{ litellm_port }}

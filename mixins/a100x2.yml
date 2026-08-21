@@ -1,0 +1,66 @@
+# GalaxyAI configuration for the dual-A100 GPU backend: a 70B-class model on 2x NVIDIA
+# A100 40GB (a2-highgpu-2g, 80GB aggregate VRAM) behind LiteLLM. The dev image is
+# required for the latest GalaxyAI.
+#
+# This mixin is ENGINE-AGNOSTIC: bin/a100x2.sh selects the serving engine via
+# --engine (ollama-gpu | vllm-gpu), and the playbook deploys whichever one. Ollama
+# layer-splits the model across the two GPUs; vLLM tensor-parallels it. Either way the
+# model is a 4-bit ~72B (~40-47GB), which fits in the 80GB aggregate with room for KV
+# cache -- a step up from the single-A100 a100.yml's 32b, without needing an 80GB card.
+#
+# Like a100.yml, the 72B handles the GalaxyAI agents' structured/tool-call output
+# NATIVELY, so the mixins/cpu.yml band-aids (structured_output_override, disabling
+# custom_tool) are intentionally NOT used. The runtime ai_api_base_url / ai_model /
+# ai_api_key are injected by the playbook (LiteLLM service + generated key), so this
+# mixin only carries the static agent tuning and branding.
+image:
+  repository: quay.io/galaxyproject/galaxy-min
+  tag: "dev"
+
+configs:
+  galaxy.yml:
+    galaxy:
+      logo_url: null
+      brand: GalaxyAI-72B
+      inference_services:
+        default:
+          # Fail fast on the rare doomed request rather than burning the full retry
+          # budget; structured output normally succeeds first try on a 72B.
+          retries: 1
+
+extraFileMappings:
+  /galaxy/server/static/welcome.html:
+    applyToWeb: true
+    applyToNginx: true
+    content: |
+      <!DOCTYPE html>
+      <html lang="en">
+          <head>
+              <meta charset="utf-8" />
+              <link rel="stylesheet" href="dist/base.css" type="text/css" />
+          </head>
+          <body class="m-0">
+              <div class="py-4">
+                  <div class="container">
+                      <div class="row mb-4">
+                          <div class="col-md-12">
+                              <h2>Welcome to Galaxy</h2>
+                              <p>
+                                  Galaxy is an interactive and workflow analysis
+                                  platform providing a graphical user interface
+                                  for computational tools. This is your own
+                                  Galaxy instance that you can customize and use
+                                  for your own research.
+                              </p>
+                              <h2>GalaxyAI</h2>
+                              <p>
+                                This Galaxy instance routes GalaxyAI to a self-hosted
+                                70B model on two NVIDIA A100 40GB GPUs (behind LiteLLM),
+                                served by either Ollama or vLLM.
+                              </p>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </body>
+      </html>

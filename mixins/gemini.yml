@@ -1,0 +1,70 @@
+# GalaxyAI configuration for the Gemini for Government (GFG) backend
+# (ai_backend=vertex): LiteLLM routes to a GFG Gemini model on Vertex AI in an
+# Assured Workloads project (US multi-region); no local model runs. Model +
+# location + project come from the role defaults (vertex_model / vertex_location /
+# vertex_project). The dev image is required for the latest GalaxyAI.
+image:
+  repository: ksuderman/galaxy-min
+  tag: "26.2.dev0"
+
+# Gemini handles the GalaxyAI agents' tool-call / JSON structured output natively,
+# so the CPU band-aids are left commented out below (structured_output_override,
+# and disabling custom_tool) -- unlike mixins/cpu.yml. Only a small retry budget
+# is kept.
+#
+# The runtime ai_api_base_url / ai_model / ai_api_key are injected by the
+# playbook (they depend on the in-cluster LiteLLM service + generated key), so
+# this mixin only carries the static agent tuning.
+configs:
+  galaxy.yml:
+    galaxy:
+      logo_url: null
+      brand: Gemini
+      inference_services:
+        default:
+          # Parse plain-text responses instead of demanding structured/tool-call
+          # output the small CPU model can't reliably produce. Avoids the
+          # validation-retry death loop that returns the fallback message.
+#          structured_output_override: false
+          # Fail fast instead of burning ~40-50s x 3 on doomed retries.
+          retries: 1
+        custom_tool:
+          # The custom-tool agent (code generation + its own reflection loop) is
+          # the most expensive; disable it to cut per-question fan-out.
+#          enabled: false
+extraFileMappings:
+  /galaxy/server/static/welcome.html:
+    applyToWeb: true
+    applyToNginx: true
+    content: |
+      <!DOCTYPE html>
+      <html lang="en">
+          <head>
+              <meta charset="utf-8" />
+              <link rel="stylesheet" href="dist/base.css" type="text/css" />
+          </head>
+          <body class="m-0">
+              <div class="py-4">
+                  <div class="container">
+                      <div class="row mb-4">
+                          <div class="col-md-12">
+                              <h2>Welcome to Galaxy</h2>
+                              <p>
+                                  Galaxy is an interactive and workflow analysis
+                                  platform providing a graphical user interface
+                                  for computational tools. This is your own
+                                  Galaxy instance that you can customize and use
+                                  for your own research.
+                              </p>
+                              <h2>GalaxyAI</h2>
+                              <p>
+                                This Galaxy instance has been configured to route
+                                GalaxyAI to Gemini for Government (Vertex AI, in an
+                                Assured Workloads project) via the LiteLLM front door.
+                              </p>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </body>
+      </html>

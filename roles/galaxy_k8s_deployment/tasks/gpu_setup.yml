@@ -1,0 +1,51 @@
+---
+# GPU host verification (ai_backend=ollama-gpu). The NVIDIA driver + container
+# toolkit are baked into the GPU machine image (galaxy-k8s-boot-gpu-*, set via
+# MACHINE_IMAGE in bin/gpu.sh), so this task only confirms the GPU is usable --
+# it does NOT install the driver. Runs before rke2_setup so RKE2 detects the
+# nvidia-container-runtime and creates the `nvidia` RuntimeClass.
+#
+# Installing the driver at boot on a stock image is unreliable: the base image's
+# kernel drifts behind the Debian repos, so the matching headers for the DKMS
+# build disappear, and ansible-pull cannot reboot into a newer kernel. Baking the
+# driver into the image (matched kernel + driver) sidesteps all of that. To
+# rebuild the image, see SESSION_NOTES.md / the gpu image bake procedure.
+
+- name: Detect NVIDIA GPU on the host
+  ansible.builtin.shell: lspci | grep -i nvidia
+  register: _gpu_lspci
+  changed_when: false
+  failed_when: false
+  become: true
+
+- name: Fail if ollama-gpu requested but no GPU is present
+  ansible.builtin.fail:
+    msg: >-
+      ai_backend=ollama-gpu but no NVIDIA GPU was detected on this VM. Launch with
+      a GPU accelerator (e.g. nvidia-tesla-t4) in a GPU-capable zone (us-east4-a).
+  when: _gpu_lspci.rc != 0
+
+- name: Ensure the NVIDIA kernel modules are loaded
+  ansible.builtin.shell: "modprobe nvidia && modprobe nvidia_uvm"
+  register: _modprobe
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Verify the GPU is visible (nvidia-smi) -- driver must be baked into the image
+  ansible.builtin.command: nvidia-smi
+  register: _smi
+  retries: 6
+  delay: 5
+  until: _smi.rc == 0
+  changed_when: false
+  become: true
+  failed_when: _smi.rc != 0
+
+- name: Verify the NVIDIA container runtime is present (for RKE2 auto-detect)
+  ansible.builtin.command: which nvidia-container-runtime
+  changed_when: false
+
+- name: Show detected GPU
+  ansible.builtin.debug:
+    msg: "{{ _smi.stdout_lines | select('search', 'Tesla|NVIDIA|Driver Version') | list }}"

@@ -1,0 +1,20 @@
+# Wildcard TLS certificate for Galaxy Interactive Tools. One cert covers every IT,
+# because all IT hostnames differ only in their leftmost label
+# (<id>-<token>.ep.its.<it_proxy_host>). cert-manager provisions and renews it via the
+# DNS-01 ClusterIssuer (Cloud DNS) and writes the result into it_tls_secret_name in the
+# galaxy namespace; the per-IT ingresses that Galaxy's KubernetesJobRunner creates
+# reference that secret for TLS.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: galaxy-it-wildcard
+  namespace: galaxy
+  labels:
+    app.kubernetes.io/part-of: galaxy-interactive-tools
+spec:
+  secretName: {{ it_tls_secret_name }}
+  issuerRef:
+    name: {{ it_dns01_issuer_name }}
+    kind: ClusterIssuer
+  dnsNames:
+    - "{{ it_wildcard_host }}"

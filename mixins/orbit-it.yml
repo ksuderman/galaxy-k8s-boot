@@ -1,0 +1,86 @@
+# Register Orbit as a custom Interactive Tool
+#
+# This mixin only adds the TOOL, in the same way you'd add any custom IT:
+#   1. mount the tool XML into the Galaxy pods' interactive tool dir, and
+#   2. reference it from a tool_conf that is appended to tool_config_file.
+# Galaxy's BUNDLED ITs (jupyter, cellxgene, ...) are already in the chart's tool_conf.xml,
+# so they need nothing here. To add another custom IT, copy this file and change the tool
+# XML + the <tool file=...> line (compose several with multiple -f flags).
+#
+# NOTE: mixins are copied to the VM RAW and handed to Helm -- so `{{ }}` here is HELM
+# templating (rendered by the chart's `tpl`), NOT Ansible. Role vars are not available;
+# use `{{ .Values.x }}` for anything dynamic.
+
+extraFileMappings:
+  # The Orbit interactive-tool definition. Placed in the Galaxy tool_path
+  # (/galaxy/server/database/tools) alongside the bundled ITs, so the tool_conf below
+  # resolves it as interactive/orbit.xml (Galaxy resolves <tool file=...> against tool_path).
+  /galaxy/server/database/tools/interactive/orbit.xml:
+    applyToJob: true       # the handler that dispatches the IT pod loads the toolbox
+    applyToWeb: true       # the web handler renders/serves the tool panel
+    applyToWorkflow: true  # keep every toolbox-loading pod consistent
+    applyToNginx: false
+    applyToSetupJob: false
+    useSecret: false
+    tpl: false
+    content: |
+      <tool id="interactive_tool_orbit" tool_type="interactive" name="Orbit AI Shell" version="0.1.0" profile="24.0">
+          <requirements>
+              <container type="docker">docker.io/ksuderman/orbit:b218555</container>
+          </requirements>
+          <entry_points>
+              <entry_point name="Orbit" requires_domain="True">
+                  <port>3000</port>
+                  <url><![CDATA[/]]></url>
+              </entry_point>
+          </entry_points>
+          <environment_variables>
+              <!-- Env contract: Loom web/REMOTE.md. LOOM_MODE + GALAXY_URL + GALAXY_API_KEY
+                   are required; Galaxy fills the last two natively (request URL + the
+                   launching user's key). -->
+              <environment_variable name="LOOM_MODE">remote</environment_variable>
+              <environment_variable name="GALAXY_URL">$__galaxy_url__</environment_variable>
+              <environment_variable name="GALAXY_API_KEY" inject="api_key" />
+              <!-- Behind the trusted IT ingress: bind 0.0.0.0 with no token. -->
+              <environment_variable name="LOOM_WEB_ALLOW_INSECURE">1</environment_variable>
+              <!-- Brain (pi) LLM: routed to the IN-CLUSTER LiteLLM (no egress). When
+                   LOOM_LLM_BASE_URL is set the image builds the pi custom-provider config
+                   itself (see loom web/remote-llm.ts); LOOM_LLM_MODEL is required, the key
+                   falls back to OPENAI_API_KEY. Set the LiteLLM key in a local copy before
+                   deploy (Galaxy IT env vars are literals; no secretKeyRef). -->
+              <environment_variable name="LOOM_LLM_BASE_URL">http://litellm.galaxy.svc:4000/v1</environment_variable>
+              <environment_variable name="LOOM_LLM_MODEL">galaxy-default</environment_variable>
+              <environment_variable name="LOOM_LLM_API_KEY">sk-its-orbit-test</environment_variable>
+          </environment_variables>
+          <!-- The k8s runner overrides the image entrypoint (kubernetes.py sets
+               command=[sh] args=[-c, job_file]), so the tool command IS the launch: run the
+               image's Dockerfile CMD explicitly (WORKDIR /app). -->
+          <command detect_errors="aggressive"><![CDATA[
+              cd /app && node web/node_modules/.bin/tsx web/server.ts
+          ]]></command>
+          <inputs/>
+      </tool>
+
+  # Adds Orbit to the toolbox. Referenced by tool_config_file below.
+  /galaxy/server/config/interactive_tool_conf.xml:
+    applyToJob: true
+    applyToWeb: true
+    applyToWorkflow: true
+    applyToNginx: false
+    applyToSetupJob: false
+    useSecret: false
+    tpl: false
+    content: |
+      <?xml version="1.0"?>
+      <toolbox monitor="true">
+        <section id="interactive_custom" name="Interactive Tools">
+          <tool file="interactive/orbit.xml" />
+        </section>
+      </toolbox>
+
+configs:
+  galaxy.yml:
+    galaxy:
+      # Chart default (verbatim, so the standard + shed confs are preserved -- the chart
+      # tpl-renders this, hence the {{if}}) + our generated interactive_tool_conf.xml.
+      tool_config_file: "/galaxy/server/config/tool_conf.xml{{if .Values.setupJob.downloadToolConfs.enabled}},{{ .Values.setupJob.downloadToolConfs.volume.mountPath }}/config/shed_tool_conf.xml{{end}},/galaxy/server/config/interactive_tool_conf.xml"

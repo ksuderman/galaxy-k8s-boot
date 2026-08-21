@@ -76,6 +76,73 @@ setup_postgres_storage: true
 setup_cert_manager: false
 cert_manager_version: "v1.20.0"
 
+# HTTPS / TLS Configuration (Let's Encrypt via cert-manager)
+# When galaxy_hostname is set, Galaxy is served over HTTPS at that FQDN: the Galaxy
+# ingress gets the host + a TLS block (secret tls_secret_name), and a Let's Encrypt
+# ClusterIssuer is created so cert-manager provisions/renews the cert via an HTTP-01
+# challenge. Requires DNS for galaxy_hostname -> the VM's public IP (use a reserved
+# static IP), ports 80/443 reachable, and cert-manager (auto-installed when
+# galaxy_hostname is set). Empty -> plain HTTP on the VM IP (unchanged default).
+galaxy_hostname: ""
+# ACME account email (Let's Encrypt expiry/renewal notices). Required when
+# galaxy_hostname is set.
+acme_email: ""
+letsencrypt_issuer_name: "letsencrypt-prod"
+# Let's Encrypt ACME directory. Production issues browser-trusted certs but is
+# rate-limited (~5 duplicate failures/domain/week); switch to the staging URL
+# (https://acme-staging-v02.api.letsencrypt.org/directory) to dry-run the flow.
+letsencrypt_server: "https://acme-v02.api.letsencrypt.org/directory"
+tls_secret_name: "galaxy-tls"
+
+# Interactive Tools (e.g. the Orbit AI shell) -- DNS + wildcard TLS
+# ---------------------------------------------------------------------------
+# Galaxy's KubernetesJobRunner serves each IT at its own hostname of the form
+#   <id>-<token>.<class_id>.<prefix>.<it_proxy_host>
+# where class_id is the constant "ep" and prefix is interactivetools_prefix. Only the
+# leftmost label varies per launch, so a SINGLE wildcard -- *.ep.its.<it_proxy_host> --
+# covers every IT for both DNS and TLS. The IT subdomain is per-instance (it derives
+# from the per-instance galaxy_hostname) and is served from its own Cloud DNS managed
+# zone, delegated once from the parent zone. cert-manager issues the wildcard cert via
+# a DNS-01 (Cloud DNS) challenge using the VM service account (ADC) -- no static creds,
+# matching the Vertex backend. Requires the VM SA to hold roles/dns.admin.
+enable_interactive_tools: false
+# Galaxy constants that shape the IT hostname (kept as vars for clarity/wildcard build).
+it_prefix: "its"
+it_class_id: "ep"
+# Per-instance IT subdomain, e.g. interactivetool.a100.galaxy.useanvil.org.
+it_proxy_host: "interactivetool.{{ galaxy_hostname }}"
+# The single wildcard that matches every IT hostname under it_proxy_host. Quoted
+# because a bare leading '*' is a YAML alias.
+it_wildcard_host: "*.{{ it_class_id }}.{{ it_prefix }}.{{ it_proxy_host }}"
+# Cloud DNS managed-zone NAME (a GCP resource id: lowercase RFC1035). Derived from the
+# hostname; the zone's dnsName is it_proxy_host itself.
+it_dns_zone_name: "it-{{ galaxy_hostname | lower | regex_replace('[^a-z0-9]+', '-') | regex_replace('(^-+|-+$)', '') }}"
+it_dns_ttl: 300
+# cert-manager DNS-01 ClusterIssuer (Cloud DNS solver via ADC) and the wildcard cert
+# secret the IT ingresses consume. Reuses acme_email / letsencrypt_server from above.
+it_dns01_issuer_name: "letsencrypt-dns01"
+it_tls_secret_name: "galaxy-it-tls"
+
+# TLS certificate reuse across redeploys (ON by default). These instances have fixed
+# hostnames and static IPs, so the cert from the previous deploy is still valid -- but a
+# fresh cluster makes cert-manager request a brand-new one, burning Let's Encrypt's
+# per-hostname rate limit (~5/week). The playbook restores the previously-issued cert
+# Secret(s) from a GCS bucket before cert-manager runs (it adopts the valid cert instead
+# of reissuing) and re-saves them after issuance/renewal. Only PRODUCTION certs are saved
+# (skipped when letsencrypt_server is staging) so the store never serves an untrusted cert.
+# Auth is via the VM service account (ADC); that SA needs roles/storage.objectAdmin on
+# cert_store_bucket. Restore/save degrade gracefully (a 403/absent object just falls back
+# to normal issuance), so leaving this on is safe even where the bucket isn't reachable.
+# Override cert_store_bucket (or set persist_certs=false) per deploy as needed.
+# See tasks/cert_persist.yml.
+persist_certs: true
+cert_store_bucket: "anvil-and-terra-development-galaxy-cert-store"
+cert_store_prefix: "certs"
+# Which Secrets to persist: the main-host cert (HTTP-01) and the IT wildcard (DNS-01).
+persist_cert_secrets:
+  - "{{ tls_secret_name }}"
+  - "{{ it_tls_secret_name }}"
+
 # CNPG Skip-Initdb Plugin Configuration
 # Enable this to allow PostgreSQL to reuse existing data directories
 # Requires: cert-manager installed in the cluster
@@ -187,6 +254,13 @@ gcp_batch_region: ""
 # the NFS server. Empty -> the value in the Helm values files is used unchanged.
 gcp_batch_network: ""
 gcp_batch_subnet: ""
+# Prefix for GCP Batch job names so Batch jobs are identifiable per cluster. The
+# runner builds the job name as "<prefix>-<id>", so keep it short and valid for a
+# Batch job name: ^[a-z]([a-z0-9-]*[a-z0-9])?$ (lowercase letters, digits, hyphens;
+# start with a letter). launch_vm.sh overrides this per cluster (explicit
+# --job-id-prefix, else the sanitized instance name). Never leave empty -- an unset
+# prefix surfaces as a literal "None" in the Batch job name and is rejected (400).
+gcp_batch_job_id_prefix: "galaxy-batch"
 
 # Terra / AnVIL launch context
 # Supplied at VM launch time by the orchestrating service (e.g. Leonardo).
@@ -200,6 +274,126 @@ pulsar_chart: cloudve/pulsar
 pulsar_chart_version: "0.2.0"
 pulsar_deps_version: "1.1.1"
 pulsar_api_key: ""
+
+# ChatGXY / AI Inference Configuration
+# ChatGXY (Galaxy's AI multi-agent framework) talks to an OpenAI-compatible
+# endpoint. We front all backends with a LiteLLM proxy so Galaxy always points
+# at one stable URL/model/key and backend swaps happen only in LiteLLM's routing.
+#
+# ai_backend selects what gets deployed and how LiteLLM routes the virtual model:
+#   none        - no inference server deployed; ChatGXY disabled (default)
+#   ollama-cpu  - self-hosted Ollama (CPU) behind LiteLLM
+#   ollama-gpu  - self-hosted Ollama (GPU) behind LiteLLM   [requires GPU node]
+#   vllm-gpu    - self-hosted vLLM (GPU, tensor-parallel) behind LiteLLM; for large
+#                 models on a multi-GPU node (e.g. a 70B on 2x A100 40GB) [requires GPU]
+#   external    - LiteLLM only, routing to an external provider (OpenAI/Anthropic)
+#   vertex      - LiteLLM only, routing to Google Vertex AI (Gemini); auth via the
+#                 VM service account (ADC), no API key needed
+ai_backend: "none"
+inference_namespace: "galaxy"
+
+# Virtual model name Galaxy requests from LiteLLM (routing target is set per backend).
+ai_model_name: "galaxy-default"
+
+# LiteLLM front door
+litellm_image: "ghcr.io/berriai/litellm:main-latest"
+litellm_port: 4000
+# SECRET: the key Galaxy presents to LiteLLM. Override at launch
+# (e.g. -e litellm_master_key=sk-...) rather than committing a real value.
+litellm_master_key: "sk-galaxy-litellm-changeme"
+# Publish LiteLLM's OpenAI-compatible API externally so desktop clients (e.g. Orbit)
+# can use this instance's self-hosted inference. Off by default: this exposes an LLM
+# endpoint on the public internet, protected only by litellm_master_key (bearer). It
+# is served under litellm_path on galaxy_hostname, reusing the Galaxy TLS cert, so it
+# REQUIRES galaxy_hostname (HTTPS). Clients set base URL https://<host><litellm_path>/v1.
+expose_litellm: false
+litellm_path: "/llm"
+
+# Ollama (self-hosted engine for ollama-cpu / ollama-gpu)
+ollama_image: "ollama/ollama:latest"
+ollama_model_cpu: "qwen2.5:3b"
+ollama_model_gpu: "qwen2.5:7b"
+# Node-local single-consumer storage for the model cache. Must NOT be the `nfs`
+# class: Galaxy's main PVC claims the entire NFS pool, so an ollama PVC there
+# starves it (ProvisioningFailed: insufficient available space). `blockstorage`
+# uses the local-path provisioner and does not draw from the NFS pool.
+ollama_storage_class: "blockstorage"
+ollama_storage_size: "20Gi"
+ollama_memory_request: "6Gi"
+ollama_memory_limit: "10Gi"
+ollama_gpu_count: 1
+# Default context window Ollama serves models with (OLLAMA_CONTEXT_LENGTH). Ollama's
+# built-in default is only 4096, but the GalaxyAI agent prompts run ~2-4k tokens; at
+# 4096 a request overflows mid-generation, triggering a context shift that discards
+# half the prompt and makes the model loop / over-generate. 16384 fits the prompt
+# plus a full reply with headroom for agent hand-offs. KV-cache cost for qwen2.5:14b
+# at 16k is ~3GB on top of ~9GB weights -- comfortable on an L4's 24GB (raise for
+# larger context, but watch VRAM on smaller GPUs).
+ollama_context_length: 16384
+# NVIDIA device plugin (ollama-gpu / vllm-gpu): advertises nvidia.com/gpu so the GPU
+# inference pod can be scheduled. Requires the host driver + toolkit (gpu_setup.yml).
+nvidia_device_plugin_image: "nvcr.io/nvidia/k8s-device-plugin:v0.17.1"
+
+# vLLM (self-hosted engine for vllm-gpu). Serves an OpenAI-compatible API with true
+# tensor parallelism across GPUs -- the right engine for a large model on a multi-GPU
+# node (e.g. a 70B on 2x A100 40GB). The playbook sets vllm_tensor_parallel_size to the
+# number of GPUs the node advertises, so it spans every attached GPU automatically.
+vllm_image: "vllm/vllm-openai:latest"
+# HuggingFace repo id. Default is an AWQ 4-bit Qwen2.5-72B (~40GB) so it fits in the
+# 80GB aggregate VRAM of 2x A100 40GB; the full FP16 (~145GB) would not. Open weights,
+# no HF token required. Must match vllm_quantization.
+vllm_model: "Qwen/Qwen2.5-72B-Instruct-AWQ"
+vllm_quantization: "awq"
+# The model id LiteLLM routes to (openai/<served-name>); decoupled from the repo path.
+vllm_served_model_name: "qwen2.5-72b"
+# Overridden at deploy time to the node's GPU count; the literal here is the fallback.
+vllm_tensor_parallel_size: 2
+# Context window. KV cache grows with this and shares VRAM with the weights; 16384 is
+# a safe default for a 4-bit 72B on 2x 40GB. Raise only if you have KV headroom.
+vllm_max_model_len: 16384
+vllm_gpu_memory_utilization: "0.90"
+# Node-local model cache (same rationale as ollama_storage_class). Sized for a ~40GB
+# quantized 70B plus HuggingFace metadata.
+vllm_storage_class: "blockstorage"
+vllm_storage_size: "120Gi"
+vllm_memory_request: "16Gi"
+vllm_memory_limit: "48Gi"
+# Shared-memory (/dev/shm) size for NCCL tensor-parallel communication. The container
+# default (64MB) is far too small and NCCL will hang without a larger mount.
+vllm_shm_size: "8Gi"
+
+# External provider (only used when ai_backend=external)
+ai_external_provider: "openai"        # openai | anthropic
+ai_external_model: "gpt-4o-mini"
+ai_external_api_key: ""               # SECRET: provider API key
+
+# Google Vertex AI / Gemini (only used when ai_backend=vertex).
+# LiteLLM authenticates via the VM service account (Application Default
+# Credentials over the GCE metadata server) -- no API key. The default compute
+# SA's Editor role already covers Vertex AI predict.
+#
+# Gemini model + Vertex location. gemini-3.5-flash is GA and Google's strongest tier
+# for agentic / tool-calling workloads (validated driving the Orbit desktop agent).
+# It is served ONLY at the "global" endpoint for this project (404s at regional
+# locations like us-central1). Alternatives: gemini-2.5-pro (works at global AND
+# us-central1), gemini-2.5-flash (cheap/fast tier).
+#
+# GFG (Gemini for Government) is a SEPARATE track: it needs an Assured Workloads
+# project (FedRAMP High / IL4) with the model available in the US multi-region
+# (vertex_location: "us"). Model x location availability differs inside an AW folder,
+# so validate there -- "us" 404s on this commercial project. See mixins/vertex.yml.
+vertex_model: "gemini-3.5-flash"
+vertex_location: "global"
+# GFG REQUIREMENT: for actual Gemini-for-Government (not commercial Vertex), set
+# this to a project INSIDE an Assured Workloads folder (Data Boundary for FedRAMP
+# High or IL4), and run the VM / its service account in that same project. Left
+# empty, LiteLLM infers the project from the VM's credentials -- which on a
+# commercial project is the COMMERCIAL Vertex endpoint, NOT GFG.
+vertex_project: ""
+# gemini-2.5-flash is a "thinking" model that spends tokens on internal reasoning;
+# with a tight max_tokens it can return empty output. Disabling reasoning keeps
+# short/structured agent calls reliable. Set to "" to keep Gemini's default thinking.
+vertex_reasoning_effort: "disable"
 
 # Galaxy K8s Monitor Configuration
 monitor_chart: cloudve/galaxy-k8s-monitor

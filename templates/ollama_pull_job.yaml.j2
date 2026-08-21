@@ -1,0 +1,39 @@
+# One-shot Job that pulls the configured model into the Ollama PVC once the
+# Ollama service is reachable. `stream:false` makes the pull request block until
+# the download completes, so Job completion == model ready. Re-runs are cheap:
+# an already-present model returns immediately.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ollama-pull-{{ _ollama_model | regex_replace('[^a-z0-9]', '-') }}
+  namespace: {{ inference_namespace }}
+  labels:
+    app: ollama
+    app.kubernetes.io/part-of: chatgxy
+spec:
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: ollama-pull
+        app.kubernetes.io/part-of: chatgxy
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: pull
+          image: curlimages/curl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Waiting for Ollama to become ready..."
+              until curl -sf http://ollama.{{ inference_namespace }}.svc.cluster.local:11434/api/version; do
+                sleep 5
+              done
+              echo "Pulling model {{ _ollama_model }} (this may take several minutes)..."
+              curl -sf -X POST http://ollama.{{ inference_namespace }}.svc.cluster.local:11434/api/pull \
+                -H 'Content-Type: application/json' \
+                -d '{"name": "{{ _ollama_model }}", "stream": false}'
+              echo "Model {{ _ollama_model }} is ready."
