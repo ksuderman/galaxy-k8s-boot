@@ -30,7 +30,7 @@ AI_MASTER_KEY=sk-its-orbit-test
 # us-east4. PREREQ: DNS for isis.galaxy.useanvil.org -> 34.85.149.203, and (for
 # ITs) the delegated interactivetool.isis.galaxy.useanvil.org Cloud DNS zone --
 # the playbook manages the zone, but the NS delegation must exist in the parent.
-ZONE=us-east4-c
+ZONE=us-east4-a
 ADDRESS=ks-isis-ip-east4
 GALAXY_HOSTNAME=isis.galaxy.useanvil.org
 ACME_EMAIL=suderman@jhu.edu
