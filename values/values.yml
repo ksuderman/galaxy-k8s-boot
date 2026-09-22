@@ -78,11 +78,14 @@ configs:
       job_metrics:
         - type: core
         - type: cgroup
-      # Adds a masthead icon that opens the galaxy-k8s-monitor dashboard
-      # (deployed alongside Galaxy by this playbook when deploy_monitor is
-      # true) in a new tab. The plugin directory is mounted from the
-      # galaxy-webhook-k8s-monitor ConfigMap; see extraVolumes/
-      # extraVolumeMounts below.
+      # Adds masthead icons that open sibling dashboards in a new tab: the
+      # galaxy-k8s-monitor dashboard (deployed alongside Galaxy by this
+      # playbook when deploy_monitor is true) and Rainstone's cost reports.
+      # Each plugin directory is mounted from that application's own
+      # ConfigMap; see extraVolumes/extraVolumeMounts below. A masthead link
+      # is how these are reached at all: the platform's proxy routes the
+      # Galaxy prefix, so a bare URL typed into the address bar arrives
+      # without the headers the route requires.
       webhooks_dir: "config/plugins/webhooks,/galaxy/server/config/plugins/webhooks-custom"
   job_conf.yml:
     runners:
@@ -339,6 +342,13 @@ extraVolumes:
   - name: webhook-k8s-monitor
     configMap:
       name: galaxy-webhook-k8s-monitor
+  # Rainstone owns this ConfigMap, so its link and icon stay with the chart
+  # that knows its path. `optional` keeps Galaxy's pod startable whether or not
+  # Rainstone is installed, in either order.
+  - name: webhook-rainstone
+    configMap:
+      name: rainstone-webhook
+      optional: true
 
 extraVolumeMounts:
   - name: static-images
@@ -346,6 +356,9 @@ extraVolumeMounts:
     readOnly: true
   - name: webhook-k8s-monitor
     mountPath: /galaxy/server/config/plugins/webhooks-custom/k8s_monitor
+    readOnly: true
+  - name: webhook-rainstone
+    mountPath: /galaxy/server/config/plugins/webhooks-custom/rainstone
     readOnly: true
 
 extraFileMappings:
@@ -379,10 +392,14 @@ extraFileMappings:
           </body>
       </html>
 
+# The VM has four CPUs and each Galaxy job pod requests a whole one, so the
+# handlers' own requests are kept to a scheduling floor rather than a share of
+# the machine. Requests reserve capacity; they do not cap what a handler may
+# use when the node is idle.
 webHandlers:
   resources:
     requests:
-      cpu: 0.2
+      cpu: 0.1
   gunicorn:
     timeout: 900             # 15 minutes!
   startupProbe:
@@ -402,7 +419,7 @@ workflowHandlers:
 jobHandlers:
   resources:
     requests:
-      cpu: 0.4
+      cpu: 0.1
   startupProbe:
     initialDelaySeconds: 60
     periodSeconds: 10
