@@ -36,6 +36,12 @@ configs:
         pool_max_vm_lifetime: 6h
         pool_claim_timeout_seconds: 120
         max_run_duration: 3600s
+        # Zones Batch may place VMs in; it uses whichever has capacity, which is
+        # the main defence against stockouts. Must be zones of the deployment's
+        # Batch region (the role derives gcp_batch_region from the VM's zone and
+        # the runner rejects zones outside it, since every VM mounts NFS). These
+        # are the two us-east4 zones that offer L4 GPUs.
+        allowed_locations: us-east4-a,us-east4-c
         # pool_dir defaults to <first gcp_batch_volumes mount_path>/.galaxy-vm-pool,
         # i.e. /galaxy/server/database/.galaxy-vm-pool on the NFS export the
         # role injects, which both the handler and the Batch VMs can reach.
