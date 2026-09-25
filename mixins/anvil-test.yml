@@ -1,0 +1,102 @@
+# Combined test deployment for three galaxy-dev features built into one image
+# (branch anvil-test-2026-09; see ANVIL_TEST_IMAGE_PLAN.md in galaxy-dev):
+#
+#   1. Admin panel extensions (link items) - a new "AnVIL" section in the Admin
+#      panel, fed by the galaxy-admin-ext-anvil ConfigMap created by the role.
+#   2. Warm VM pool for the GCP Batch runner - VMs stay alive after a job and
+#      take follow-up jobs over the NFS handoff dir.
+#   3. L4 GPU jobs on GCP Batch - a gcp_batch_gpu destination that only accepts
+#      tools tagged gpu.
+#
+# Usage: bin/launch_vm.sh ... --values values/values.yml --values mixins/anvil-test.yml
+#
+# Helm replaces lists rather than merging them, so extraVolumes and
+# extraVolumeMounts restate the values/values.yml entries in full.
+
+image:
+  repository: ksuderman/galaxy-anvil-test
+  tag: "anvil-test-2026-09"
+
+configs:
+  galaxy.yml:
+    galaxy:
+      # config/plugins/admin ships only a .sample in the image; the custom dir
+      # is the ConfigMap mount below.
+      admin_extensions_dir: "config/plugins/admin,/galaxy/server/config/plugins/admin-custom"
+  job_conf.yml:
+    runners:
+      gcp_batch:
+        # Warm VM pool. A job is only handed to a pooled VM when the VM's
+        # remaining lifetime covers the job's walltime, so max_run_duration
+        # must stay well below pool_max_vm_lifetime or VMs are never reused
+        # (the runner logs a warning per job when that is the case).
+        pool_enabled: true
+        pool_ttl_seconds: 600
+        pool_max_size: 3
+        pool_max_vm_lifetime: 6h
+        pool_claim_timeout_seconds: 120
+        max_run_duration: 3600s
+        # pool_dir defaults to <first gcp_batch_volumes mount_path>/.galaxy-vm-pool,
+        # i.e. /galaxy/server/database/.galaxy-vm-pool on the NFS export the
+        # role injects, which both the handler and the Batch VMs can reach.
+    execution:
+      environments:
+        gcp_batch_gpu:
+          runner: gcp_batch
+
+extraVolumes:
+  - name: static-images
+    configMap:
+      name: galaxy-static-images
+  - name: webhook-k8s-monitor
+    configMap:
+      name: galaxy-webhook-k8s-monitor
+  - name: admin-ext-anvil
+    configMap:
+      name: galaxy-admin-ext-anvil
+
+extraVolumeMounts:
+  - name: static-images
+    mountPath: /galaxy/server/static/images
+    readOnly: true
+  - name: webhook-k8s-monitor
+    mountPath: /galaxy/server/config/plugins/webhooks-custom/k8s_monitor
+    readOnly: true
+  - name: admin-ext-anvil
+    mountPath: /galaxy/server/config/plugins/admin-custom/anvil
+    readOnly: true
+
+jobs:
+  rules:
+    tpv_rules_local.yml:
+      destinations:
+        gcp_batch_gpu:
+          runner: gcp_batch
+          params:
+            docker_enabled: "true"
+            cores: "{cores}"
+            mem: "{mem}"
+            # TPV interpolates the tool's gpus entity attribute; the runner
+            # rounds fractional requests up to whole L4 devices.
+            gpus: "{gpus}"
+            job_id_prefix: galaxy-gpu
+            # Idle L4 VMs are expensive; keep them around for less time than
+            # CPU VMs. Every pool_* runner param can be overridden here.
+            pool_ttl_seconds: 180
+            # Set to "false" if gcp_batch_vm_image has the NVIDIA driver baked
+            # in; otherwise Batch installs it at boot on supported images.
+            install_gpu_drivers: "true"
+          scheduling:
+            require:
+              - gpu
+      tools:
+        # Route GPU-capable tools here by tagging them gpu and giving a GPU
+        # count. Tools without the gpu tag never land on gcp_batch_gpu, and
+        # gpu-tagged tools never land on the CPU destinations. Replace the
+        # placeholder with the tool id(s) used for the test, for example a
+        # tool whose container includes nvidia-smi or a CUDA framework.
+        .*gpu_test.*:
+          gpus: 1
+          scheduling:
+            require:
+              - gpu
