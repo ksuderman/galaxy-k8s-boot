@@ -204,37 +204,6 @@
           function: >
             window.open(window.location.origin + '{{ monitor_base_path }}', '_blank');
 
-# Backs the galaxy-admin-ext-anvil volume mounted by mixins/anvil-test.yml.
-# Galaxy only loads it when admin_extensions_dir includes the mount path, so
-# on a default deployment (no mixin) this ConfigMap is inert. Created
-# unconditionally, like the webhook ConfigMap above, so the mount always
-# resolves when the mixin is used.
-- name: Create ConfigMap for the AnVIL admin panel extension
-  kubernetes.core.k8s:
-    state: present
-    kubeconfig: "{{ kubeconfig_path }}"
-    definition:
-      apiVersion: v1
-      kind: ConfigMap
-      metadata:
-        name: galaxy-admin-ext-anvil
-        namespace: galaxy
-      data:
-        config.yml: |
-          id: anvil
-          section: AnVIL
-          items:
-            - id: monitor
-              type: link
-              title: Cluster Monitor
-              url: {{ monitor_base_path }}
-              target: iframe
-            - id: monitor_tab
-              type: link
-              title: Cluster Monitor (new tab)
-              url: {{ monitor_base_path }}
-              target: new_tab
-
 # - name: Write Galaxy post-install user values
 #   ansible.builtin.copy:
 #     dest: /tmp/galaxy-postinstall-user.yaml

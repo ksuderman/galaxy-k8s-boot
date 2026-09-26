@@ -2,16 +2,13 @@
 # (branch anvil-test-2026-09; see ANVIL_TEST_IMAGE_PLAN.md in galaxy-dev):
 #
 #   1. Admin panel extensions (link items) - a new "AnVIL" section in the Admin
-#      panel, fed by the galaxy-admin-ext-anvil ConfigMap created by the role.
+#      panel, defined by the extraFileMappings entry at the end of this file.
 #   2. Warm VM pool for the GCP Batch runner - VMs stay alive after a job and
 #      take follow-up jobs over the NFS handoff dir.
 #   3. L4 GPU jobs on GCP Batch - a gcp_batch_gpu destination that only accepts
 #      tools tagged gpu.
 #
 # Usage: bin/launch_vm.sh ... --values values/values.yml --values mixins/anvil-test.yml
-#
-# Helm replaces lists rather than merging them, so extraVolumes and
-# extraVolumeMounts restate the values/values.yml entries in full.
 
 image:
   repository: ksuderman/galaxy-anvil-test
@@ -21,7 +18,7 @@ configs:
   galaxy.yml:
     galaxy:
       # config/plugins/admin ships only a .sample in the image; the custom dir
-      # is the ConfigMap mount below.
+      # is written by the extraFileMappings entry below.
       admin_extensions_dir: "config/plugins/admin,/galaxy/server/config/plugins/admin-custom"
   job_conf.yml:
     runners:
@@ -56,27 +53,37 @@ configs:
         gcp_batch_gpu:
           runner: gcp_batch
 
-extraVolumes:
-  - name: static-images
-    configMap:
-      name: galaxy-static-images
-  - name: webhook-k8s-monitor
-    configMap:
-      name: galaxy-webhook-k8s-monitor
-  - name: admin-ext-anvil
-    configMap:
-      name: galaxy-admin-ext-anvil
-
-extraVolumeMounts:
-  - name: static-images
-    mountPath: /galaxy/server/static/images
-    readOnly: true
-  - name: webhook-k8s-monitor
-    mountPath: /galaxy/server/config/plugins/webhooks-custom/k8s_monitor
-    readOnly: true
-  - name: admin-ext-anvil
-    mountPath: /galaxy/server/config/plugins/admin-custom/anvil
-    readOnly: true
+# Admin panel extension: one "AnVIL" section. Galaxy loads every
+# <admin_extensions_dir>/<id>/config.yml at startup and only galaxy-web serves
+# the API, so the file is written to the web pod only. Relative URLs are
+# resolved against Galaxy's root by the client, so /monitor becomes
+# <galaxy_prefix>/monitor behind Leonardo too (it must match the role's
+# monitor_base_path, which defaults to the same thing). Another values file
+# can add its own section by mapping another admin-custom/<id>/config.yml;
+# Helm merges these maps across -f files, unlike extraVolumes lists.
+extraFileMappings:
+  /galaxy/server/config/plugins/admin-custom/anvil/config.yml:
+    useSecret: false
+    applyToWeb: true
+    applyToJob: false
+    applyToWorkflow: false
+    applyToSetupJob: false
+    applyToNginx: false
+    tpl: false
+    content: |
+      id: anvil
+      section: AnVIL
+      items:
+        - id: monitor
+          type: link
+          title: Cluster Monitor
+          url: /monitor
+          target: iframe
+        - id: monitor_tab
+          type: link
+          title: Cluster Monitor (new tab)
+          url: /monitor
+          target: new_tab
 
 jobs:
   rules:
