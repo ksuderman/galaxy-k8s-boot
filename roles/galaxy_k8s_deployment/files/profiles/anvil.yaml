@@ -2,7 +2,6 @@ postInstallJob:
   enabled: true
   galaxyUser: "default-user@galaxyproject.org"
   bootstrapConfig: |
-    version: 1
     datasets:
       "rnaseq-de":
         - "https://zenodo.org/records/13987631/files/Saccharomyces_cerevisiae.R64-1-1.113.gtf"
@@ -17,3 +16,8 @@ postInstallJob:
     workflows:
       - "https://raw.githubusercontent.com/galaxyproject/iwc/refs/heads/main/workflows/transcriptomics/rnaseq-de/rnaseq-de-filtering-plotting.ga"
       - "https://raw.githubusercontent.com/galaxyproject/iwc/refs/heads/main/workflows/transcriptomics/goseq/goseq-go-kegg-enrichment-analsis.ga"
+      - https://benchmarking-inputs.s3.us-east-1.amazonaws.com/ILLung/Galaxy-Workflow-IL_Lung.ga
+      - https://benchmarking-inputs.s3.amazonaws.com/Variant/Galaxy-Workflow-Variant_analysis_on_WGS_PE_data.ga
+    histories:
+      - https://benchmarking-inputs.s3.us-east-1.amazonaws.com/ILLung/ILLungyoungvsold.tar.gz
+      - https://benchmarking-inputs.s3.amazonaws.com/ERR3485802/Galaxy-History-VC-Test-Data.tar.gz

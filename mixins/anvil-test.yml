@@ -30,12 +30,18 @@ configs:
         # remaining lifetime covers the job's walltime, so max_run_duration
         # must stay well below pool_max_vm_lifetime or VMs are never reused
         # (the runner logs a warning per job when that is the case).
+        # Keep Batch VMs alive between containerized jobs instead of provisioning one per job.
         pool_enabled: true
-        pool_ttl_seconds: 600
-        pool_max_size: 3
-        pool_max_vm_lifetime: 6h
-        pool_claim_timeout_seconds: 120
-        max_run_duration: 3600s
+        # Idle seconds before a pooled VM shuts itself down (runner default 300).
+        pool_ttl_seconds: 120
+        # Max idle VMs kept per handler; busy VMs are uncapped (runner default 5).
+        pool_max_size: 2
+        # Batch max_run_duration of a pooled VM, spanning all its jobs plus idle time.
+        pool_max_vm_lifetime: 24h
+        # Seconds after the VM reports RUNNING to claim a job before it is resubmitted fresh (runner default 60).
+        #pool_claim_timeout_seconds: 120
+        # Per job runtime. Enforced by Batch not Galaxy.
+        max_run_duration: 12h
         # Zones Batch may place VMs in; it uses whichever has capacity, which is
         # the main defence against stockouts. Must be zones of the deployment's
         # Batch region (the role derives gcp_batch_region from the VM's zone and
@@ -88,6 +94,7 @@ jobs:
             job_id_prefix: galaxy-gpu
             # Idle L4 VMs are expensive; keep them around for less time than
             # CPU VMs. Every pool_* runner param can be overridden here.
+            # Idle seconds before a pooled GPU VM shuts itself down.
             pool_ttl_seconds: 180
             # Set to "false" if gcp_batch_vm_image has the NVIDIA driver baked
             # in; otherwise Batch installs it at boot on supported images.
