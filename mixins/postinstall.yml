@@ -1,6 +1,6 @@
 postInstallJob:
   enabled: true
-  galaxyUser: "admin@galaxyproject.org"
+  galaxyUser: "default-user@galaxyproject.org"
   bootstrapConfig: |
     # Workflow imports
     workflows:
