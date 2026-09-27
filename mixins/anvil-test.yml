@@ -20,6 +20,29 @@ configs:
       # config/plugins/admin ships only a .sample in the image; the custom dir
       # is written by the extraFileMappings entry below.
       admin_extensions_dir: "config/plugins/admin,/galaxy/server/config/plugins/admin-custom"
+  # Tools whose HTML outputs Galaxy renders instead of serving as text/plain
+  # (sanitize_all_html). Entries are tool-shed repo prefixes, so every version
+  # matches. A string value, so the chart's default list is restated here plus
+  # image_learner's Ludwig report. Seeded into config/mutable on a fresh disk
+  # only; Admin > Manage Allowlist edits the live copy on the data disk.
+  sanitize_allowlist.txt: |
+    toolshed.g2.bx.psu.edu/repos/bgruening/diff/
+    toolshed.g2.bx.psu.edu/repos/bgruening/pharmcat/
+    toolshed.g2.bx.psu.edu/repos/bgruening/plotly_parallel_coordinates_plot/
+    toolshed.g2.bx.psu.edu/repos/bgruening/plotly_regression_performance_plots/
+    toolshed.g2.bx.psu.edu/repos/crs4/taxonomy_krona_chart/
+    toolshed.g2.bx.psu.edu/repos/devteam/fastqc/
+    toolshed.g2.bx.psu.edu/repos/goeckslab/image_learner/
+    toolshed.g2.bx.psu.edu/repos/iuc/dexseq/
+    toolshed.g2.bx.psu.edu/repos/iuc/fastp/
+    toolshed.g2.bx.psu.edu/repos/iuc/jbrowse/
+    toolshed.g2.bx.psu.edu/repos/iuc/macs2/
+    toolshed.g2.bx.psu.edu/repos/iuc/meme_meme/
+    toolshed.g2.bx.psu.edu/repos/iuc/multiqc/
+    toolshed.g2.bx.psu.edu/repos/iuc/prestor_abseq3/
+    toolshed.g2.bx.psu.edu/repos/iuc/quast/
+    toolshed.g2.bx.psu.edu/repos/iuc/seurat/
+    toolshed.g2.bx.psu.edu/repos/iuc/snpeff/
   job_conf.yml:
     runners:
       gcp_batch:
