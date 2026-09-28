@@ -94,6 +94,11 @@ postgres_storage_disk_path: /mnt/postgres_storage
 setup_postgres_storage: true
 
 # cert-manager Configuration
+# Fail before deploying if the storage paths above are not mount points, so an
+# unmounted persistent disk is not silently replaced by the boot disk. Set to
+# false only for deployments meant to run on the boot disk (e.g. ephemeral VMs).
+require_mounted_storage: true
+
 # Required for CNPG skip-initdb plugin TLS certificates
 setup_cert_manager: false
 cert_manager_version: "v1.20.0"

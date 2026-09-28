@@ -2,6 +2,10 @@
 # Main tasks file for galaxy_k8s_deployment role
 # This orchestrates all the components needed for Galaxy deployment
 
+- name: Include persistent storage preflight checks
+  ansible.builtin.include_tasks: storage_preflight.yml
+  when: require_mounted_storage | bool
+
 - name: Include system setup tasks
   ansible.builtin.include_tasks: system_setup.yml
   when: setup_system | default(true) | bool
