@@ -154,6 +154,12 @@ write_files:
           echo "[$(date)] - Galaxy Restore Mode: Disabled"
       fi
 
+      # Each disk is optional above, and a missing one means that data lives on
+      # the boot disk by design, so only enforce mounts when both are attached.
+      if [ ! -b /dev/disk/by-id/google-galaxy-data ] || [ ! -b /dev/disk/by-id/google-galaxy-postgres-data ]; then
+          PULL_ARGS+=(--extra-vars "require_mounted_storage=false")
+      fi
+
       PULL_ARGS+=(playbook.yml)
 
       mkdir -p /tmp/ansible-inventory

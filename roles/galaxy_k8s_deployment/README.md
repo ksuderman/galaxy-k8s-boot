@@ -105,6 +105,7 @@ cinder_csi_version: "2.31.2"               # Cinder CSI version (if used)
 block_storage_disk_path: /mnt/block_storage # Local path to NFS backing disk
 postgres_storage_disk_path: /mnt/postgres_storage # Local path to PSQL backing disk
 setup_postgres_storage: true               # Setup local-path storage for PostgreSQL
+require_mounted_storage: true              # Fail if the paths above are not mounts
 ```
 
 ### CNPG and Restoration Configuration

@@ -11,6 +11,7 @@ setup_ingress: true
 deploy_galaxy: true
 deploy_pulsar: false
 deploy_monitor: true
+deploy_rainstone: true
 
 # CVMFS Configuration (installed when setup_system is true)
 setup_cvmfs: true
@@ -92,6 +93,11 @@ block_storage_disk_path: /mnt/block_storage
 # PostgreSQL Storage Configuration
 postgres_storage_disk_path: /mnt/postgres_storage
 setup_postgres_storage: true
+
+# Fail before deploying if the storage paths above are not mount points, so an
+# unmounted persistent disk is not silently replaced by the boot disk. Set to
+# false only for deployments meant to run on the boot disk (e.g. ephemeral VMs).
+require_mounted_storage: true
 
 # cert-manager Configuration
 # Required for CNPG skip-initdb plugin TLS certificates
@@ -242,3 +248,22 @@ monitor_namespace: galaxy
 # matches the more specific path first, so this does not shadow Galaxy itself.
 # Set explicitly to pin the monitor somewhere else.
 monitor_base_path: "{{ galaxy_prefix | regex_replace('/$', '') }}/monitor"
+
+# Rainstone Configuration
+# Galaxy compute cost reports, installed after Galaxy (deploy_rainstone) into
+# Galaxy's namespace and linked from its masthead. It reads Galaxy's database
+# with Galaxy's own application credential and changes nothing in Galaxy.
+rainstone_chart: cloudve/rainstone
+rainstone_chart_version: "0.3.0"
+# Behind Galaxy's prefix, for the same reason as monitor_base_path.
+rainstone_base_path: "{{ galaxy_prefix | regex_replace('/$', '') }}/costs"
+# Rainstone's instance identity. Keep it stable for a given Galaxy: a new slug
+# is a new reporting history.
+rainstone_instance_slug: galaxy-galaxy
+# The shared Galaxy account reported on when Galaxy's configuration names no
+# single_user.
+rainstone_workspace_owner: "{{ galaxy_user }}"
+# Chart values merged over the ones this role derives, e.g. an image tag.
+rainstone_values: {}
+# By default a failed Rainstone install is reported without failing the boot.
+rainstone_required: false
