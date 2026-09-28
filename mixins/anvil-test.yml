@@ -9,10 +9,18 @@
 #      tools tagged gpu.
 #
 # Usage: bin/launch_vm.sh ... --values values/values.yml --values mixins/anvil-test.yml
+#
+# Do NOT combine with the AnVIL import profile (files/profiles/anvil.yaml):
+# that profile mounts a release_26.1 copy of the local job runner over the
+# job pods (galaxy#17773 workaround), which would revert the newer runner in
+# this dev-based image. bin/anvil.sh already launches with --profile ''.
 
 image:
   repository: ksuderman/galaxy-anvil-test
-  tag: "anvil-test-2026-09"
+  # Immutable per-build tag (galaxy-dev anvil-test-2026-09 @ a93ed58). The
+  # rolling anvil-test-2026-09 tag bit us once: imagePullPolicy IfNotPresent
+  # kept serving a stale build after the tag was overwritten.
+  tag: "anvil-test-2026-09-a93ed58"
 
 configs:
   galaxy.yml:
