@@ -108,7 +108,7 @@ extraFileMappings:
         - id: monitor_tab
           type: link
           title: Cluster Monitor (new tab)
-          url: /galaxy/monitor
+          url: /monitor
           target: new_tab
         # Runtime overrides for the GCP Batch runner. Each key is one the runner
         # reads (gcp_batch.<runner param>); a saved value beats the runner-level
