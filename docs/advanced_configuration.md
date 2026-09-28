@@ -83,3 +83,8 @@ Then deploy with:
 ansible-playbook -i inventories/vm.ini playbook.yml \
   -e galaxy_values_files='["values/base.yml","values/production.yml","values/gcp-batch.yml"]'
 ```
+
+## Rainstone Cost Reports
+
+Rainstone is deployed with Galaxy by default. See [rainstone.md](rainstone.md)
+for what the playbook configures and the variables that change it.
