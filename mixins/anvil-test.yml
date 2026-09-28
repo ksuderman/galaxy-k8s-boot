@@ -77,8 +77,11 @@ configs:
           runner: gcp_batch
 
 # Admin panel extension: one "AnVIL" section. Galaxy loads every
-# <admin_extensions_dir>/<id>/config.yml at startup and only galaxy-web serves
-# the API, so the file is written to the web pod only. Relative URLs are
+# <admin_extensions_dir>/<id>/config.yml at startup. galaxy-web serves the API
+# and renders the panel, but the job handlers must load the file too: the
+# settings manager only honours keys declared by a loaded extension, so a
+# handler without the file would ignore every value saved from the form and
+# the GCP Batch runner would fall back to job_conf.yml. Relative URLs are
 # resolved against Galaxy's root by the client, so /monitor becomes
 # <galaxy_prefix>/monitor behind Leonardo too (it must match the role's
 # monitor_base_path, which defaults to the same thing). Another values file
@@ -88,7 +91,7 @@ extraFileMappings:
   /galaxy/server/config/plugins/admin-custom/anvil/config.yml:
     useSecret: false
     applyToWeb: true
-    applyToJob: false
+    applyToJob: true
     applyToWorkflow: false
     applyToSetupJob: false
     applyToNginx: false
@@ -105,8 +108,63 @@ extraFileMappings:
         - id: monitor_tab
           type: link
           title: Cluster Monitor (new tab)
-          url: /monitor
+          url: /galaxy/monitor
           target: new_tab
+        # Runtime overrides for the GCP Batch runner. Each key is one the runner
+        # reads (gcp_batch.<runner param>); a saved value beats the runner-level
+        # value in job_conf.yml above but not a destination-level param, so the
+        # GPU destination's own pool_ttl_seconds and image still apply there.
+        # Pool settings are fixed when a VM boots: a change affects VMs
+        # provisioned after the save, and VMs already running keep their values
+        # until they expire. Saved values persist across restarts and upgrades.
+        - id: batch
+          type: form
+          title: GCP Batch Settings
+          description: >-
+            Defaults for jobs sent to GCP Batch. Keep the job walltime well below
+            the pooled VM lifetime or VMs are never reused. Changes apply to VMs
+            provisioned after saving.
+          inputs:
+            - name: pool_enabled
+              key: gcp_batch.pool_enabled
+              type: boolean
+              label: Keep VMs warm between jobs
+              help: Reuse Batch VMs for follow-up jobs instead of provisioning one per job.
+              default: true
+            - name: pool_ttl_seconds
+              key: gcp_batch.pool_ttl_seconds
+              type: integer
+              label: Idle seconds before a warm VM shuts down
+              help: Longer keeps more jobs off the boot path; idle VMs bill the whole time.
+              default: 120
+              min: 30
+              max: 3600
+            - name: pool_max_size
+              key: gcp_batch.pool_max_size
+              type: integer
+              label: Idle VMs kept per machine type
+              help: Per job handler. Running VMs are not counted.
+              default: 2
+              min: 0
+              max: 20
+            - name: pool_max_vm_lifetime
+              key: gcp_batch.pool_max_vm_lifetime
+              type: text
+              label: Warm VM lifetime
+              help: Total lifetime of a warm VM across all its jobs, e.g. 24h or 6h.
+              default: 24h
+            - name: max_run_duration
+              key: gcp_batch.max_run_duration
+              type: text
+              label: Job walltime
+              help: Longest a single job may run, e.g. 12h or 3600s. Must stay well below the warm VM lifetime.
+              default: 12h
+            - name: allowed_locations
+              key: gcp_batch.allowed_locations
+              type: text
+              label: Allowed zones
+              help: Comma-separated zones in the Batch region that Batch may place VMs in.
+              default: us-east4-a,us-east4-c
 
 jobs:
   rules:
