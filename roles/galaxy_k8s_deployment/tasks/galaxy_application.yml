@@ -164,6 +164,18 @@
 # Install Galaxy
 # ============================================================================
 
+# The file lookup only reads text, so binary images are read with slurp on
+# the controller, which returns them already base64-encoded.
+- name: Read Galaxy static images
+  ansible.builtin.slurp:
+    src: "{{ role_path }}/files/{{ item }}"
+  loop:
+    - galaxy-project-logo-white-square.png
+    - anvil-project-logo-white.png
+  register: static_images
+  delegate_to: localhost
+  become: false
+
 - name: Create ConfigMap for Galaxy static images
   kubernetes.core.k8s:
     state: present
@@ -174,9 +186,7 @@
       metadata:
         name: galaxy-static-images
         namespace: galaxy
-      binaryData:
-        galaxy-project-logo-white-square.png: "{{ lookup('file', 'files/galaxy-project-logo-white-square.png') | b64encode }}"
-        anvil-project-logo-white.png: "{{ lookup('file', 'files/anvil-project-logo-white.png') | b64encode }}"
+      binaryData: "{{ dict(static_images.results | map(attribute='item') | zip(static_images.results | map(attribute='content'))) }}"
 
 # Backs the galaxy-webhook-k8s-monitor volume mounted via values/values.yml's
 # extraVolumes/extraVolumeMounts. Created unconditionally, like the ConfigMap
