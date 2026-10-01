@@ -47,10 +47,10 @@ rainstone_required: false
 
 ## The masthead link
 
-Galaxy loads masthead webhooks only at startup, and behind the platform's proxy
-that link is how Rainstone is reached. When the playbook installs Rainstone for
-the first time, it restarts the `galaxy-web` deployment once. This is a rolling
-restart, so the old pod keeps serving until the new one is ready.
+Behind the platform's proxy, Galaxy's masthead link is how Rainstone is
+reached. Galaxy loads masthead webhooks only at startup, so the playbook
+creates the link's `galaxy-webhook-rainstone` ConfigMap before installing
+Galaxy, and Rainstone's chart is installed with its own webhook turned off.
 
 ## Storage and restoration
 

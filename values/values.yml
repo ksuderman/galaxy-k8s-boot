@@ -342,12 +342,11 @@ extraVolumes:
   - name: webhook-k8s-monitor
     configMap:
       name: galaxy-webhook-k8s-monitor
-  # Rainstone owns this ConfigMap, so its link and icon stay with the chart
-  # that knows its path. `optional` keeps Galaxy's pod startable whether or not
-  # Rainstone is installed, in either order.
+  # The playbook creates this ConfigMap before Galaxy starts, only when it
+  # deploys Rainstone; `optional` keeps Galaxy's pod startable without it.
   - name: webhook-rainstone
     configMap:
-      name: rainstone-webhook
+      name: galaxy-webhook-rainstone
       optional: true
 
 extraVolumeMounts:

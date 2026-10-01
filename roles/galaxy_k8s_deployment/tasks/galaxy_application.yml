@@ -214,6 +214,33 @@
           function: >
             window.open(window.location.origin + '{{ monitor_base_path }}', '_blank');
 
+# Backs the webhook-rainstone volume in values/values.yml. It is created here,
+# before Galaxy, rather than by Rainstone's chart after it, because Galaxy loads
+# webhooks only at startup: a link created later would appear only after
+# restarting Galaxy's web server. Skipped without Rainstone; the mount is
+# optional.
+- name: Create ConfigMap for the Rainstone masthead webhook
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubeconfig_path }}"
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: galaxy-webhook-rainstone
+        namespace: galaxy
+      data:
+        config.yml: |
+          id: rainstone
+          type:
+            - masthead
+          activate: true
+          icon: fa-dollar-sign
+          tooltip: Compute cost
+          function: >
+            window.open(window.location.origin + '{{ rainstone_base_path }}', '_blank');
+  when: deploy_rainstone | bool
+
 # - name: Write Galaxy post-install user values
 #   ansible.builtin.copy:
 #     dest: /tmp/galaxy-postinstall-user.yaml

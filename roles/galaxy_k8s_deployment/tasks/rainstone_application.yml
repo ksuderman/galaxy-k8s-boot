@@ -84,15 +84,6 @@
           Rainstone's workspace profile reports one shared account.
       when: _rainstone_owner | length == 0
 
-    - name: Check whether Rainstone's masthead link already exists
-      kubernetes.core.k8s_info:
-        api_version: v1
-        kind: ConfigMap
-        name: rainstone-webhook
-        namespace: galaxy
-        kubeconfig: "{{ kubeconfig_path }}"
-      register: rainstone_webhook_before
-
     - name: Helm install Rainstone
       kubernetes.core.helm:
         name: rainstone
@@ -109,6 +100,10 @@
             # boots of the same Galaxy.
             slug: "{{ rainstone_instance_slug }}"
           basePath: "{{ rainstone_base_path }}"
+          # The playbook creates the masthead link before Galaxy starts; see
+          # galaxy_application.yml.
+          galaxyWebhook:
+            enabled: false
           auth:
             mode: anvil-workspace
             workspaceOwner: "{{ _rainstone_owner }}"
@@ -141,24 +136,6 @@
             gcpBatch:
               project: "{{ gcp_project_id }}"
               location: "{{ gcp_batch_region }}"
-
-    # Galaxy loads webhooks only at startup, and the platform's proxy reaches
-    # Rainstone only through that masthead link. A Galaxy web pod that started
-    # before the link's ConfigMap existed is restarted once; the rolling
-    # restart keeps the old pod serving until the new one is ready.
-    - name: Restart Galaxy's web server to load Rainstone's masthead link
-      when: rainstone_webhook_before.resources | length == 0
-      block:
-        - name: Restart the Galaxy web deployment
-          ansible.builtin.shell: kubectl rollout restart deployment galaxy-web -n galaxy
-          environment:
-            KUBECONFIG: "{{ kubeconfig_path }}"
-
-        - name: Wait for the Galaxy web deployment to finish rolling out
-          ansible.builtin.shell: kubectl rollout status deployment galaxy-web -n galaxy --timeout=1800s
-          environment:
-            KUBECONFIG: "{{ kubeconfig_path }}"
-          changed_when: false
 
     - name: Display Rainstone's address
       ansible.builtin.debug:
