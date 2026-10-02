@@ -124,7 +124,23 @@ restore_galaxy: false                      # Detect and restore existing Galaxy 
 
 ```yaml
 ingress_version: "4.13.2"                  # NGINX ingress chart version
+ingress_use_forwarded_headers: false       # Trust caller-supplied X-Forwarded-* (external L7 proxy only)
+galaxy_tls_cert: ""                        # Certificate served on 443 (PEM or base64 PEM); empty = built-in self-signed
+galaxy_tls_key: ""                         # Its private key
+ingress_tls_from_metadata: true            # Read galaxy_tls_cert/galaxy_tls_key instance attributes when unset
+ingress_tls_secret: galaxy-ingress-tls     # Name of the TLS Secret created in ingress-nginx
 ```
+
+The ingress controller always listens on 443. Without a certificate it serves
+its own self-signed one, which suits clients that do not validate the chain.
+A launcher that wants to validate the connection (Leonardo on Terra) sets the
+`galaxy_tls_cert` and `galaxy_tls_key` instance metadata attributes; the role
+reads them, validates the pair (`files/check_tls_pair.sh`: parseable, key
+matches certificate, not expired), stores it as a TLS Secret and makes it the
+controller's default certificate. The attributes are read by the role rather
+than passed as extra-vars because `--extra-vars "key=value"` splits on
+whitespace and would corrupt a PEM. A pair that fails validation fails the
+play, since nginx would otherwise fall back to its own certificate silently.
 
 ### Galaxy Application Configuration
 
