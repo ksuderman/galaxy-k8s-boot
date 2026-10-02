@@ -7,7 +7,7 @@
 # Each file holds PEM, or base64-encoded PEM (how a value may arrive through
 # instance metadata). Exit 0 and print the certificate's subject, subject
 # alternative names and expiry when the certificate parses, the key parses, the
-# key belongs to the certificate and the certificate has not expired. Exit 1
+# key belongs to the certificate and the certificate is currently valid. Exit 1
 # with the reason on stderr otherwise, exit 2 on usage errors.
 #
 # nginx silently keeps its own certificate when the configured one is unusable,
@@ -53,6 +53,13 @@ if [ "$cert_pub" != "$key_pub" ]; then
 fi
 if ! openssl x509 -in "$work/cert.pem" -noout -checkend 0 >/dev/null 2>&1; then
     echo "certificate has expired ($(openssl x509 -in "$work/cert.pem" -noout -enddate))" >&2
+    exit 1
+fi
+
+# Check notBefore as well as notAfter. Trust the supplied leaf for this check:
+# the launcher's issuer need not be installed in the VM's system trust store.
+if ! validity=$(openssl verify -partial_chain -trusted "$work/cert.pem" "$work/cert.pem" 2>&1); then
+    echo "certificate is not currently valid: $validity" >&2
     exit 1
 fi
 

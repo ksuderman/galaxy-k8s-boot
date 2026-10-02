@@ -20,22 +20,23 @@ except ImportError:  # pragma: no cover
 SCRIPT = Path(__file__).resolve().parents[1] / "roles/galaxy_k8s_deployment/files/check_tls_pair.sh"
 
 
-def make_pair(directory, name, cn, days=365):
-    """Write a self-signed certificate and key; a negative ``days`` yields an expired certificate."""
+def make_pair(directory, name, cn, days=365, start_days=-2, issuer=None):
+    """Write a certificate/key pair, self-signed unless an issuer is supplied; negative days expires it."""
     cert, key = directory / f"{name}.crt", directory / f"{name}.key"
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     now = datetime.datetime.now(datetime.timezone.utc)
     subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+    issuer_name, signing_key = issuer if issuer is not None else (subject, private_key)
     certificate = (
         x509.CertificateBuilder()
         .subject_name(subject)
-        .issuer_name(subject)
+        .issuer_name(issuer_name)
         .public_key(private_key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(now - datetime.timedelta(days=2))
+        .not_valid_before(now + datetime.timedelta(days=start_days))
         .not_valid_after(now + datetime.timedelta(days=days))
         .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address(cn))]), critical=False)
-        .sign(private_key, hashes.SHA256())
+        .sign(signing_key, hashes.SHA256())
     )
     cert.write_bytes(certificate.public_bytes(serialization.Encoding.PEM))
     key.write_bytes(
@@ -87,6 +88,22 @@ class CheckTlsPairTests(unittest.TestCase):
         result = self.check(cert, key)
         self.assertEqual(result.returncode, 1)
         self.assertIn("expired", result.stderr)
+
+    def test_certificate_that_is_not_yet_valid_is_rejected(self):
+        cert, key = make_pair(self.dir, "future", "10.0.0.1", start_days=1)
+        result = self.check(cert, key)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("not yet valid", result.stderr)
+
+    def test_issuer_does_not_need_to_be_in_system_trust_store(self):
+        ca_cert, ca_key = make_pair(self.dir, "ca", "10.0.0.2")
+        issuer = (
+            x509.load_pem_x509_certificate(ca_cert.read_bytes()).subject,
+            serialization.load_pem_private_key(ca_key.read_bytes(), password=None),
+        )
+        cert, key = make_pair(self.dir, "leaf", "10.0.0.1", issuer=issuer)
+        result = self.check(cert, key)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_base64_encoded_pem_is_accepted(self):
         cert, key = make_pair(self.dir, "good", "10.0.0.1")

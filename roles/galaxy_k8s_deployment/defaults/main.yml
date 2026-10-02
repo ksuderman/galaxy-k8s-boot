@@ -144,8 +144,9 @@ ingress_use_forwarded_headers: false
 # connection instead of trusting any certificate (galaxy-k8s-boot#143); with
 # ingress_tls_from_metadata those attributes are read when the variables below
 # are empty. PEM or base64-encoded PEM. A pair that does not validate (key and
-# certificate mismatch, expired, unparseable) fails the play: nginx would
-# otherwise keep its own certificate silently and the client could not tell why.
+# certificate mismatch, not yet valid, expired, unparseable) fails the play:
+# nginx would otherwise keep its own certificate silently and the client could
+# not tell why.
 galaxy_tls_cert: ""
 galaxy_tls_key: ""
 ingress_tls_from_metadata: true

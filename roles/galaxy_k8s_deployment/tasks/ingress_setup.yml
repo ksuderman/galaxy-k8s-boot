@@ -23,22 +23,40 @@
 # split on whitespace and would corrupt a PEM. The Secret is created before the
 # Helm install so the controller finds it on its first start.
 - name: Read the TLS certificate from the instance metadata
-  ansible.builtin.uri:
-    url: "http://metadata.google.internal/computeMetadata/v1/instance/attributes/{{ item }}"
-    headers:
-      Metadata-Flavor: Google
-    return_content: true
-    timeout: 5
-  register: _ingress_tls_meta
-  failed_when: false
-  no_log: true
-  loop:
-    - galaxy_tls_cert
-    - galaxy_tls_key
+  # Missing attributes are optional. Retry errors on GCE instead of treating
+  # them as absence and silently serving the controller's self-signed cert.
+  # A metadata transport error (-1) remains optional outside GCE.
+  vars:
+    _tls_metadata_on_gce: "{{ ansible_facts.product_name | default('') == 'Google Compute Engine' }}"
+    _tls_metadata_ok_statuses: "{{ [200, 404] if _tls_metadata_on_gce else [200, 404, -1] }}"
   when:
     - ingress_tls_from_metadata | bool
     - galaxy_tls_cert | length == 0
     - galaxy_tls_key | length == 0
+  block:
+    - name: Fetch the TLS metadata attributes
+      ansible.builtin.uri:
+        url: "http://metadata.google.internal/computeMetadata/v1/instance/attributes/{{ item }}"
+        headers:
+          Metadata-Flavor: Google
+        return_content: true
+        timeout: 5
+      register: _ingress_tls_meta
+      failed_when: _ingress_tls_meta.status | default(-1) not in _tls_metadata_ok_statuses
+      until: _ingress_tls_meta.status | default(-1) in _tls_metadata_ok_statuses
+      retries: 3
+      delay: 2
+      no_log: true
+      loop:
+        - galaxy_tls_cert
+        - galaxy_tls_key
+  rescue:
+    - name: Report TLS metadata retrieval failure without exposing the TLS material
+      ansible.builtin.fail:
+        msg: >-
+          TLS metadata could not be read after retries (attribute request statuses:
+          {{ _ingress_tls_meta.results | map(attribute='status', default=-1) | list }}).
+          Refusing to fall back to the ingress controller's self-signed certificate.
 
 - name: Resolve the TLS certificate and key
   ansible.builtin.set_fact:
