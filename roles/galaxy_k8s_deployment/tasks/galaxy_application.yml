@@ -706,6 +706,15 @@
       changed_when: false
 
 # ============================================================================
+# User-defined tool permissions
+# ============================================================================
+- name: Configure single-user Galaxy UDT permissions
+  ansible.builtin.include_tasks: user_defined_tools.yml
+  when:
+    - deploy_galaxy | default(true) | bool
+    - galaxy_grant_user_defined_tool_permissions | default(true) | bool
+
+# ============================================================================
 # Default user disk quota
 # ============================================================================
 # `enable_quotas` in the Helm values only switches quota enforcement on. The amount
