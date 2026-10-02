@@ -56,5 +56,7 @@ if ! openssl x509 -in "$work/cert.pem" -noout -checkend 0 >/dev/null 2>&1; then
     exit 1
 fi
 
-openssl x509 -in "$work/cert.pem" -noout -subject -enddate
+# RFC 2253 keeps the subject format stable across OpenSSL versions (3.0 prints
+# "CN = x" by default, 3.6 "CN=x").
+openssl x509 -in "$work/cert.pem" -noout -subject -nameopt RFC2253 -enddate
 openssl x509 -in "$work/cert.pem" -noout -ext subjectAltName 2>/dev/null | sed -n '2s/^ *//p'
