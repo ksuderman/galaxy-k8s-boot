@@ -37,7 +37,6 @@
           {{ _udt_user_roles.json
              | selectattr('type', 'equalto', 'user_tool_execute')
              | selectattr('id', 'in', _udt_active_role_ids) | list }}
-      no_log: true
       block:
         - name: Look up the configured Galaxy user
           ansible.builtin.uri:
@@ -47,6 +46,7 @@
             timeout: 30
           register: _udt_users_response
           changed_when: false
+          no_log: true
 
         - name: Verify the configured Galaxy user exists
           ansible.builtin.assert:
@@ -61,6 +61,7 @@
             timeout: 30
           register: _udt_user_roles
           changed_when: false
+          no_log: true
 
         - name: Read active Galaxy roles
           ansible.builtin.uri:
@@ -70,6 +71,7 @@
             timeout: 30
           register: _udt_roles_response
           changed_when: false
+          no_log: true
 
         - name: Create and assign the UDT execution role
           ansible.builtin.uri:
@@ -79,9 +81,9 @@
               x-api-key: "{{ galaxy_bootstrap_api_key }}"
             body_format: json
             body:
-              # Deleted roles retain their names and associations. The suffix
-              # advances when a previous grant was revoked, avoiding conflicts.
-              name: "anvil-user-tools-{{ _udt_user.id }}-{{ _udt_user_roles.json | length }}"
+              # Role names are unique, including deleted and unassigned roles,
+              # which the API cannot list. A timestamp avoids reusing them.
+              name: "anvil-user-tools-{{ _udt_user.id }}-{{ now(utc=true, fmt='%Y%m%d%H%M%S') }}"
               description: "User-defined tool execution managed by galaxy-k8s-boot"
               role_type: user_tool_execute
               user_ids:
@@ -90,3 +92,4 @@
             timeout: 30
           when: _udt_execution_roles | length == 0
           changed_when: true
+          no_log: true
