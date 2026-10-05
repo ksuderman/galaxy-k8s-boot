@@ -130,7 +130,7 @@ galaxy_tls_key: ""                         # Its private key
 ingress_tls_from_metadata: true            # Read galaxy_tls_cert/galaxy_tls_key instance attributes when unset
 ingress_tls_secret: galaxy-ingress-tls     # Name of the TLS Secret created in ingress-nginx
 galaxy_tls_client_ca: ""                   # CA client certificates on 443 must chain to (mTLS); empty = no client verification
-ingress_tls_client_ca_secret: galaxy-ingress-client-ca  # Secret (key ca.crt) the auth-tls annotations reference
+ingress_tls_client_ca_secret: galaxy-ingress-client-ca  # Secret (key ca.crt) in the galaxy namespace the auth-tls annotations reference
 ingress_tls_client_verify_depth: 1         # Chain depth between client certificate and the CA
 ```
 
@@ -153,8 +153,12 @@ optional; set `ingress_tls_from_metadata: false` to skip the lookup entirely.
 
 Mutual TLS adds the other direction: with the `galaxy_tls_client_ca` attribute
 (or variable), the role validates the CA (`files/check_ca_cert.sh`), stores it
-as a Secret in `ingress-nginx`, and annotates the Galaxy Ingress with
+as a Secret in the `galaxy` namespace, and annotates the Galaxy Ingress with
 `auth-tls-secret`, `auth-tls-verify-client: "on"` and `auth-tls-verify-depth`.
+The Secret has to share the Ingress's namespace: ingress-nginx rejects a
+cross-namespace reference unless `allow-cross-namespace-resources` is enabled,
+and the rejection is `return 403` for the whole server rather than a skipped
+annotation.
 ingress-nginx applies client verification per host, and every Ingress of this
 deployment uses the empty host, where the controller takes the first Ingress's
 client auth for the whole server, so tusd, the monitor and Rainstone are
