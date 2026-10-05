@@ -464,7 +464,7 @@
     update_repo_cache: "{{ not (use_local_chart | default(false) | bool) }}"
     timeout: "20m0s"
     values_files: "{{ lookup('sequence', 'start=0 end=' ~ (_galaxy_values_files|length - 1) ~ ' format=/tmp/galaxy_values_%d.yml', wantlist=True) }}"
-    values: "{{ _helm_values_base | combine(_helm_values_gcp_project if (enable_gcp_batch | default(false) | bool and gcp_project_id | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_gcp_batch if (enable_gcp_batch | default(false) | bool and gcp_batch_region | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_gcp_network if (enable_gcp_batch | default(false) | bool and gcp_batch_network | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_gcp_subnet if (enable_gcp_batch | default(false) | bool and gcp_batch_subnet | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_forwarded_proto if (ingress_use_forwarded_headers | default(false) | bool) else {}, recursive=True) | combine(_helm_values_cnpg_plugin if (restore_galaxy | bool) else {}, recursive=True) }}"
+    values: "{{ _helm_values_base | combine(_helm_values_gcp_project if (enable_gcp_batch | default(false) | bool and gcp_project_id | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_gcp_batch if (enable_gcp_batch | default(false) | bool and gcp_batch_region | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_gcp_network if (enable_gcp_batch | default(false) | bool and gcp_batch_network | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_gcp_subnet if (enable_gcp_batch | default(false) | bool and gcp_batch_subnet | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_forwarded_proto if (ingress_use_forwarded_headers | default(false) | bool) else {}, recursive=True) | combine(_helm_values_client_auth if (_ingress_tls_client_ca | default('') | length > 0) else {}, recursive=True) | combine(_helm_values_cnpg_plugin if (restore_galaxy | bool) else {}, recursive=True) }}"
     set_values: "{{ galaxy_helm_extra_sets | default([]) + _helm_prefix_sets }}"
   vars:
     _helm_prefix_sets:
@@ -550,6 +550,17 @@
       nginx:
         conf:
           forwardedProtoOverride: https
+    # Mutual TLS on port 443 (ingress_setup.yml stores the CA). ingress-nginx
+    # applies client verification per host, never per path, and every Ingress
+    # of this deployment uses the empty host (the controller's default server),
+    # where the first Ingress with a CA configures the whole server. Annotating
+    # the Galaxy Ingress therefore covers tusd, the monitor and Rainstone too.
+    _helm_values_client_auth:
+      ingress:
+        annotations:
+          nginx.ingress.kubernetes.io/auth-tls-secret: "ingress-nginx/{{ ingress_tls_client_ca_secret }}"
+          nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
+          nginx.ingress.kubernetes.io/auth-tls-verify-depth: "{{ ingress_tls_client_verify_depth }}"
     _helm_values_cnpg_plugin:
       postgresql:
         cluster:
