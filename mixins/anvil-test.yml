@@ -226,3 +226,12 @@ jobs:
           scheduling:
             require:
               - gpu
+
+webHandlers:
+  resources:
+    requests:
+      cpu: 0.1
+jobHandlers:
+  resources:
+    requests:
+      cpu: 0.2

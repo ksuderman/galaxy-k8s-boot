@@ -294,6 +294,12 @@ jobs:
         k8s:
           max_accepted_cores: 1
           max_accepted_mem: 4
+          params:
+            # The chart requests a full core per job core, but on a 4-vCPU head
+            # node the control plane and Galaxy's own pods already reserve about
+            # 3 cores, so a 1-core helper job could never be scheduled. Request a
+            # quarter instead; no CPU limit is set, so jobs still burst to a core.
+            requests_cpu: "{cores * 0.25}"
           scheduling:
             prefer:
               - small-job
