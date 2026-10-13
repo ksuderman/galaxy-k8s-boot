@@ -43,10 +43,19 @@ cvmfs:
     logVerbosityLevel: 5
 
 postgresql:
+  resources:
+    requests:
+      cpu: 75m
+      memory: 300M
   persistence:
     storageClass: postgres-storage
 
 rabbitmq:
+  extraSpec:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
   persistence:
     storageClassName: blockstorage
 
@@ -446,7 +455,8 @@ extraFileMappings:
 webHandlers:
   resources:
     requests:
-      cpu: 0.1
+      cpu: 300m
+      memory: 3.5G
   gunicorn:
     timeout: 900             # 15 minutes!
   startupProbe:
@@ -457,7 +467,8 @@ webHandlers:
 workflowHandlers:
   resources:
     requests:
-      cpu: 0.1
+      cpu: 150m
+      memory: 1.25G
   startupProbe:
     initialDelaySeconds: 60
     periodSeconds: 10
@@ -466,7 +477,8 @@ workflowHandlers:
 jobHandlers:
   resources:
     requests:
-      cpu: 0.1
+      cpu: 200m
+      memory: 1.35G
   startupProbe:
     initialDelaySeconds: 60
     periodSeconds: 10
@@ -475,9 +487,23 @@ jobHandlers:
 nginx:
   resources:
     requests:
-      cpu: 0.05
+      cpu: 25m
+      memory: 32Mi
+
+tusd:
+  resources:
+    requests:
+      cpu: 75m
+      memory: 32Mi
+
+celeryBeat:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 500M
 
 celery:
   resources:
     requests:
-      cpu: 0.05
+      cpu: 25m
+      memory: 600M
