@@ -45,8 +45,8 @@ cvmfs:
 postgresql:
   resources:
     requests:
-      cpu: 75m
-      memory: 300M
+      cpu: 150m
+      memory: 600M
   persistence:
     storageClass: postgres-storage
 
@@ -54,7 +54,7 @@ rabbitmq:
   extraSpec:
     resources:
       requests:
-        cpu: 50m
+        cpu: 25m
         memory: 256Mi
   persistence:
     storageClassName: blockstorage
@@ -448,14 +448,16 @@ extraFileMappings:
           </body>
       </html>
 
-# The VM has four CPUs and each Galaxy job pod requests a whole one, so the
-# handlers' own requests are kept to a scheduling floor rather than a share of
-# the machine. Requests reserve capacity; they do not cap what a handler may
-# use when the node is idle.
+# On a four-CPU / 16 GB VM, leave one CPU and 4 GB for Kubernetes job pods.
+# With one replica of each service and the measured infrastructure requests,
+# these settings plus Rainstone reserve 2.890 CPU / 11.927 GB, leaving at least
+# 0.1 CPU below the ongoing-service budget for infrastructure changes.
+# Requests reserve capacity; local jobs inside the handler can use more, so
+# their concurrency must also fit the VM's available resources.
 webHandlers:
   resources:
     requests:
-      cpu: 300m
+      cpu: 450m
       memory: 3.5G
   gunicorn:
     timeout: 900             # 15 minutes!
@@ -467,7 +469,7 @@ webHandlers:
 workflowHandlers:
   resources:
     requests:
-      cpu: 150m
+      cpu: 100m
       memory: 1.25G
   startupProbe:
     initialDelaySeconds: 60
@@ -477,8 +479,8 @@ workflowHandlers:
 jobHandlers:
   resources:
     requests:
-      cpu: 200m
-      memory: 1.35G
+      cpu: 325m
+      memory: 1.9G
   startupProbe:
     initialDelaySeconds: 60
     periodSeconds: 10
@@ -493,17 +495,17 @@ nginx:
 tusd:
   resources:
     requests:
-      cpu: 75m
+      cpu: 10m
       memory: 32Mi
 
 celeryBeat:
   resources:
     requests:
-      cpu: 25m
+      cpu: 10m
       memory: 500M
 
 celery:
   resources:
     requests:
       cpu: 25m
-      memory: 600M
+      memory: 650M
