@@ -342,6 +342,14 @@ jobs:
         k8s:
           max_accepted_cores: 1
           max_accepted_mem: 4
+          params:
+            # The chart requests a full core per job core, but the head node only
+            # keeps about one CPU free for Kubernetes jobs once the control plane
+            # and Galaxy's own pods have reserved theirs, so a 1-core job would
+            # take that whole allowance and a second one could never be
+            # scheduled. Request a quarter core instead so several single-core
+            # jobs fit; no CPU limit is set, so each job can still burst to a core.
+            requests_cpu: "{cores * 0.25}"
           scheduling:
             # Helm replaces lists; retain docker from the chart's defaults.
             accept:
