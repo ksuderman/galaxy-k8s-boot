@@ -97,6 +97,7 @@ configs:
       # Galaxy prefix, so a bare URL typed into the address bar arrives
       # without the headers the route requires.
       webhooks_dir: "config/plugins/webhooks,/galaxy/server/config/plugins/webhooks-custom"
+      job_resource_params_file: "/galaxy/server/config/job_resource_params_conf.xml"
   job_conf.yml:
     runners:
       gcp_batch:
@@ -189,6 +190,10 @@ configs:
         id: map_param_value
       - environment: local
         id: param_value_from_file
+    resources:
+      default: default
+      groups:
+        default: [ processors, mem, walltime, gpus ]
     limits:
       - type: total_walltime
         window: 1  # number in days
@@ -426,6 +431,17 @@ extraVolumeMounts:
     readOnly: true
 
 extraFileMappings:
+  /galaxy/server/config/job_resource_params_conf.xml:
+    applyToWeb: true
+    content: |
+      <parameters>
+        <param label="Processors" name="processors" type="integer" min="1" max="64" value="" help="Number of processing cores, 'ppn' value (1-64). Leave blank to use default value." />
+        <param label="GPUs" name="gpus" type="integer" min="0" max="8" value="" help="Number of GPUs, value (0-8). Leave blank to use default value." />
+        <param label="Memory" name="mem" type="integer" min="1" max="1024" value="" help="Memory size in gigabytes, 'pmem' value (1-1024). Leave blank to use default value." />
+        <param label="Wall Time" name="walltime" type="text" value="" help="Maximum run time, e.g. 90m, 24h or 2d. Leave blank for the default (24h).">
+          <validator type="regex" message="Use a number with a unit suffix: s, m, h or d (e.g. 24h)">^\s*([0-9]+(\.[0-9]+)?\s*[smhd])?\s*$</validator>
+        </param>
+      </parameters>
   /galaxy/server/static/welcome.html:
     applyToWeb: true
     applyToNginx: true
