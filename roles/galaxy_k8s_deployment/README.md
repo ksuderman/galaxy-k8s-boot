@@ -76,6 +76,11 @@ cvmfs_quota_limit: 4000                    # CVMFS cache size (MB)
 cvmfs_http_proxies: ["DIRECT"]             # HTTP proxies for CVMFS
 ```
 
+Galaxy inherits reference-data mounts and table configuration from its chart.
+The GCP Batch configuration uses the chart's reference-volume helper; worker
+images must provide the corresponding CVMFS mounts. Rebuild older images with
+`image_prep.yml` to verify access to data, cloud tools and IDC repositories.
+
 ### RKE2 Configuration
 
 ```yaml
@@ -173,8 +178,8 @@ browsers hitting the VM directly.
 
 ```yaml
 galaxy_chart: cloudve/galaxy
-galaxy_chart_version: "6.8.0"              # Galaxy chart version
-galaxy_deps_version: "1.1.1"               # Galaxy dependencies version
+galaxy_chart_version: "6.8.9"              # Galaxy chart version
+galaxy_deps_version: "1.2.0"               # Galaxy dependencies version
 galaxy_values_files: ["values/values.yml"] # Path to Galaxy values files
 galaxy_persistence_size: "128Gi"           # Galaxy data volume size
 galaxy_db_password: "galaxydbpassword"     # PostgreSQL password
@@ -241,7 +246,7 @@ See the [ABM documentation][abm-docs] for the complete configuration format.
 ```yaml
 pulsar_chart: cloudve/pulsar
 pulsar_chart_version: "0.2.0"              # Pulsar chart version
-pulsar_deps_version: "1.1.1"               # Pulsar dependencies version
+pulsar_deps_version: "1.2.0"               # Pulsar dependencies version
 pulsar_api_key: ""                         # Pulsar API key
 ```
 
