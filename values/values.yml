@@ -8,7 +8,7 @@ terra:
 
 image:
   repository: quay.io/galaxyproject/galaxy-min
-  tag: "26.1-auto"
+  tag: "26.2-auto"
 
 ingress:
   enabled: true
@@ -99,6 +99,8 @@ configs:
       webhooks_dir: "config/plugins/webhooks,/galaxy/server/config/plugins/webhooks-custom"
   job_conf.yml:
     runners:
+      k8s:
+        k8s_fs_group_change_policy: OnRootMismatch
       gcp_batch:
         load: galaxy.jobs.runners.gcp_batch:GoogleCloudBatchJobRunner
         workers: 4
