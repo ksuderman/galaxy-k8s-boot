@@ -173,9 +173,9 @@ ingress_tls_client_verify_depth: 1
 use_local_chart: false
 galaxy_prefix: "/galaxy"
 galaxy_chart: cloudve/galaxy
-galaxy_chart_version: "6.8.8"
+galaxy_chart_version: "6.8.9"
 galaxy_deps_chart: cloudve/galaxy-deps
-galaxy_deps_version: "1.1.1"
+galaxy_deps_version: "1.2.0"
 
 # Galaxy Helm values files configuration
 # Supports multiple values files that will be merged in order
@@ -238,7 +238,7 @@ enable_gcp_batch: true
 # so the value is NOT hardcoded in values/values.yml.
 gcp_project_id: ""
 # Name of the custom Batch VM image (CVMFS pre-configured).
-gcp_batch_vm_image: "galaxy-k8s-boot-v2026-06-30"
+gcp_batch_vm_image: "galaxy-k8s-boot-v2026-10-15"
 # Project that HOSTS the golden Batch VM image. Distinct from gcp_project_id (where the
 # job runs): the image is published centrally in anvil-and-terra-development and shared
 # with allAuthenticatedUsers (roles/compute.imageUser), so any project's Batch VMs can use
@@ -268,7 +268,7 @@ terra_api_url: ""
 # Pulsar Application Configuration
 pulsar_chart: cloudve/pulsar
 pulsar_chart_version: "0.2.0"
-pulsar_deps_version: "1.1.1"
+pulsar_deps_version: "1.2.0"
 pulsar_api_key: ""
 
 # Galaxy K8s Monitor Configuration

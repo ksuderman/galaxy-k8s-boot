@@ -28,6 +28,10 @@ The process will set up the following components on the image:
 - Configured for the following Galaxy's CVMFS data repositories:
   - data.galaxyproject.org
   - cloud.galaxyproject.org
+  - idc.galaxyproject.org
+
+Rebuild deployment and Batch worker images to inherit the updated CVMFS client
+configuration. Image preparation verifies access to all three repositories.
 
 ## Repo Files Structure
 

@@ -16,10 +16,10 @@ GALAXY_CHART="cloudve/galaxy"
 # bump it. Setting a value here (or via --galaxy-chart-version) overrides it.
 GALAXY_CHART_VERSION=""
 GALAXY_DEPS_CHART="cloudve/galaxy-deps"
-GALAXY_DEPS_VERSION="1.1.1"
+GALAXY_DEPS_VERSION="1.2.0"
 GIT_BRANCH="anvil"
 GIT_REPO="https://github.com/galaxyproject/galaxy-k8s-boot.git"
-MACHINE_IMAGE="galaxy-k8s-boot-v2026-06-30"
+MACHINE_IMAGE="galaxy-k8s-boot-v2026-10-15"
 MACHINE_TYPE="t2d-standard-4"
 PROJECT="anvil-and-terra-development"
 VM_USER="debian"
@@ -93,7 +93,7 @@ Examples:
   $0 -k "ssh-rsa AAAAB3..." my-galaxy-vm
 
   # Launch VM with specific machine image
-  $0 -k "ssh-rsa AAAAB3..." -i galaxy-k8s-boot-v2026-06-30 my-galaxy-vm
+  $0 -k "ssh-rsa AAAAB3..." -i galaxy-k8s-boot-v2026-10-15 my-galaxy-vm
 
   # Launch VM with specific disk names
   $0 -k "ssh-rsa AAAAB3..." -d galaxy-shared-disk --postgres-disk galaxy-postgres-disk my-galaxy-vm

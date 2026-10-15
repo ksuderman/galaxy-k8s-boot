@@ -125,7 +125,7 @@ configs:
         # Note: container_image comes from tool requirements via Galaxy's container finder
         galaxy_user_id: 10001
         galaxy_group_id: 10001
-        docker_extra_volumes: "/cvmfs/data.galaxyproject.org:/cvmfs/data.galaxyproject.org:ro,/cvmfs/cloud.galaxyproject.org:/cvmfs/cloud.galaxyproject.org:ro"
+        docker_extra_volumes: '{{ list (include "galaxy.refdata_container_volumes" .) "/cvmfs/cloud.galaxyproject.org:/cvmfs/cloud.galaxyproject.org:ro" | compact | join "," }}'
 
         # custom_vm_image (projects/<gcp_project_id>/global/images/<gcp_batch_vm_image>)
         # is injected by the playbook; update gcp_batch_vm_image to change the image.
