@@ -230,7 +230,7 @@
           type:
             - masthead
           activate: true
-          icon: fa-tachometer-alt
+          icon: fa-heartbeat
           tooltip: K8s Monitor
           function: >
             window.open(window.location.origin + '{{ monitor_base_path }}', '_blank');
