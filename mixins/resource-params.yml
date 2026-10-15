@@ -6,22 +6,22 @@ configs:
     resources:
       default: default
       groups:
-        default: [ processors, mem, time ]
+        default: [ processors, mem, time, gpus ]
 
 jobs:
   user_limits:
     cores: 16
+    gpus: 8
     mem: 64
     walltime: 168
 
 extraFileMappings:
   /galaxy/server/config/job_resource_params_conf.xml:
     applyToWeb: true
-    applyToJob: true
-    applyToWorkflow: true
     content: |
       <parameters>
         <param label="Processors" name="processors" type="integer" min="1" max="64" value="" help="Number of processing cores, 'ppn' value (1-64). Leave blank to use default value." />
+        <param label="GPUs" name="gpus" type="integer" min="0" max="8" value="" help="Number of GPUs, value (0-8). Leave blank to use default value." />
         <param label="Memory" name="mem" type="integer" min="1" max="1024" value="" help="Memory size in gigabytes, 'pmem' value (1-1024). Leave blank to use default value." />
         <param label="Wall Time" name="time" type="integer" min="1" max="168" value="" help="Maximum job time in hours, 'walltime' value (1-168). Leave blank to use default value." />
       </parameters>
