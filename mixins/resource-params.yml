@@ -8,13 +8,6 @@ configs:
       groups:
         default: [ processors, mem, time, gpus ]
 
-jobs:
-  user_limits:
-    cores: 16
-    gpus: 8
-    mem: 64
-    walltime: 168
-
 extraFileMappings:
   /galaxy/server/config/job_resource_params_conf.xml:
     applyToWeb: true
