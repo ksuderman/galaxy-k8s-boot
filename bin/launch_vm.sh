@@ -76,6 +76,7 @@ Options:
   -r, --git-repo REPO               Git repository URL (default: $GIT_REPO)
   -s, --disk-size SIZE              Size of NFS persistent disk (default: $DISK_SIZE)
   -z, --zone ZONE                   GCP zone (default: $ZONE)
+  --boot-disk-size SIZE             Size of VM boot disk (default: $BOOT_DISK_SIZE)
   --galaxy-chart CHART              Galaxy Helm chart location (default: $GALAXY_CHART)
   --galaxy-chart-version VERSION    Galaxy Helm chart version (default: role default)
   --galaxy-deps-chart CHART         Galaxy dependencies chart location (default: $GALAXY_DEPS_CHART)
@@ -199,6 +200,10 @@ while [[ $# -gt 0 ]]; do
             DISK_SIZE="$2"
             shift 2
             ;;
+        --boot-disk-size)
+            BOOT_DISK_SIZE="$2"
+            shift 2
+            ;;
         -u|--user)
             VM_USER="$2"
             shift 2
@@ -296,6 +301,7 @@ echo "Project: $PROJECT"
 echo "Zone: $ZONE"
 echo "Machine Type: $MACHINE_TYPE"
 echo "Machine Image: $MACHINE_IMAGE"
+echo "Boot Disk Size: $BOOT_DISK_SIZE"
 echo "Galaxy Chart Version: ${GALAXY_CHART_VERSION:-(role default)}"
 echo "Galaxy Deps Version: $GALAXY_DEPS_VERSION"
 echo "Galaxy Values Files: ${GALAXY_VALUES_FILES[@]}"
