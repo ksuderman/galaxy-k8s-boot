@@ -20,7 +20,7 @@ image:
   # Immutable per-build tag (galaxy-dev anvil-test-2026-09 @ a93ed58). The
   # rolling anvil-test-2026-09 tag bit us once: imagePullPolicy IfNotPresent
   # kept serving a stale build after the tag was overwritten.
-  tag: "anvil-test-2026-09-a93ed58"
+  tag: "anvil-test-2026-09-5c4b8c7"
 
 configs:
   galaxy.yml:
