@@ -37,6 +37,14 @@ GCP_PROJECT_ID=""
 # specific run via the GCP billing export's own labels field instead of
 # inferring it from a VM's creation-time window.
 LABELS=""
+# Extra Ansible variables for the playbook, from repeated --extra-var KEY=VALUE.
+# Each becomes one more key in the --extra-vars JSON handed to ansible-pull,
+# after the keys this script always sets, so a role default (e.g.
+# galaxy_job_max_cores, which the role injects into the Helm values on top of
+# every -f file) can be overridden at launch without editing the role.
+# enable_gcp_batch gets its own variable so it is never emitted twice.
+ENABLE_GCP_BATCH="true"
+EXTRA_VAR_JSON_ITEMS=""
 
 # Parse command line arguments
 DISK_NAME=""
@@ -73,7 +81,11 @@ Options:
                                     Empty -> auto-detected from the VM's metadata.
   --labels KEY=VALUE,...            GCE instance labels (gcloud --labels format).
                                     Empty by default - unlabeled unless a caller opts in.
-  -r, --git-repo REPO               Git repository URL (default: $GIT_REPO)
+  --extra-var KEY=VALUE             Extra Ansible variable for the playbook (repeatable).
+                                    true, false and integers are passed typed, anything
+                                    else as a string. Overrides role defaults such as
+                                    galaxy_job_max_cores or enable_gcp_batch.
+  -r, --git-repo REPO              Git repository URL (default: $GIT_REPO)
   -s, --disk-size SIZE              Size of NFS persistent disk (default: $DISK_SIZE)
   -z, --zone ZONE                   GCP zone (default: $ZONE)
   --boot-disk-size SIZE             Size of VM boot disk (default: $BOOT_DISK_SIZE)
@@ -129,6 +141,11 @@ Examples:
 
   # Launch VM with CI-tracking labels (for cost attribution via billing export)
   $0 -k "ssh-rsa AAAAB3..." --labels "managed-by=galaxy-tests-ci,github-run-id=123456789" my-galaxy-vm
+
+  # Keep every job on a large head node (see mixins/no-batch.yml): let k8s jobs
+  # have up to 16 cores / 64 GB instead of the role's 1 core / 4 GB
+  $0 -k "ssh-rsa AAAAB3..." -m n2-custom-40-163840 -f values/values.yml -f mixins/no-batch.yml \\
+     --extra-var galaxy_job_max_cores=16 --extra-var galaxy_job_max_mem=64 my-galaxy-vm
 
 EOF
 }
@@ -236,6 +253,39 @@ while [[ $# -gt 0 ]]; do
             LABELS="$2"
             shift 2
             ;;
+        --extra-var)
+            if [[ ! "$2" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+                echo "Error: --extra-var expects KEY=VALUE, got '$2'"
+                exit 1
+            fi
+            EXTRA_VAR_KEY="${BASH_REMATCH[1]}"
+            EXTRA_VAR_VALUE="${BASH_REMATCH[2]}"
+            # The value ends up in a double-quoted assignment inside the
+            # single-quoted `bash -c '...'` block of the generated user-data
+            # (see GALAXY_VALUES_FILES_JSON below), so only characters that
+            # are inert in both contexts are accepted: no quotes, no $, no
+            # backticks, no backslashes.
+            if [[ ! "$EXTRA_VAR_VALUE" =~ ^[A-Za-z0-9_./:@,+=-]*$ ]]; then
+                echo "Error: --extra-var $EXTRA_VAR_KEY: value may only contain letters, digits and _ . / : @ , + = -"
+                exit 1
+            fi
+            # Typed JSON for booleans and integers, quoted for everything else.
+            if [[ "$EXTRA_VAR_VALUE" =~ ^(true|false|-?[0-9]+)$ ]]; then
+                EXTRA_VAR_JSON="$EXTRA_VAR_VALUE"
+            else
+                EXTRA_VAR_JSON="\"$EXTRA_VAR_VALUE\""
+            fi
+            if [ "$EXTRA_VAR_KEY" = "enable_gcp_batch" ]; then
+                if [[ ! "$EXTRA_VAR_VALUE" =~ ^(true|false)$ ]]; then
+                    echo "Error: --extra-var enable_gcp_batch must be true or false"
+                    exit 1
+                fi
+                ENABLE_GCP_BATCH="$EXTRA_VAR_VALUE"
+            else
+                EXTRA_VAR_JSON_ITEMS="${EXTRA_VAR_JSON_ITEMS:+$EXTRA_VAR_JSON_ITEMS, }\"$EXTRA_VAR_KEY\": $EXTRA_VAR_JSON"
+            fi
+            shift 2
+            ;;
         -h|--help|help)
             usage
             exit 0
@@ -307,6 +357,8 @@ echo "Galaxy Deps Version: $GALAXY_DEPS_VERSION"
 echo "Galaxy Values Files: ${GALAXY_VALUES_FILES[@]}"
 echo "Git Repository: $GIT_REPO"
 echo "Git Branch: $GIT_BRANCH"
+echo "GCP Batch Runner (enable_gcp_batch): $ENABLE_GCP_BATCH"
+echo "Extra Ansible Vars: ${EXTRA_VAR_JSON_ITEMS:-(none)}"
 
 if [ "$RESTORE_GALAXY" = true ]; then
     echo "Galaxy Restore Mode: Auto-detect and restore"
@@ -404,6 +456,9 @@ fi
 # broke ansible-pull's arguments on every run.
 GALAXY_VALUES_FILES_JSON_ESCAPED=$(printf '%s' "$GALAXY_VALUES_FILES_JSON" | sed 's/"/\\"/g')
 GALAXY_IMPORT_PROFILE_JSON_ESCAPED=$(printf '%s' "$GALAXY_IMPORT_PROFILE_JSON" | sed 's/"/\\"/g')
+# Same treatment for the --extra-var items: a JSON object body without braces,
+# e.g. "galaxy_job_max_cores": 16, "galaxy_job_max_mem": 64
+EXTRA_VAR_JSON_ITEMS_ESCAPED=$(printf '%s' "$EXTRA_VAR_JSON_ITEMS" | sed 's/"/\\"/g')
 
 cat > "$TEMP_USER_DATA" << 'EOF'
 #cloud-config
@@ -496,6 +551,8 @@ cat >> "$TEMP_USER_DATA" << EOF
     RESTORE_GALAXY="${RESTORE_GALAXY}"
     REQUIRE_MOUNTED_STORAGE="${REQUIRE_MOUNTED_STORAGE}"
     GCP_PROJECT_ID="${GCP_PROJECT_ID}"
+    ENABLE_GCP_BATCH="${ENABLE_GCP_BATCH}"
+    EXTRA_VAR_JSON_ITEMS="${EXTRA_VAR_JSON_ITEMS_ESCAPED}"
 EOF
 
 cat >> "$TEMP_USER_DATA" << 'EOF'
@@ -530,7 +587,7 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     echo "[`date`] - Inventory file created at /tmp/ansible-inventory/localhost; running ansible-pull..."
 
     # Build the ansible-pull extra-vars, only overriding galaxy_import_profile when --profile was used.
-    EXTRA_VARS="{\"enable_gcp_batch\": true, \"galaxy_chart\": \"${GALAXY_CHART}\", \"galaxy_deps_chart\": \"${GALAXY_DEPS_CHART}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}"
+    EXTRA_VARS="{\"enable_gcp_batch\": ${ENABLE_GCP_BATCH}, \"galaxy_chart\": \"${GALAXY_CHART}\", \"galaxy_deps_chart\": \"${GALAXY_DEPS_CHART}\", \"galaxy_deps_version\": \"${GALAXY_DEPS_VERSION}\", \"galaxy_values_files\": ${GALAXY_VALUES_FILES_JSON}"
     # Only pass galaxy_chart_version when one was supplied; empty lets the
     # playbook fall through to the role default, so the version is pinned in
     # exactly one file and cannot drift out of step with it.
@@ -545,7 +602,13 @@ cat >> "$TEMP_USER_DATA" << 'EOF'
     if [ -n "${GCP_PROJECT_ID}" ]; then
         EXTRA_VARS="${EXTRA_VARS}, \"gcp_project_id\": \"${GCP_PROJECT_ID}\""
     fi
+    # Caller-supplied --extra-var KEY=VALUE pairs, last so they win over the
+    # keys above should one ever be repeated.
+    if [ -n "${EXTRA_VAR_JSON_ITEMS}" ]; then
+        EXTRA_VARS="${EXTRA_VARS}, ${EXTRA_VAR_JSON_ITEMS}"
+    fi
     EXTRA_VARS="${EXTRA_VARS}}"
+    echo "[`date`] - Ansible extra-vars: ${EXTRA_VARS}"
 
     ANSIBLE_CALLBACKS_ENABLED=profile_tasks ANSIBLE_HOST_PATTERN_MISMATCH=ignore ansible-pull -U ${GIT_REPO} -C ${GIT_BRANCH} -d /home/PLACEHOLDER_VM_USER/ansible -i /tmp/ansible-inventory/localhost --accept-host-key --limit 127.0.0.1 --extra-vars "${EXTRA_VARS}" playbook.yml
 

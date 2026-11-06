@@ -1,0 +1,58 @@
+# Keep every tool job on the head node: route nothing to GCP Batch.
+#
+# Written for galaxy-tests' "no Batch, big VM" experiment
+# (anvil-test-no-batch.yaml): the same deployment as the nightly run, with the
+# gcp_batch TPV destination made abstract so the scheduler never picks it and
+# the k8s destination allowed to accept the multi-core tools that would
+# otherwise have gone to Batch. The gcp_batch runner still loads and the NFS
+# export is still patched (enable_gcp_batch stays true), so the only
+# difference from a nightly deployment is where the jobs execute, which is
+# what the experiment measures.
+#
+# Two limits have to be raised, in two different places:
+#
+#   * max_accepted_cores / max_accepted_mem (here). TPV skips a destination
+#     whose accepted maximum is below what the tool asks for; values.yml sets
+#     1 core / 4 GB on k8s precisely so that multi-core tools fall through to
+#     gcp_batch. With gcp_batch abstract, a tool above the k8s limit would
+#     have no destination at all and fail at dispatch.
+#
+#   * max_cores / max_mem, the clamp on what a job actually gets. The role
+#     injects these from the Ansible variables galaxy_job_max_cores (1) and
+#     galaxy_job_max_mem (4) on top of every values file, so no values file
+#     can change them. Pass them at launch instead, sized to the head node
+#     with a few cores left for the control plane and Galaxy's own pods:
+#
+#       bin/launch_vm.sh ... -f values/values.yml -f mixins/no-batch.yml \
+#         -m n2-custom-40-163840 \
+#         --extra-var galaxy_job_max_cores=16 --extra-var galaxy_job_max_mem=64
+#
+# Pass this file after values/values.yml (and after ci-concurrency.yml, which
+# does not touch any of these keys).
+configs:
+  job_conf.yml:
+    runners:
+      # The chart leaves the k8s runner at Galaxy's default of 4 worker
+      # threads, which both submit job pods and collect finished jobs'
+      # outputs. With every tool job on this runner instead of ~60 of them
+      # on gcp_batch, give it the handler-side concurrency ci-concurrency.yml
+      # gives gcp_batch, so the runner itself is not the gate being measured.
+      k8s:
+        workers: 60
+
+jobs:
+  rules:
+    tpv_rules_local.yml:
+      destinations:
+        gcp_batch:
+          # Never a scheduling target. Kept rather than removed because Helm
+          # merges maps across -f files, so a later values file cannot delete
+          # a destination an earlier one defines.
+          abstract: true
+        k8s:
+          # Accept anything; the galaxy_job_max_* clamp (see above) decides
+          # what a job actually gets. Memory requests and limits still follow
+          # the clamped {mem} (chart default requests_memory/limits_memory),
+          # so the node's memory, not these numbers, bounds concurrency.
+          max_accepted_cores: 64
+          max_accepted_mem: 512
