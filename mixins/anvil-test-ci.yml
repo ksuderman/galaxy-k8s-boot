@@ -1,0 +1,39 @@
+# CI capacity for the warm-pool test image, for galaxy-tests'
+# anvil-test-warm-pool.yaml. Pass it after mixins/anvil-test.yml.
+#
+# mixins/ci-concurrency.yml on this branch cannot be combined with
+# mixins/anvil-test.yml: it pins the image to galaxy-min:26.1-auto-0915 and
+# mounts a copy of that image's local.py over the job pods, either of which
+# would replace the anvil-test image and the pooled runner it carries. This
+# file is the capacity half of that mixin on its own: the runner worker
+# counts, the DB pool with the matching Postgres max_connections, and the job
+# handler memory limit. See ci-concurrency.yml for the reasoning behind each
+# number; they are unchanged here.
+configs:
+  job_conf.yml:
+    runners:
+      gcp_batch:
+        workers: 60
+      local:
+        workers: 12
+  galaxy.yml:
+    galaxy:
+      # Raise both together or neither; see ci-concurrency.yml.
+      database_engine_option_pool_size: 20
+      database_engine_option_max_overflow: 60
+
+# Local-runner jobs execute inside the job handler pod; 12 workers need more
+# than the chart's 7G ceiling.
+jobHandlers:
+  resources:
+    limits:
+      memory: 12G
+
+# Two 80-connection pools (galaxy-web and the job handler) have to fit inside
+# max_connections; CNPG's default of 100 does not.
+postgresql:
+  operator:
+    operatorSpecExtra:
+      postgresql:
+        parameters:
+          max_connections: "200"
