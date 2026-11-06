@@ -54,5 +54,5 @@ jobs:
           # what a job actually gets. Memory requests and limits still follow
           # the clamped {mem} (chart default requests_memory/limits_memory),
           # so the node's memory, not these numbers, bounds concurrency.
-          max_accepted_cores: 64
-          max_accepted_mem: 512
+          max_accepted_cores: 32
+          max_accepted_mem: 128
