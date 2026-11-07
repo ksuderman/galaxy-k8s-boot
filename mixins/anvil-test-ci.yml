@@ -37,3 +37,16 @@ postgresql:
       postgresql:
         parameters:
           max_connections: "200"
+
+# Cap on the CPU a Batch job is given, matching the job-max-cores default of
+# galaxy-tests' anvil-test-no-batch.yaml so the warm-pool and no-Batch
+# experiments hand a tool the same CPU budget. Only the CPU destination:
+# gcp_batch_gpu (mixins/anvil-test.yml) keeps the 32 cores that select the
+# g2-standard-32 shape. The runner still picks the smallest N2 shape with at
+# least the clamped cores, so a 24-core job lands on a 32-vCPU VM.
+jobs:
+  rules:
+    tpv_rules_local.yml:
+      destinations:
+        gcp_batch:
+          max_cores: 24
