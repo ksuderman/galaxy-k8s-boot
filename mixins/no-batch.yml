@@ -56,3 +56,13 @@ jobs:
           # so the node's memory, not these numbers, bounds concurrency.
           max_accepted_cores: 32
           max_accepted_mem: 128
+          params:
+            # values.yml requests a quarter core per job core so several
+            # small jobs fit on the nightly's single spare CPU, and the
+            # Kubernetes runner sets GALAXY_SLOTS from that request, so an
+            # 8-core tool ran with 2 threads here (bwa_mem, bowtie2, hisat2,
+            # minimap2: 2 instead of 8; STAR and freebayes: 3 instead of
+            # 10). On this node every tool is a Kubernetes job, so request
+            # the full core count: the tool gets the threads TPV assigned
+            # and the node's cores bound how many jobs run at once.
+            requests_cpu: "{cores}"
